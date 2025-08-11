@@ -9,6 +9,7 @@ import { ProjectTabs } from './project-tabs'
 import { ColorPalette } from './color-palette'
 import { FrameManager } from './frame-manager'
 import { ProjectPanel } from './project-panel'
+import { AppHeader } from './app-header'
 import toast from 'react-hot-toast'
 
 interface PixelEditorProps {
@@ -54,7 +55,10 @@ export function PixelEditor({ className }: PixelEditorProps) {
 
   return (
     <div className={cn('flex h-screen flex-col bg-gray-50', className)}>
-      {/* Header with project tabs */}
+      {/* App Header */}
+      <AppHeader />
+      
+      {/* Project tabs */}
       <div className="flex-shrink-0 border-b border-gray-200 bg-white">
         <ProjectTabs />
       </div>

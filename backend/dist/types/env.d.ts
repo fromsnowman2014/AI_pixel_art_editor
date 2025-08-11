@@ -25,6 +25,9 @@ export declare const envSchema: z.ZodObject<{
     RATE_LIMIT_AI_REQUESTS_PER_HOUR: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
     RATE_LIMIT_GLOBAL_BURST: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
     RATE_LIMIT_WINDOW_MS: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
+    ANONYMOUS_AI_CALLS_PER_HOUR: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
+    AUTHENTICATED_AI_CALLS_PER_HOUR: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
+    API_TEST_TOKEN: z.ZodDefault<z.ZodString>;
     AI_MAX_IMAGE_SIZE: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
     AI_DEFAULT_COLOR_COUNT: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
     AI_GENERATION_TIMEOUT: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
@@ -53,6 +56,9 @@ export declare const envSchema: z.ZodObject<{
     RATE_LIMIT_AI_REQUESTS_PER_HOUR: number;
     RATE_LIMIT_GLOBAL_BURST: number;
     RATE_LIMIT_WINDOW_MS: number;
+    ANONYMOUS_AI_CALLS_PER_HOUR: number;
+    AUTHENTICATED_AI_CALLS_PER_HOUR: number;
+    API_TEST_TOKEN: string;
     AI_MAX_IMAGE_SIZE: number;
     AI_DEFAULT_COLOR_COUNT: number;
     AI_GENERATION_TIMEOUT: number;
@@ -103,6 +109,9 @@ export declare const envSchema: z.ZodObject<{
     RATE_LIMIT_AI_REQUESTS_PER_HOUR?: string | undefined;
     RATE_LIMIT_GLOBAL_BURST?: string | undefined;
     RATE_LIMIT_WINDOW_MS?: string | undefined;
+    ANONYMOUS_AI_CALLS_PER_HOUR?: string | undefined;
+    AUTHENTICATED_AI_CALLS_PER_HOUR?: string | undefined;
+    API_TEST_TOKEN?: string | undefined;
     AI_MAX_IMAGE_SIZE?: string | undefined;
     AI_DEFAULT_COLOR_COUNT?: string | undefined;
     AI_GENERATION_TIMEOUT?: string | undefined;
@@ -134,6 +143,9 @@ export declare const env: {
     RATE_LIMIT_AI_REQUESTS_PER_HOUR: number;
     RATE_LIMIT_GLOBAL_BURST: number;
     RATE_LIMIT_WINDOW_MS: number;
+    ANONYMOUS_AI_CALLS_PER_HOUR: number;
+    AUTHENTICATED_AI_CALLS_PER_HOUR: number;
+    API_TEST_TOKEN: string;
     AI_MAX_IMAGE_SIZE: number;
     AI_DEFAULT_COLOR_COUNT: number;
     AI_GENERATION_TIMEOUT: number;

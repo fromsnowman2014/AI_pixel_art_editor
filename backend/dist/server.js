@@ -14,10 +14,12 @@ const logger_1 = require("./utils/logger");
 const connection_1 = require("./db/connection");
 const rateLimit_1 = require("./services/rateLimit");
 const rateLimit_2 = require("./middleware/rateLimit");
+const auth_1 = require("./middleware/auth");
 // Import route handlers
 const ai_1 = require("./routes/ai");
 const projects_1 = require("./routes/projects");
 const frames_1 = require("./routes/frames");
+const export_1 = require("./routes/export");
 const fastify = (0, fastify_1.default)({
     logger: {
         level: env_1.env.LOG_LEVEL,
@@ -49,6 +51,8 @@ async function buildServer() {
                 files: 5,
             },
         });
+        // Register auth plugin
+        await fastify.register(auth_1.authPlugin);
         // Register custom rate limiting middleware
         await fastify.register(rateLimit_2.aiGenerationRateLimit);
         await fastify.register(rateLimit_2.apiRateLimit);
@@ -58,12 +62,7 @@ async function buildServer() {
             max: env_1.env.RATE_LIMIT_GLOBAL_BURST,
             timeWindow: env_1.env.RATE_LIMIT_WINDOW_MS,
         });
-        // Authentication decorator (placeholder)
-        fastify.decorate('authenticate', async (request, reply) => {
-            // Implement authentication logic here
-            request.user = { id: 'anonymous' };
-            return;
-        });
+        // Auth decorators are registered by the authPlugin
         // Health check endpoint
         fastify.get('/health', async () => {
             const [dbHealth, redisHealth] = await Promise.all([
@@ -97,6 +96,7 @@ async function buildServer() {
         await fastify.register(ai_1.aiRoutes, { prefix: '/api/ai' });
         await fastify.register(projects_1.projectRoutes, { prefix: '/api/projects' });
         await fastify.register(frames_1.frameRoutes, { prefix: '/api/frames' });
+        await fastify.register(export_1.exportRoutes, { prefix: '/api/export' });
         // Global error handler
         fastify.setErrorHandler(async (error, request, reply) => {
             logger_1.logger.error('Unhandled error', {

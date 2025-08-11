@@ -36,6 +36,11 @@ exports.envSchema = zod_1.z.object({
     RATE_LIMIT_AI_REQUESTS_PER_HOUR: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1)).default('60'),
     RATE_LIMIT_GLOBAL_BURST: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1)).default('1000'),
     RATE_LIMIT_WINDOW_MS: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1000)).default('3600000'),
+    // Anonymous User Limits (COPPA compliance)
+    ANONYMOUS_AI_CALLS_PER_HOUR: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1)).default('10'),
+    AUTHENTICATED_AI_CALLS_PER_HOUR: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1)).default('60'),
+    // Development/Testing
+    API_TEST_TOKEN: zod_1.z.string().default('dev-test-token-123'),
     // Image Processing
     AI_MAX_IMAGE_SIZE: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(16).max(2048)).default('512'),
     AI_DEFAULT_COLOR_COUNT: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(2).max(256)).default('24'),
@@ -47,7 +52,7 @@ exports.envSchema = zod_1.z.object({
     ENABLE_GIF_EXPORT: zod_1.z.string().transform(val => val === 'true').default('true'),
     ENABLE_ANALYTICS: zod_1.z.string().transform(val => val === 'true').default('false'),
     // CORS Configuration
-    CORS_ORIGIN: zod_1.z.string().default('http://localhost:3000'),
+    CORS_ORIGIN: zod_1.z.string().default('http://localhost:3000,http://localhost:3001,https://vercel.app'),
     // Logging
     LOG_LEVEL: zod_1.z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
     LOG_FILE: zod_1.z.string().optional(),

@@ -9,11 +9,14 @@ import { logger } from './utils/logger';
 import { db, checkDatabaseHealth, closeDatabaseConnection } from './db/connection';
 import { rateLimitService } from './services/rateLimit';
 import { aiGenerationRateLimit, apiRateLimit, burstProtection } from './middleware/rateLimit';
+import { authPlugin } from './middleware/auth';
 
 // Import route handlers
 import { aiRoutes } from './routes/ai';
 import { projectRoutes } from './routes/projects';
 import { frameRoutes } from './routes/frames';
+import { exportRoutes } from './routes/export';
+import { uploadRoutes } from './routes/upload';
 
 const fastify = Fastify({
   logger: {
@@ -50,6 +53,9 @@ async function buildServer() {
       },
     });
 
+    // Register auth plugin
+    await fastify.register(authPlugin);
+
     // Register custom rate limiting middleware
     await fastify.register(aiGenerationRateLimit);
     await fastify.register(apiRateLimit);
@@ -62,12 +68,7 @@ async function buildServer() {
     });
 
 
-    // Authentication decorator (placeholder)
-    fastify.decorate('authenticate', async (request: any, reply: any) => {
-      // Implement authentication logic here
-      request.user = { id: 'anonymous' };
-      return;
-    });
+    // Auth decorators are registered by the authPlugin
 
     // Health check endpoint
     fastify.get('/health', async () => {
@@ -105,6 +106,8 @@ async function buildServer() {
     await fastify.register(aiRoutes, { prefix: '/api/ai' });
     await fastify.register(projectRoutes, { prefix: '/api/projects' });
     await fastify.register(frameRoutes, { prefix: '/api/frames' });
+    await fastify.register(exportRoutes, { prefix: '/api/export' });
+    await fastify.register(uploadRoutes, { prefix: '/api/upload' });
 
     // Global error handler
     fastify.setErrorHandler(async (error, request, reply) => {

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 export const envSchema = z.object({
   // Server Configuration
@@ -7,18 +11,18 @@ export const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
 
   // OpenAI API Configuration
-  OPENAI_API_KEY: z.string().min(1),
+  OPENAI_API_KEY: z.string().min(1).optional(), // Optional for development
   OPENAI_MODEL: z.string().default('dall-e-3'),
   OPENAI_MAX_RETRIES: z.string().transform(Number).pipe(z.number().min(1).max(10)).default('3'),
   OPENAI_TIMEOUT: z.string().transform(Number).pipe(z.number().min(1000)).default('30000'),
 
   // Database Configuration
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.string().min(1), // Allow any string for SQLite
   POSTGRES_PRISMA_URL: z.string().url().optional(),
   POSTGRES_URL_NON_POOLING: z.string().url().optional(),
 
   // Redis Configuration
-  REDIS_URL: z.string().url(),
+  REDIS_URL: z.string().min(1), // Allow any string for local Redis
 
   // Storage Configuration (Optional - either R2 or Supabase)
   R2_ACCOUNT_ID: z.string().optional(),
@@ -33,13 +37,20 @@ export const envSchema = z.object({
   SUPABASE_BUCKET_NAME: z.string().optional(),
 
   // JWT Configuration
-  JWT_SECRET: z.string().min(32),
+  JWT_SECRET: z.string().min(8), // Relaxed for development
   JWT_EXPIRES_IN: z.string().default('7d'),
 
   // Rate Limiting
   RATE_LIMIT_AI_REQUESTS_PER_HOUR: z.string().transform(Number).pipe(z.number().min(1)).default('60'),
   RATE_LIMIT_GLOBAL_BURST: z.string().transform(Number).pipe(z.number().min(1)).default('1000'),
   RATE_LIMIT_WINDOW_MS: z.string().transform(Number).pipe(z.number().min(1000)).default('3600000'),
+  
+  // Anonymous User Limits (COPPA compliance)
+  ANONYMOUS_AI_CALLS_PER_HOUR: z.string().transform(Number).pipe(z.number().min(1)).default('10'),
+  AUTHENTICATED_AI_CALLS_PER_HOUR: z.string().transform(Number).pipe(z.number().min(1)).default('60'),
+  
+  // Development/Testing
+  API_TEST_TOKEN: z.string().default('dev-test-token-123'),
 
   // Image Processing
   AI_MAX_IMAGE_SIZE: z.string().transform(Number).pipe(z.number().min(16).max(2048)).default('512'),
@@ -54,7 +65,7 @@ export const envSchema = z.object({
   ENABLE_ANALYTICS: z.string().transform(val => val === 'true').default('false'),
 
   // CORS Configuration
-  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_ORIGIN: z.string().default('http://localhost:3000,http://localhost:3001,https://vercel.app'),
 
   // Logging
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),

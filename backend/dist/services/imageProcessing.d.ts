@@ -22,6 +22,17 @@ export interface ProcessedImage {
     sizeBytes: number;
     processingTimeMs: number;
 }
+export interface GifFrame {
+    buffer: Buffer;
+    delay: number;
+}
+export interface GifOptions {
+    frames: GifFrame[];
+    loop: boolean;
+    quality?: 'low' | 'medium' | 'high';
+    width?: number;
+    height?: number;
+}
 export declare class ImageProcessingService {
     /**
      * Process AI-generated image for pixel art: quantize + resize
@@ -60,6 +71,10 @@ export declare class ImageProcessingService {
      * Extract palette from existing image
      */
     extractPalette(inputBuffer: Buffer, maxColors?: number): Promise<RGBColor[]>;
+    /**
+     * Create animated GIF from multiple frames
+     */
+    createAnimatedGif(options: GifOptions): Promise<Buffer>;
 }
 export declare const imageProcessingService: ImageProcessingService;
 //# sourceMappingURL=imageProcessing.d.ts.map

@@ -5,6 +5,7 @@ import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import type { Project, Frame, PixelData, CanvasState, HistoryEntry } from '@/lib/types/api'
 import { generatePalette, DEFAULT_PALETTE } from '@/lib/utils'
+import { useAuthStore } from './auth-store'
 
 interface ProjectTab {
   id: string
@@ -72,8 +73,9 @@ const createDefaultProject = (options?: {
   width?: number
   height?: number
   colorLimit?: number
+  userId?: string | null
 }): Omit<Project, 'id' | 'createdAt' | 'updatedAt'> => ({
-  userId: null,
+  userId: options?.userId || null,
   name: 'New Project',
   width: options?.width || 32,
   height: options?.height || 32,
@@ -124,9 +126,13 @@ export const useProjectStore = create<ProjectStore>()(
             const projectId = `project-${Date.now()}`
             const frameId = `frame-${Date.now()}`
             
+            // Get current user from auth store
+            const authState = useAuthStore.getState()
+            const userId = authState.user?.type === 'authenticated' ? authState.user.id : null
+            
             const project: Project = {
               id: projectId,
-              ...createDefaultProject(options),
+              ...createDefaultProject({ ...options, userId }),
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               activeFrameId: frameId,

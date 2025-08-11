@@ -78,6 +78,49 @@ export class StorageService {
     return `${env.SUPABASE_URL}/storage/v1/object/public/${env.SUPABASE_BUCKET_NAME}/${filename}`;
   }
 
+  /**
+   * Upload file to storage (generic method)
+   */
+  async upload(
+    filename: string,
+    buffer: Buffer,
+    mimeType: string,
+    folder?: string
+  ): Promise<string> {
+    return this.uploadImage(buffer, filename, mimeType, folder);
+  }
+
+  /**
+   * Download file from storage by URL
+   */
+  async download(url: string): Promise<Buffer> {
+    logger.info('Downloading file from storage', { url });
+
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      logger.info('File downloaded successfully', {
+        url,
+        sizeBytes: buffer.length,
+      });
+
+      return buffer;
+    } catch (error) {
+      logger.error('File download failed', {
+        url,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
       // Simple health check - just verify configuration
