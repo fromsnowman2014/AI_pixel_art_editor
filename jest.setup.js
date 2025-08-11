@@ -5,9 +5,17 @@ const mockCanvas = {
   getContext: jest.fn(() => ({
     fillRect: jest.fn(),
     clearRect: jest.fn(),
-    getImageData: jest.fn(() => ({ data: new Uint8ClampedArray(4) })),
+    getImageData: jest.fn((x, y, w, h) => ({ 
+      data: new Uint8ClampedArray(w * h * 4),
+      width: w,
+      height: h
+    })),
     putImageData: jest.fn(),
-    createImageData: jest.fn(() => ({ data: new Uint8ClampedArray(4) })),
+    createImageData: jest.fn((w, h) => ({ 
+      data: new Uint8ClampedArray(w * h * 4),
+      width: w,
+      height: h
+    })),
     setTransform: jest.fn(),
     drawImage: jest.fn(),
     save: jest.fn(),
@@ -23,6 +31,10 @@ const mockCanvas = {
     scale: jest.fn(),
     translate: jest.fn(),
     rotate: jest.fn(),
+    imageSmoothingEnabled: false,
+    webkitImageSmoothingEnabled: false,
+    mozImageSmoothingEnabled: false,
+    msImageSmoothingEnabled: false,
   })),
   toDataURL: jest.fn(() => 'data:image/png;base64,mock'),
   width: 100,
@@ -61,6 +73,23 @@ const mockIDB = {
 }
 
 global.indexedDB = mockIDB
+
+// Mock ImageData constructor
+global.ImageData = class ImageData {
+  constructor(dataOrWidth, heightOrWidth, height) {
+    if (typeof dataOrWidth === 'number') {
+      // ImageData(width, height)
+      this.width = dataOrWidth
+      this.height = heightOrWidth
+      this.data = new Uint8ClampedArray(dataOrWidth * heightOrWidth * 4)
+    } else {
+      // ImageData(data, width, height?)
+      this.data = dataOrWidth
+      this.width = heightOrWidth
+      this.height = height || (dataOrWidth.length / (heightOrWidth * 4))
+    }
+  }
+}
 
 // Mock environment variables
 process.env = {

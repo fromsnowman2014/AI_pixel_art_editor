@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Functionality Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #canvas {
+            border: 2px solid #ccc;
+            cursor: crosshair;
+        }
+        .test-controls {
+            margin: 20px 0;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>PixelBuddy Canvas Functionality Test</h1>
+    
+    <div class="test-controls">
+        <button onclick="testCanvasCreation()">Test Canvas Creation</button>
+        <button onclick="testDrawing()">Test Drawing</button>
+        <button onclick="testPixelManipulation()">Test Pixel Data</button>
+        <button onclick="testImageData()">Test ImageData Operations</button>
+        <button onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+
+    <div id="status" class="status">Click a test button to start...</div>
+
+    <canvas id="canvas" width="320" height="320"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+
+        // Pixel art settings
+        const PIXEL_SIZE = 10; // 10x10 pixels for each "pixel"
+        const GRID_WIDTH = 32;
+        const GRID_HEIGHT = 32;
+
+        let pixelData = new Uint8ClampedArray(GRID_WIDTH * GRID_HEIGHT * 4);
+        let currentTool = 'pencil';
+        let currentColor = { r: 255, g: 0, b: 0 }; // Red
+
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function testCanvasCreation() {
+            try {
+                // Test canvas context
+                if (!ctx) {
+                    throw new Error('Cannot get 2D context');
+                }
+                
+                // Test pixel art settings
+                ctx.imageSmoothingEnabled = false;
+                
+                // Initialize with white background
+                for (let i = 0; i < pixelData.length; i += 4) {
+                    pixelData[i] = 255;     // R
+                    pixelData[i + 1] = 255; // G
+                    pixelData[i + 2] = 255; // B
+                    pixelData[i + 3] = 255; // A
+                }
+                
+                renderCanvas();
+                updateStatus('✓ Canvas creation test passed', 'success');
+            } catch (error) {
+                updateStatus(`✗ Canvas creation failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testDrawing() {
+            try {
+                // Test drawing a red square in the middle
+                const centerX = Math.floor(GRID_WIDTH / 2);
+                const centerY = Math.floor(GRID_HEIGHT / 2);
+                
+                drawPixel(centerX, centerY);
+                drawPixel(centerX + 1, centerY);
+                drawPixel(centerX, centerY + 1);
+                drawPixel(centerX + 1, centerY + 1);
+                
+                renderCanvas();
+                updateStatus('✓ Drawing test passed - drew red square in center', 'success');
+            } catch (error) {
+                updateStatus(`✗ Drawing test failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testPixelManipulation() {
+            try {
+                // Test setting individual pixels
+                const testPixels = [
+                    { x: 5, y: 5, color: { r: 255, g: 0, b: 0 } }, // Red
+                    { x: 10, y: 5, color: { r: 0, g: 255, b: 0 } }, // Green  
+                    { x: 15, y: 5, color: { r: 0, g: 0, b: 255 } }, // Blue
+                ];
+
+                testPixels.forEach(({ x, y, color }) => {
+                    setPixelColor(x, y, color);
+                });
+
+                renderCanvas();
+                updateStatus('✓ Pixel manipulation test passed - drew RGB pixels', 'success');
+            } catch (error) {
+                updateStatus(`✗ Pixel manipulation failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testImageData() {
+            try {
+                // Create ImageData from our pixel array
+                const imageData = new ImageData(pixelData, GRID_WIDTH, GRID_HEIGHT);
+                
+                // Create a temporary canvas for testing
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = GRID_WIDTH;
+                tempCanvas.height = GRID_HEIGHT;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                if (!tempCtx) {
+                    throw new Error('Cannot create temporary context');
+                }
+                
+                tempCtx.imageSmoothingEnabled = false;
+                tempCtx.putImageData(imageData, 0, 0);
+                
+                // Draw scaled version to main canvas
+                ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+                
+                updateStatus('✓ ImageData test passed - rendered scaled pixel data', 'success');
+            } catch (error) {
+                updateStatus(`✗ ImageData test failed: ${error.message}`, 'error');
+            }
+        }
+
+        function drawPixel(x, y) {
+            if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return;
+            
+            const index = (y * GRID_WIDTH + x) * 4;
+            pixelData[index] = currentColor.r;
+            pixelData[index + 1] = currentColor.g;
+            pixelData[index + 2] = currentColor.b;
+            pixelData[index + 3] = 255; // Alpha
+        }
+
+        function setPixelColor(x, y, color) {
+            if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return;
+            
+            const index = (y * GRID_WIDTH + x) * 4;
+            pixelData[index] = color.r;
+            pixelData[index + 1] = color.g;
+            pixelData[index + 2] = color.b;
+            pixelData[index + 3] = 255; // Alpha
+        }
+
+        function renderCanvas() {
+            // Create ImageData and render to canvas
+            const imageData = new ImageData(pixelData, GRID_WIDTH, GRID_HEIGHT);
+            
+            // Create temporary canvas for nearest-neighbor scaling
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = GRID_WIDTH;
+            tempCanvas.height = GRID_HEIGHT;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (!tempCtx) return;
+            
+            tempCtx.imageSmoothingEnabled = false;
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Clear main canvas and draw scaled pixel art
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1;
+            
+            for (let x = 0; x <= GRID_WIDTH; x++) {
+                ctx.beginPath();
+                ctx.moveTo(x * PIXEL_SIZE, 0);
+                ctx.lineTo(x * PIXEL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = 0; y <= GRID_HEIGHT; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, y * PIXEL_SIZE);
+                ctx.lineTo(canvas.width, y * PIXEL_SIZE);
+                ctx.stroke();
+            }
+        }
+
+        function clearCanvas() {
+            // Reset pixel data to white
+            for (let i = 0; i < pixelData.length; i += 4) {
+                pixelData[i] = 255;     // R
+                pixelData[i + 1] = 255; // G
+                pixelData[i + 2] = 255; // B
+                pixelData[i + 3] = 255; // A
+            }
+            renderCanvas();
+            updateStatus('Canvas cleared', 'info');
+        }
+
+        // Mouse interaction for testing
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
+            
+            drawPixel(x, y);
+            renderCanvas();
+            updateStatus(`Drew pixel at (${x}, ${y})`, 'success');
+        });
+
+        // Initialize canvas
+        testCanvasCreation();
+    </script>
+</body>
+</html>
