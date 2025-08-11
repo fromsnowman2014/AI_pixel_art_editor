@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   
   // Image optimization for pixel art
   images: {
@@ -17,10 +14,7 @@ const nextConfig = {
       },
     ],
     // Disable image optimization for pixel art to maintain quality
-    unoptimized: false,
-    // Custom loader for pixel art
-    loader: 'custom',
-    loaderFile: './src/lib/image-loader.ts',
+    unoptimized: true,
   },
 
   // Canvas and WebAssembly support
@@ -135,7 +129,6 @@ const nextConfig = {
 
   // Experimental features for better performance
   experimental: {
-    optimizeCss: true,
     optimizePackageImports: ['zustand', 'clsx'],
   },
 };

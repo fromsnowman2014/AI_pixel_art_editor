@@ -1,0 +1,173 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+:root {
+  --font-inter: Inter, system-ui, sans-serif;
+}
+
+/* Reset and base styles for pixel art */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--font-inter);
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+}
+
+/* Pixel-perfect rendering for canvas */
+.pixel-canvas {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Kid-friendly focus styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-4 focus:ring-blue-300 focus:ring-opacity-50;
+}
+
+/* Large touch targets for accessibility */
+.touch-target {
+  @apply min-w-11 min-h-11 p-2;
+}
+
+/* Custom scrollbar for better UX */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animation classes */
+.animate-draw {
+  animation: draw 0.3s ease-in-out;
+}
+
+@keyframes draw {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 0.5s ease-in-out;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Loading spinner */
+.spinner {
+  border: 2px solid #f3f4f6;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Tooltip styles */
+.tooltip {
+  @apply absolute z-50 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded shadow-lg pointer-events-none;
+  transform: translateX(-50%) translateY(-100%);
+  margin-top: -8px;
+}
+
+/* High contrast mode for accessibility */
+@media (prefers-contrast: high) {
+  .high-contrast {
+    filter: contrast(1.2);
+  }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Color palette preview */
+.color-swatch {
+  @apply w-8 h-8 rounded-md border-2 border-gray-300 cursor-pointer transition-all;
+}
+
+.color-swatch:hover {
+  @apply border-gray-400 scale-110;
+}
+
+.color-swatch.active {
+  @apply border-blue-500 ring-2 ring-blue-200;
+}
+
+/* Canvas container */
+.canvas-container {
+  @apply relative overflow-hidden rounded-lg border-2 border-gray-300 bg-white;
+  background-image: 
+    linear-gradient(45deg, #f8f9fa 25%, transparent 25%),
+    linear-gradient(-45deg, #f8f9fa 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f8f9fa 75%),
+    linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+/* Frame thumbnail styles */
+.frame-thumbnail {
+  @apply relative w-16 h-16 rounded border-2 border-gray-300 bg-white cursor-pointer transition-all;
+  image-rendering: pixelated;
+}
+
+.frame-thumbnail:hover {
+  @apply border-blue-400;
+}
+
+.frame-thumbnail.active {
+  @apply border-blue-500 ring-2 ring-blue-200;
+}
+
+.frame-thumbnail.dragging {
+  @apply opacity-50 rotate-3;
+}

@@ -1,0 +1,560 @@
+'use client'
+
+import { create } from 'zustand'
+import { devtools, persist } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
+import type { Project, Frame, PixelData, CanvasState, HistoryEntry } from '@/lib/types/api'
+import { generatePalette, DEFAULT_PALETTE } from '@/lib/utils'
+
+interface ProjectTab {
+  id: string
+  project: Project
+  currentFrame: Frame | null
+  frames: Frame[]
+  canvasData: PixelData | null
+  canvasState: CanvasState
+  history: HistoryEntry[]
+  historyIndex: number
+  isDirty: boolean
+}
+
+interface ProjectStore {
+  // Current state
+  tabs: ProjectTab[]
+  activeTabId: string | null
+  isLoading: boolean
+  error: string | null
+
+  // Actions
+  initializeApp: () => void
+  createNewProject: (options?: { width?: number; height?: number; colorLimit?: number }) => void
+  openProject: (project: Project) => void
+  closeTab: (tabId: string) => void
+  setActiveTab: (tabId: string) => void
+  duplicateTab: (tabId: string) => void
+
+  // Canvas operations
+  updateCanvasData: (tabId: string, data: PixelData) => void
+  updateCanvasState: (tabId: string, state: Partial<CanvasState>) => void
+  undo: (tabId: string) => void
+  redo: (tabId: string) => void
+  addHistoryEntry: (tabId: string, action: string, data: PixelData) => void
+
+  // Project operations
+  updateProject: (tabId: string, updates: Partial<Project>) => void
+  saveProject: (tabId: string) => Promise<void>
+  exportProject: (tabId: string, format: 'png' | 'gif' | 'jpg') => Promise<void>
+
+  // Frame operations
+  addFrame: (tabId: string) => void
+  deleteFrame: (tabId: string, frameId: string) => void
+  duplicateFrame: (tabId: string, frameId: string) => void
+  setActiveFrame: (tabId: string, frameId: string) => void
+  reorderFrames: (tabId: string, frameIds: string[]) => void
+
+  // Utility functions
+  getActiveTab: () => ProjectTab | null
+  getTab: (tabId: string) => ProjectTab | null
+  markTabDirty: (tabId: string) => void
+  clearError: () => void
+}
+
+const createDefaultCanvasState = (): CanvasState => ({
+  tool: 'pencil',
+  color: '#000000',
+  brushSize: 1,
+  zoom: 8, // 8x zoom for pixel art
+  panX: 0,
+  panY: 0,
+})
+
+const createDefaultProject = (options?: {
+  width?: number
+  height?: number
+  colorLimit?: number
+}): Omit<Project, 'id' | 'createdAt' | 'updatedAt'> => ({
+  userId: null,
+  name: 'New Project',
+  width: options?.width || 32,
+  height: options?.height || 32,
+  colorLimit: options?.colorLimit || 24,
+  palette: generatePalette(options?.colorLimit || 24),
+  mode: 'beginner',
+  frames: [],
+  activeFrameId: null,
+})
+
+const createDefaultFrame = (): Omit<Frame, 'id' | 'createdAt' | 'updatedAt'> => ({
+  projectId: '',
+  index: 0,
+  delayMs: 500,
+  included: true,
+  layers: [],
+  flattenedPngUrl: null,
+})
+
+const createEmptyPixelData = (width: number, height: number): PixelData => ({
+  width,
+  height,
+  data: new Uint8ClampedArray(width * height * 4), // RGBA
+})
+
+export const useProjectStore = create<ProjectStore>()(
+  devtools(
+    persist(
+      immer((set, get) => ({
+        // Initial state
+        tabs: [],
+        activeTabId: null,
+        isLoading: false,
+        error: null,
+
+        // Initialize app with default project
+        initializeApp: () => {
+          const { tabs } = get()
+          if (tabs.length === 0) {
+            get().createNewProject()
+          }
+        },
+
+        // Create new project tab
+        createNewProject: (options) => {
+          set((state) => {
+            const tabId = `tab-${Date.now()}`
+            const projectId = `project-${Date.now()}`
+            const frameId = `frame-${Date.now()}`
+            
+            const project: Project = {
+              id: projectId,
+              ...createDefaultProject(options),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              activeFrameId: frameId,
+              frames: [frameId],
+            }
+
+            const frame: Frame = {
+              id: frameId,
+              ...createDefaultFrame(),
+              projectId,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }
+
+            const canvasData = createEmptyPixelData(project.width, project.height)
+
+            const newTab: ProjectTab = {
+              id: tabId,
+              project,
+              currentFrame: frame,
+              frames: [frame],
+              canvasData,
+              canvasState: createDefaultCanvasState(),
+              history: [{
+                id: `history-${Date.now()}`,
+                action: 'initial',
+                data: canvasData,
+                timestamp: Date.now(),
+              }],
+              historyIndex: 0,
+              isDirty: false,
+            }
+
+            state.tabs.push(newTab)
+            state.activeTabId = tabId
+          })
+        },
+
+        // Open existing project
+        openProject: (project) => {
+          set((state) => {
+            const tabId = `tab-${Date.now()}-${project.id}`
+            
+            // Check if project is already open
+            const existingTab = state.tabs.find(tab => tab.project.id === project.id)
+            if (existingTab) {
+              state.activeTabId = existingTab.id
+              return
+            }
+
+            const canvasData = createEmptyPixelData(project.width, project.height)
+
+            const newTab: ProjectTab = {
+              id: tabId,
+              project,
+              currentFrame: null, // Will be loaded from API
+              frames: [], // Will be loaded from API
+              canvasData,
+              canvasState: createDefaultCanvasState(),
+              history: [{
+                id: `history-${Date.now()}`,
+                action: 'loaded',
+                data: canvasData,
+                timestamp: Date.now(),
+              }],
+              historyIndex: 0,
+              isDirty: false,
+            }
+
+            state.tabs.push(newTab)
+            state.activeTabId = tabId
+          })
+        },
+
+        // Close tab
+        closeTab: (tabId) => {
+          set((state) => {
+            const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
+            if (tabIndex === -1) return
+
+            state.tabs.splice(tabIndex, 1)
+
+            // Update active tab
+            if (state.activeTabId === tabId) {
+              if (state.tabs.length > 0) {
+                // Select next tab or previous if it was the last
+                const newIndex = Math.min(tabIndex, state.tabs.length - 1)
+                state.activeTabId = state.tabs[newIndex]?.id || null
+              } else {
+                state.activeTabId = null
+              }
+            }
+          })
+        },
+
+        // Set active tab
+        setActiveTab: (tabId) => {
+          set((state) => {
+            if (state.tabs.find(tab => tab.id === tabId)) {
+              state.activeTabId = tabId
+            }
+          })
+        },
+
+        // Duplicate tab
+        duplicateTab: (tabId) => {
+          set((state) => {
+            const sourceTab = state.tabs.find(tab => tab.id === tabId)
+            if (!sourceTab) return
+
+            const newTabId = `tab-${Date.now()}-copy`
+            const newProjectId = `project-${Date.now()}-copy`
+
+            const newProject: Project = {
+              ...sourceTab.project,
+              id: newProjectId,
+              name: `${sourceTab.project.name} (Copy)`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }
+
+            const newTab: ProjectTab = {
+              ...sourceTab,
+              id: newTabId,
+              project: newProject,
+              isDirty: true,
+            }
+
+            state.tabs.push(newTab)
+            state.activeTabId = newTabId
+          })
+        },
+
+        // Update canvas data
+        updateCanvasData: (tabId, data) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              tab.canvasData = data
+              tab.isDirty = true
+            }
+          })
+        },
+
+        // Update canvas state
+        updateCanvasState: (tabId, stateUpdates) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              Object.assign(tab.canvasState, stateUpdates)
+            }
+          })
+        },
+
+        // Undo operation
+        undo: (tabId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab && tab.historyIndex > 0) {
+              tab.historyIndex--
+              const historyEntry = tab.history[tab.historyIndex]
+              if (historyEntry) {
+                tab.canvasData = historyEntry.data
+                tab.isDirty = true
+              }
+            }
+          })
+        },
+
+        // Redo operation
+        redo: (tabId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab && tab.historyIndex < tab.history.length - 1) {
+              tab.historyIndex++
+              const historyEntry = tab.history[tab.historyIndex]
+              if (historyEntry) {
+                tab.canvasData = historyEntry.data
+                tab.isDirty = true
+              }
+            }
+          })
+        },
+
+        // Add history entry
+        addHistoryEntry: (tabId, action, data) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              // Remove any history entries after current index
+              tab.history = tab.history.slice(0, tab.historyIndex + 1)
+              
+              // Add new entry
+              tab.history.push({
+                id: `history-${Date.now()}`,
+                action,
+                data: { ...data, data: new Uint8ClampedArray(data.data) },
+                timestamp: Date.now(),
+              })
+              
+              // Limit history to 100 entries
+              if (tab.history.length > 100) {
+                tab.history = tab.history.slice(-100)
+              }
+              
+              tab.historyIndex = tab.history.length - 1
+            }
+          })
+        },
+
+        // Update project
+        updateProject: (tabId, updates) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              Object.assign(tab.project, updates)
+              tab.project.updatedAt = new Date().toISOString()
+              tab.isDirty = true
+            }
+          })
+        },
+
+        // Save project (placeholder - will use API)
+        saveProject: async (tabId) => {
+          const tab = get().getTab(tabId)
+          if (!tab) return
+
+          set((state) => {
+            state.isLoading = true
+            state.error = null
+          })
+
+          try {
+            // TODO: Implement API save
+            console.log('Saving project:', tab.project)
+            
+            set((state) => {
+              const tabToUpdate = state.tabs.find(t => t.id === tabId)
+              if (tabToUpdate) {
+                tabToUpdate.isDirty = false
+              }
+              state.isLoading = false
+            })
+          } catch (error) {
+            set((state) => {
+              state.error = error instanceof Error ? error.message : 'Save failed'
+              state.isLoading = false
+            })
+          }
+        },
+
+        // Export project (placeholder)
+        exportProject: async (tabId, format) => {
+          const tab = get().getTab(tabId)
+          if (!tab || !tab.canvasData) return
+
+          set((state) => {
+            state.isLoading = true
+            state.error = null
+          })
+
+          try {
+            // TODO: Implement export logic
+            console.log(`Exporting project as ${format}:`, tab.project)
+            
+            set((state) => {
+              state.isLoading = false
+            })
+          } catch (error) {
+            set((state) => {
+              state.error = error instanceof Error ? error.message : 'Export failed'
+              state.isLoading = false
+            })
+          }
+        },
+
+        // Add frame
+        addFrame: (tabId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              const frameId = `frame-${Date.now()}`
+              const newFrame: Frame = {
+                id: frameId,
+                ...createDefaultFrame(),
+                projectId: tab.project.id,
+                index: tab.frames.length,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+
+              tab.frames.push(newFrame)
+              tab.project.frames.push(frameId)
+              tab.isDirty = true
+            }
+          })
+        },
+
+        // Delete frame
+        deleteFrame: (tabId, frameId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab && tab.frames.length > 1) { // Don't allow deleting the last frame
+              const frameIndex = tab.frames.findIndex(f => f.id === frameId)
+              if (frameIndex !== -1) {
+                tab.frames.splice(frameIndex, 1)
+                tab.project.frames = tab.frames.map(f => f.id)
+                
+                // Update active frame if deleted
+                if (tab.project.activeFrameId === frameId) {
+                  const newIndex = Math.min(frameIndex, tab.frames.length - 1)
+                  tab.project.activeFrameId = tab.frames[newIndex]?.id || null
+                  tab.currentFrame = tab.frames[newIndex] || null
+                }
+                
+                tab.isDirty = true
+              }
+            }
+          })
+        },
+
+        // Duplicate frame
+        duplicateFrame: (tabId, frameId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            const sourceFrame = tab?.frames.find(f => f.id === frameId)
+            if (tab && sourceFrame) {
+              const newFrameId = `frame-${Date.now()}-copy`
+              const newFrame: Frame = {
+                ...sourceFrame,
+                id: newFrameId,
+                index: sourceFrame.index + 1,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+
+              // Insert after source frame
+              const insertIndex = sourceFrame.index + 1
+              tab.frames.splice(insertIndex, 0, newFrame)
+              
+              // Update indices for frames after the inserted one
+              for (let i = insertIndex + 1; i < tab.frames.length; i++) {
+                const frame = tab.frames[i]
+                if (frame) {
+                  frame.index = i
+                }
+              }
+
+              tab.project.frames = tab.frames.map(f => f.id)
+              tab.isDirty = true
+            }
+          })
+        },
+
+        // Set active frame
+        setActiveFrame: (tabId, frameId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            const frame = tab?.frames.find(f => f.id === frameId)
+            if (tab && frame) {
+              tab.project.activeFrameId = frameId
+              tab.currentFrame = frame
+            }
+          })
+        },
+
+        // Reorder frames
+        reorderFrames: (tabId, frameIds) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              const reorderedFrames = frameIds.map((id, index) => {
+                const frame = tab.frames.find(f => f.id === id)
+                if (frame) {
+                  return { ...frame, index }
+                }
+                return frame
+              }).filter(Boolean) as Frame[]
+
+              tab.frames = reorderedFrames
+              tab.project.frames = frameIds
+              tab.isDirty = true
+            }
+          })
+        },
+
+        // Get active tab
+        getActiveTab: () => {
+          const { tabs, activeTabId } = get()
+          return tabs.find(tab => tab.id === activeTabId) || null
+        },
+
+        // Get tab by ID
+        getTab: (tabId) => {
+          const { tabs } = get()
+          return tabs.find(tab => tab.id === tabId) || null
+        },
+
+        // Mark tab as dirty
+        markTabDirty: (tabId) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              tab.isDirty = true
+            }
+          })
+        },
+
+        // Clear error
+        clearError: () => {
+          set((state) => {
+            state.error = null
+          })
+        },
+      })),
+      {
+        name: 'pixelbuddy-projects',
+        partialize: (state) => ({
+          // Only persist essential data, not the full canvas data
+          tabs: state.tabs.map(tab => ({
+            ...tab,
+            canvasData: null, // Don't persist heavy canvas data
+            history: [], // Don't persist history
+          })),
+          activeTabId: state.activeTabId,
+        }),
+      }
+    ),
+    { name: 'pixelbuddy-store' }
+  )
+)
