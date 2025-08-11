@@ -1,0 +1,29 @@
+# Ignore build outputs
+.next
+out
+build
+dist
+
+# Ignore package files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignore generated files
+*.tsbuildinfo
+next-env.d.ts
+
+# Ignore logs
+*.log
+
+# Ignore environment files
+.env*
+
+# Ignore public assets that shouldn't be formatted
+public/icons
+public/images
+public/generated
+
+# Ignore canvas temp files
+/tmp
+/temp

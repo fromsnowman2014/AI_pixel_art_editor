@@ -113,7 +113,7 @@ Engineering notes:
 
 5.11 Hosting
 	•	Frontend: Vercel (Next.js / React + Tailwind)
-	•	Backend: Railway (Fastify/Express or NestJS) for AI proxy, quantization jobs, auth.
+	•	Backend: Railway (https://aipixelarteditor-production.up.railway.app) for AI proxy, quantization jobs, auth.
 	•	Storage: Railway Postgres for projects + R2/Supabase Storage for images.
 	•	Cache/Queue: Redis (Railway add-on) for job fan-out & rate limiting.
 
@@ -208,23 +208,23 @@ Local-first: Projects also cached in IndexedDB; server sync is optional.
 
 ⸻
 
-10) API Endpoints (Backend on Railway)
+10) API Endpoints (Backend on Railway: https://aipixelarteditor-production.up.railway.app)
 
-POST /api/ai/generate
+POST https://aipixelarteditor-production.up.railway.app/api/ai/generate
 	•	body: { prompt, mode:'new'|'img2img', width, height, colorLimit, referenceImageId? }
 	•	returns: { assetId, pngUrl, palette }
 	•	flow: generate → quantize (Median Cut) → nearest-neighbor resize → store.
 
-POST /api/ai/variations
+POST https://aipixelarteditor-production.up.railway.app/api/ai/variations
 	•	body: { assetId | imageData, count } → returns array of processed variations.
 
-POST /api/project / GET /api/project/:id / PATCH /api/project/:id
+POST/GET/PATCH https://aipixelarteditor-production.up.railway.app/api/project/*
 	•	CRUD with auth.
 
-POST /api/export/gif
+POST https://aipixelarteditor-production.up.railway.app/api/export/gif
 	•	body: { frameIds, delays, loop:boolean } → returns { gifUrl }.
 
-POST /api/upload
+POST https://aipixelarteditor-production.up.railway.app/api/upload
 	•	user uploads a PNG/JPG → server quantizes/downscales per current project.
 
 Auth
@@ -332,7 +332,7 @@ v1.0
 	•	GIF builder shows all open images as thumbnails; supports drag-drop reorder + include checkboxes
 	•	New blank page starts fully transparent
 	•	New window can load image from any numbered tab
-	•	Deployed on Vercel + Railway with env-based config
+	•	Deployed on Vercel (frontend) + Railway (backend: https://aipixelarteditor-production.up.railway.app) with env-based config
 	•	Works on Chrome, Edge, Safari (latest), 13″ laptop at 125% zoom
 
 ⸻

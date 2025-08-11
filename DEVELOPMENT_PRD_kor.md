@@ -98,7 +98,7 @@ Vercel + Railway 기반으로 제작하는, AI 지원 픽셀 아트 & GIF 제작
 
 5.11 호스팅
 	•	프론트엔드: Next.js + Tailwind (Vercel)
-	•	백엔드: Express/Fastify (Railway)
+	•	백엔드: Express/Fastify (Railway: https://aipixelarteditor-production.up.railway.app)
 	•	저장소: Supabase Storage or R2, Railway Postgres
 	•	캐시: Redis(Railway)
 
@@ -153,12 +153,12 @@ Frame { id, projectId, index, delayMs, included, flattenedPngUrl, rawRleData }
 
 ⸻
 
-10) API 엔드포인트 예시
+10) API 엔드포인트 예시 (Railway: https://aipixelarteditor-production.up.railway.app)
 
-POST /api/ai/generate — AI 이미지 생성
-POST /api/ai/variations — 변형 생성
-POST /api/export/gif — GIF 조합
-POST /api/upload — 이미지 업로드 & 픽셀화
+POST https://aipixelarteditor-production.up.railway.app/api/ai/generate — AI 이미지 생성
+POST https://aipixelarteditor-production.up.railway.app/api/ai/variations — 변형 생성
+POST https://aipixelarteditor-production.up.railway.app/api/export/gif — GIF 조합
+POST https://aipixelarteditor-production.up.railway.app/api/upload — 이미지 업로드 & 픽셀화
 
 ⸻
 
@@ -203,7 +203,7 @@ MVP
 	•	AI 생성 & 자동 로딩
 	•	GIF 생성기(순서 변경, 체크박스)
 	•	PNG/JPG/GIF 내보내기
-	•	Vercel+Railway 배포
+	•	Vercel(프론트엔드) + Railway(백엔드: https://aipixelarteditor-production.up.railway.app) 배포
 
 베타
 	•	초급/고급 모드

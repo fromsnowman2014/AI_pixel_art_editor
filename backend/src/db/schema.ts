@@ -1,0 +1,208 @@
+import { relations } from 'drizzle-orm';
+import { 
+  pgTable, 
+  uuid, 
+  varchar, 
+  text, 
+  integer, 
+  boolean, 
+  timestamp, 
+  jsonb, 
+  pgEnum,
+  real,
+  bigint
+} from 'drizzle-orm/pg-core';
+
+// Enums
+export const userRoleEnum = pgEnum('user_role', ['parent', 'teacher']);
+export const projectModeEnum = pgEnum('project_mode', ['beginner', 'advanced']);
+export const assetTypeEnum = pgEnum('asset_type', ['upload', 'ai', 'generated']);
+
+// Users table (for parent/teacher accounts - COPPA compliant)
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  role: userRoleEnum('role').notNull().default('parent'),
+  locale: varchar('locale', { length: 10 }).notNull().default('en'),
+  isVerified: boolean('is_verified').notNull().default(false),
+  emailVerificationToken: varchar('email_verification_token', { length: 255 }),
+  emailVerificationExpires: timestamp('email_verification_expires'),
+  lastLoginAt: timestamp('last_login_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Projects table
+export const projects = pgTable('projects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }), // null for anonymous users
+  name: varchar('name', { length: 100 }).notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  colorLimit: integer('color_limit').notNull(),
+  palette: jsonb('palette').$type<string[]>().notNull(), // array of hex colors
+  mode: projectModeEnum('mode').notNull().default('beginner'),
+  activeFrameId: uuid('active_frame_id'),
+  isTemplate: boolean('is_template').notNull().default(false),
+  templateCategory: varchar('template_category', { length: 50 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Frames table (for animation/GIF support)
+export const frames = pgTable('frames', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  index: integer('index').notNull(),
+  delayMs: integer('delay_ms').notNull().default(500),
+  included: boolean('included').notNull().default(true),
+  flattenedPngUrl: varchar('flattened_png_url', { length: 512 }), // stored image URL
+  rawRleData: text('raw_rle_data'), // compressed pixel data (RLE encoded)
+  checksumMd5: varchar('checksum_md5', { length: 32 }), // for integrity checking
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Layers table (optional feature for advanced mode)
+export const layers = pgTable('layers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  frameId: uuid('frame_id').references(() => frames.id, { onDelete: 'cascade' }).notNull(),
+  index: integer('index').notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  visible: boolean('visible').notNull().default(true),
+  opacity: real('opacity').notNull().default(1.0),
+  blendMode: varchar('blend_mode', { length: 20 }).notNull().default('normal'),
+  layerData: text('layer_data'), // compressed layer pixel data
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Assets table (for storing generated images, uploads, etc.)
+export const assets = pgTable('assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  type: assetTypeEnum('type').notNull(),
+  originalUrl: varchar('original_url', { length: 512 }).notNull(),
+  processedUrl: varchar('processed_url', { length: 512 }),
+  thumbUrl: varchar('thumb_url', { length: 512 }),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  mimeType: varchar('mime_type', { length: 100 }).notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+  palette: jsonb('palette').$type<string[]>(), // extracted color palette
+  metadata: jsonb('metadata').$type<{
+    prompt?: string;
+    seed?: number;
+    colorLimit?: number;
+    quantizationMethod?: string;
+    processingTimeMs?: number;
+    aiModel?: string;
+  }>(),
+  checksumMd5: varchar('checksum_md5', { length: 32 }),
+  expiresAt: timestamp('expires_at'), // for temporary files
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Rate limiting table (for Redis fallback)
+export const rateLimits = pgTable('rate_limits', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  identifier: varchar('identifier', { length: 255 }).notNull(), // IP or user ID
+  type: varchar('type', { length: 50 }).notNull(), // 'ai_generation', 'api_calls', etc.
+  count: integer('count').notNull().default(0),
+  windowStart: timestamp('window_start').notNull(),
+  windowEnd: timestamp('window_end').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Analytics table (opt-in, COPPA compliant)
+export const analytics = pgTable('analytics', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  sessionId: varchar('session_id', { length: 255 }),
+  event: varchar('event', { length: 100 }).notNull(),
+  properties: jsonb('properties').$type<Record<string, any>>(),
+  userAgent: varchar('user_agent', { length: 512 }),
+  ipHash: varchar('ip_hash', { length: 64 }), // hashed IP for privacy
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// System logs table
+export const systemLogs = pgTable('system_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  level: varchar('level', { length: 20 }).notNull(),
+  message: text('message').notNull(),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  service: varchar('service', { length: 100 }).notNull(),
+  requestId: uuid('request_id'),
+  userId: uuid('user_id'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  projects: many(projects),
+  assets: many(assets),
+  analytics: many(analytics),
+}));
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  user: one(users, {
+    fields: [projects.userId],
+    references: [users.id],
+  }),
+  frames: many(frames),
+  activeFrame: one(frames, {
+    fields: [projects.activeFrameId],
+    references: [frames.id],
+  }),
+}));
+
+export const framesRelations = relations(frames, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [frames.projectId],
+    references: [projects.id],
+  }),
+  layers: many(layers),
+}));
+
+export const layersRelations = relations(layers, ({ one }) => ({
+  frame: one(frames, {
+    fields: [layers.frameId],
+    references: [frames.id],
+  }),
+}));
+
+export const assetsRelations = relations(assets, ({ one }) => ({
+  user: one(users, {
+    fields: [assets.userId],
+    references: [users.id],
+  }),
+}));
+
+export const analyticsRelations = relations(analytics, ({ one }) => ({
+  user: one(users, {
+    fields: [analytics.userId],
+    references: [users.id],
+  }),
+}));
+
+// Export types
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+export type Frame = typeof frames.$inferSelect;
+export type NewFrame = typeof frames.$inferInsert;
+export type Layer = typeof layers.$inferSelect;
+export type NewLayer = typeof layers.$inferInsert;
+export type Asset = typeof assets.$inferSelect;
+export type NewAsset = typeof assets.$inferInsert;
+export type RateLimit = typeof rateLimits.$inferSelect;
+export type NewRateLimit = typeof rateLimits.$inferInsert;
+export type Analytics = typeof analytics.$inferSelect;
+export type NewAnalytics = typeof analytics.$inferInsert;
+export type SystemLog = typeof systemLogs.$inferSelect;
+export type NewSystemLog = typeof systemLogs.$inferInsert;
