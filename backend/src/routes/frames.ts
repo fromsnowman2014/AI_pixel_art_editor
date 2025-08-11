@@ -27,7 +27,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         201: FrameResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const body = request.body as CreateFrameRequest;
@@ -124,7 +123,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         200: FrameResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -216,7 +214,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         },
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { projectId } = request.params as { projectId: string };
@@ -312,7 +309,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         200: FrameResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -418,7 +414,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         204: { type: 'null' },
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -534,7 +529,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         201: FrameResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -673,7 +667,6 @@ export const frameRoutes: FastifyPluginCallback = (fastify, options, done) => {
         },
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { projectId, frameIds } = request.body as {

@@ -27,7 +27,6 @@ export const projectRoutes: FastifyPluginCallback = (fastify, options, done) => 
         201: ProjectResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const body = request.body as CreateProjectRequest;
@@ -132,7 +131,6 @@ export const projectRoutes: FastifyPluginCallback = (fastify, options, done) => 
         },
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const query = request.query as {
@@ -282,7 +280,6 @@ export const projectRoutes: FastifyPluginCallback = (fastify, options, done) => 
         200: ProjectResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -369,7 +366,6 @@ export const projectRoutes: FastifyPluginCallback = (fastify, options, done) => 
         200: ProjectResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -471,7 +467,6 @@ export const projectRoutes: FastifyPluginCallback = (fastify, options, done) => 
         204: { type: 'null' },
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };
@@ -545,7 +540,6 @@ export const projectRoutes: FastifyPluginCallback = (fastify, options, done) => 
         201: ProjectResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const userId = request.user?.id;
     const { id } = request.params as { id: string };

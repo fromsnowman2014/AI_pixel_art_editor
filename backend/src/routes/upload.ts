@@ -45,7 +45,6 @@ export const uploadRoutes: FastifyPluginCallback = (fastify, options, done) => {
         200: UploadResponseSchema,
       },
     },
-    preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const startTime = Date.now();
     const requestId = uuidv4();

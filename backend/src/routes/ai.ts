@@ -30,10 +30,6 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
         200: AIGenerationResponseSchema,
       },
     },
-    preHandler: [
-      fastify.rateLimitAI,
-      fastify.authenticate,
-    ],
   }, async (request, reply) => {
     const startTime = Date.now();
     const requestId = uuidv4();
@@ -259,10 +255,6 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
         },
       },
     },
-    preHandler: [
-      fastify.rateLimitAI,
-      fastify.authenticate,
-    ],
   }, async (request, reply) => {
     const startTime = Date.now();
     const requestId = uuidv4();

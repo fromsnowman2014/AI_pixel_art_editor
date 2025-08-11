@@ -1,11 +1,12 @@
 import { FastifyPluginCallback } from 'fastify';
+import fp from 'fastify-plugin';
 import '../types/fastify';
 import { createLogger } from '../utils/logger';
 import { env } from '../types/env';
 
 const logger = createLogger('auth-middleware');
 
-export const authPlugin: FastifyPluginCallback = (fastify, options, done) => {
+const authPluginCallback: FastifyPluginCallback = (fastify, options, done) => {
   
   /**
    * Authentication decorator for routes
@@ -180,3 +181,8 @@ async function validateJwtToken(token: string): Promise<any> {
     return null;
   }
 }
+
+// Export as fastify-plugin to ensure decorators are available
+export const authPlugin = fp(authPluginCallback, {
+  name: 'auth-plugin'
+});
