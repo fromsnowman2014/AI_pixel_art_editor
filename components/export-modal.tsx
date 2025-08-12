@@ -56,6 +56,9 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
       
       return () => clearInterval(interval)
     }
+    
+    // Return empty cleanup function for all other cases
+    return () => {}
   }, [exportType, frames.length, gifDuration])
 
   // Reset preview frame when switching modes
