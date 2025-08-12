@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelBuddy Drawing Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-header {
+            border-bottom: 2px solid #e5e5e5;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .test-status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-pass { background: #d4edda; color: #155724; }
+        .status-fail { background: #f8d7da; color: #721c24; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        
+        .test-instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        
+        .test-url {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            word-break: break-all;
+        }
+        
+        .checklist {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        .checklist li {
+            margin: 8px 0;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .checklist li.completed {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        
+        .checklist li.failed {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🎨 PixelBuddy Drawing Functionality Test</h1>
+            <p><strong>Purpose:</strong> Verify that canvas drawing works correctly after the persistence fix</p>
+            <p><strong>Issue:</strong> Canvas drawing didn't work in production due to null canvasData from persistence</p>
+            <p><strong>Fix Applied:</strong> Initialize canvasData when loading persisted tabs</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🚀 Production Deployment Test</h2>
+            <div class="test-url">
+                <strong>Vercel URL:</strong> https://ai-pixel-art-editor.vercel.app
+            </div>
+            
+            <div class="test-instructions">
+                <h3>Test Steps:</h3>
+                <ol class="checklist">
+                    <li>✅ 1. Open the Vercel deployment URL</li>
+                    <li>✅ 2. Select "Local Mode" to bypass COPPA gate</li>
+                    <li>⏳ 3. Wait for application to load completely</li>
+                    <li>⏳ 4. Verify canvas is visible and tools are available</li>
+                    <li>🎯 5. Select a color from the color palette</li>
+                    <li>🎯 6. Select the Pencil tool</li>
+                    <li>🎯 7. Click and draw on the canvas</li>
+                    <li>🎯 8. Verify pixels appear on canvas</li>
+                    <li>🎯 9. Test Eraser tool functionality</li>
+                    <li>🎯 10. Test Fill (bucket) tool functionality</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 Root Cause Analysis</h2>
+            <p><strong>Problem:</strong> Zustand persistence configuration set <code>canvasData: null</code> to avoid storing heavy canvas data.</p>
+            
+            <p><strong>Effect:</strong> When app loads from persistence, tabs have <code>canvasData: null</code>, causing <code>drawPixel()</code> function to return early without drawing.</p>
+            
+            <p><strong>Solution:</strong> Modified <code>initializeApp()</code> to check for null canvasData and initialize it using <code>createEmptyPixelData()</code> with proper dimensions.</p>
+            
+            <h3>Code Changes Applied:</h3>
+            <pre style="background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto;">
+// In project-store.ts initializeApp():
+if (tabs.length === 0) {
+  get().createNewProject()
+} else {
+  // Fix tabs loaded from persistence that have null canvasData
+  set((state) => {
+    state.tabs.forEach(tab => {
+      if (!tab.canvasData) {
+        tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+      }
+      // Also ensure history exists for undo/redo functionality
+      if (!tab.history || tab.history.length === 0) {
+        tab.history = [{
+          id: `history-${Date.now()}`,
+          action: 'restored', 
+          data: tab.canvasData!,
+          timestamp: Date.now(),
+        }]
+        tab.historyIndex = 0
+      }
+    })
+  })
+}
+            </pre>
+        </div>
+
+        <div class="test-section">
+            <h2>✅ Expected Results</h2>
+            <ul>
+                <li><strong>Before Fix:</strong> Tools selectable, colors selectable, but canvas drawing does nothing</li>
+                <li><strong>After Fix:</strong> Complete drawing functionality working as expected</li>
+                <li><strong>Drawing Response:</strong> Immediate pixel rendering on canvas clicks</li>
+                <li><strong>Tool Switching:</strong> All tools (pencil, eraser, fill) should work properly</li>
+                <li><strong>State Persistence:</strong> Projects should save and load correctly</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🐛 Additional Fixes Included</h2>
+            <ul>
+                <li>✅ <strong>History Restoration:</strong> Ensures undo/redo works after loading persisted projects</li>
+                <li>✅ <strong>Canvas Initialization:</strong> Proper ImageData allocation with project dimensions</li>
+                <li>✅ <strong>State Consistency:</strong> Maintains data integrity between local and persisted state</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🔄 Deployment Instructions</h2>
+            <div class="test-instructions">
+                <p>After verifying the fix works locally, deploy to Vercel:</p>
+                <ol>
+                    <li><code>git add .</code></li>
+                    <li><code>git commit -m "Fix: Initialize canvasData for persisted tabs to enable drawing"</code></li>
+                    <li><code>git push</code> (triggers automatic Vercel deployment)</li>
+                    <li>Wait for deployment completion</li>
+                    <li>Test the updated production app</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactive testing functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎨 PixelBuddy Drawing Test Page Loaded');
+            console.log('Issue: Canvas drawing not working in production');
+            console.log('Fix: Initialize canvasData when loading persisted tabs');
+            console.log('Next: Deploy fix and test on Vercel');
+        });
+    </script>
+</body>
+</html>

@@ -116,6 +116,25 @@ export const useProjectStore = create<ProjectStore>()(
           const { tabs } = get()
           if (tabs.length === 0) {
             get().createNewProject()
+          } else {
+            // Fix tabs loaded from persistence that have null canvasData
+            set((state) => {
+              state.tabs.forEach(tab => {
+                if (!tab.canvasData) {
+                  tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+                }
+                // Also ensure history exists for undo/redo functionality
+                if (!tab.history || tab.history.length === 0) {
+                  tab.history = [{
+                    id: `history-${Date.now()}`,
+                    action: 'restored',
+                    data: tab.canvasData!,
+                    timestamp: Date.now(),
+                  }]
+                  tab.historyIndex = 0
+                }
+              })
+            })
           }
         },
 
