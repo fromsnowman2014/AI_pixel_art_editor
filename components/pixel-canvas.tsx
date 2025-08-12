@@ -97,7 +97,10 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     
     debugLog('DRAW_COORDS', `Pixel coordinates: (${pixelX}, ${pixelY})`, { 
       screenX: x, screenY: y, zoom: canvasState.zoom,
-      projectSize: `${project.width}x${project.height}`
+      projectSize: `${project.width}x${project.height}`,
+      conversionCalc: `${x}/${canvasState.zoom} = ${x / canvasState.zoom}, ${y}/${canvasState.zoom} = ${y / canvasState.zoom}`,
+      flooredResults: `floor(${x / canvasState.zoom}) = ${pixelX}, floor(${y / canvasState.zoom}) = ${pixelY}`,
+      validRange: `x: 0-${project.width-1}, y: 0-${project.height-1}`
     })
     
     if (pixelX < 0 || pixelX >= project.width || pixelY < 0 || pixelY >= project.height) {
@@ -230,23 +233,33 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       clientX: e.clientX,
       clientY: e.clientY,
       tool: canvasState.tool,
-      hasContainer: !!containerRef.current
+      hasContainer: !!containerRef.current,
+      hasCanvas: !!canvasRef.current
     })
 
-    if (!containerRef.current) {
-      debugLog('MOUSE_DOWN_NO_CONTAINER', 'No container ref available')
+    if (!containerRef.current || !canvasRef.current) {
+      debugLog('MOUSE_DOWN_NO_ELEMENTS', 'Missing container or canvas ref', {
+        hasContainer: !!containerRef.current,
+        hasCanvas: !!canvasRef.current
+      })
       return
     }
 
-    const rect = containerRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left - canvasState.panX
-    const y = e.clientY - rect.top - canvasState.panY
+    // Use canvas element directly for accurate coordinates
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const containerRect = containerRef.current.getBoundingClientRect()
+    
+    // Calculate coordinates relative to canvas element, not container
+    const x = e.clientX - canvasRect.left
+    const y = e.clientY - canvasRect.top
 
     debugLog('MOUSE_DOWN_COORDS', 'Calculated drawing coordinates', {
       canvasX: x,
       canvasY: y,
-      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-      pan: { x: canvasState.panX, y: canvasState.panY }
+      canvasRect: { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height },
+      containerRect: { left: containerRect.left, top: containerRect.top, width: containerRect.width, height: containerRect.height },
+      pan: { x: canvasState.panX, y: canvasState.panY },
+      coordinateMethod: 'canvas-direct'
     })
 
     setIsDragging(true)
@@ -261,7 +274,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   }, [canvasState.panX, canvasState.panY, canvasState.tool, drawPixel])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !lastMousePos || !containerRef.current) return
+    if (!isDragging || !lastMousePos || !containerRef.current || !canvasRef.current) return
 
     if (canvasState.tool === 'pan') {
       const deltaX = e.clientX - lastMousePos.x
@@ -274,9 +287,10 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         })
       }
     } else {
-      const rect = containerRef.current.getBoundingClientRect()
-      const x = e.clientX - rect.left - canvasState.panX
-      const y = e.clientY - rect.top - canvasState.panY
+      // Use canvas element directly for accurate coordinates
+      const canvasRect = canvasRef.current.getBoundingClientRect()
+      const x = e.clientX - canvasRect.left
+      const y = e.clientY - canvasRect.top
       drawPixel(x, y)
     }
 
