@@ -31,6 +31,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     duplicateFrame,
     setActiveFrame,
     updateProject,
+    getFrameThumbnail,
   } = useProjectStore()
 
   const [isPlaying, setIsPlaying] = useState(false)
@@ -189,9 +190,28 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
               )}
               onClick={() => handleFrameSelect(frame.id)}
             >
-              {/* Frame Preview (placeholder) */}
-              <div className="h-12 w-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center">
-                <span className="text-xs text-gray-500">{index + 1}</span>
+              {/* Frame Preview with Thumbnail */}
+              <div className="h-12 w-12 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
+                {(() => {
+                  const thumbnail = activeTabId ? getFrameThumbnail(activeTabId, frame.id) : null
+                  
+                  if (thumbnail) {
+                    return (
+                      <img
+                        src={thumbnail}
+                        alt={`Frame ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                    )
+                  } else {
+                    return (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-xs text-gray-500">{index + 1}</span>
+                      </div>
+                    )
+                  }
+                })()}
               </div>
 
               {/* Frame Info */}
@@ -259,24 +279,6 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
           ))}
         </div>
 
-        {/* Animation Settings */}
-        <div className="mt-3 border-t border-gray-100 pt-3">
-          <div className="flex items-center space-x-4 text-sm">
-            <div className="flex items-center space-x-2">
-              <label className="text-gray-600">Frame Rate:</label>
-              <select className="rounded border border-gray-300 px-2 py-1 text-xs">
-                <option value="12">12 FPS</option>
-                <option value="24">24 FPS</option>
-                <option value="30">30 FPS</option>
-              </select>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <label className="text-gray-600">Loop:</label>
-              <input type="checkbox" className="rounded border-gray-300" defaultChecked />
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Quick Tips */}

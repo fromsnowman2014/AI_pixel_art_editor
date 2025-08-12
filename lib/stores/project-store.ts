@@ -27,6 +27,45 @@ const downloadFile = (dataURL: string, fileName: string) => {
   document.body.removeChild(link)
 }
 
+// Utility function to generate thumbnail from pixel data
+const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | null => {
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = thumbnailSize
+    canvas.height = thumbnailSize
+    const ctx = canvas.getContext('2d')
+    
+    if (!ctx) return null
+
+    // Create source canvas with original pixel data
+    const sourceCanvas = document.createElement('canvas')
+    sourceCanvas.width = pixelData.width
+    sourceCanvas.height = pixelData.height
+    const sourceCtx = sourceCanvas.getContext('2d')
+    
+    if (!sourceCtx) return null
+
+    // Put original pixel data on source canvas
+    const imageData = new ImageData(new Uint8ClampedArray(pixelData.data), pixelData.width, pixelData.height)
+    sourceCtx.putImageData(imageData, 0, 0)
+
+    // Scale down to thumbnail size with nearest neighbor (pixel perfect)
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(sourceCanvas, 0, 0, thumbnailSize, thumbnailSize)
+
+    return canvas.toDataURL('image/png')
+  } catch (error) {
+    debugLog('THUMBNAIL_ERROR', 'Failed to generate thumbnail', { error })
+    return null
+  }
+}
+
+interface FrameCanvasData {
+  frameId: string
+  canvasData: PixelData
+  thumbnail: string | null // Base64 encoded thumbnail image
+}
+
 interface ProjectTab {
   id: string
   project: Project
@@ -37,6 +76,7 @@ interface ProjectTab {
   history: HistoryEntry[]
   historyIndex: number
   isDirty: boolean
+  frameCanvasData: FrameCanvasData[] // Store canvas data for each frame
 }
 
 interface ProjectStore {
@@ -72,6 +112,8 @@ interface ProjectStore {
   duplicateFrame: (tabId: string, frameId: string) => void
   setActiveFrame: (tabId: string, frameId: string) => void
   reorderFrames: (tabId: string, frameIds: string[]) => void
+  saveCurrentFrameCanvas: (tabId: string) => void
+  getFrameThumbnail: (tabId: string, frameId: string) => string | null
 
   // Utility functions
   getActiveTab: () => ProjectTab | null
@@ -180,6 +222,26 @@ export const useProjectStore = create<ProjectStore>()(
                   tab.historyIndex = 0
                 }
 
+                // Initialize frameCanvasData for tabs loaded from persistence
+                if (!tab.frameCanvasData) {
+                  debugLog('INIT_CREATE_FRAME_CANVAS_DATA', `Creating frameCanvasData for tab ${tab.id}`)
+                  tab.frameCanvasData = []
+                  
+                  // Create frame canvas data for existing frames
+                  if (tab.frames && tab.frames.length > 0) {
+                    tab.frames.forEach(frame => {
+                      tab.frameCanvasData.push({
+                        frameId: frame.id,
+                        canvasData: tab.canvasData ? { 
+                          ...tab.canvasData, 
+                          data: new Uint8ClampedArray(tab.canvasData.data) 
+                        } : createEmptyPixelData(tab.project.width, tab.project.height),
+                        thumbnail: null
+                      })
+                    })
+                  }
+                }
+
                 debugLog('INIT_TAB_COMPLETE', `Tab ${tab.id} initialization complete`, {
                   hasCanvasData: !!tab.canvasData,
                   canvasDataLength: tab.canvasData?.data.length,
@@ -238,6 +300,11 @@ export const useProjectStore = create<ProjectStore>()(
               }],
               historyIndex: 0,
               isDirty: false,
+              frameCanvasData: [{
+                frameId,
+                canvasData: { ...canvasData, data: new Uint8ClampedArray(canvasData.data) },
+                thumbnail: null // Will be generated when first drawn
+              }]
             }
 
             state.tabs.push(newTab)
@@ -274,6 +341,7 @@ export const useProjectStore = create<ProjectStore>()(
               }],
               historyIndex: 0,
               isDirty: false,
+              frameCanvasData: [], // Will be populated when frames are loaded
             }
 
             state.tabs.push(newTab)
@@ -333,6 +401,10 @@ export const useProjectStore = create<ProjectStore>()(
               id: newTabId,
               project: newProject,
               isDirty: true,
+              frameCanvasData: sourceTab.frameCanvasData.map(frameData => ({
+                ...frameData,
+                canvasData: { ...frameData.canvasData, data: new Uint8ClampedArray(frameData.canvasData.data) }
+              }))
             }
 
             state.tabs.push(newTab)
@@ -388,6 +460,11 @@ export const useProjectStore = create<ProjectStore>()(
                 isDirty: tab.isDirty,
                 canvasDataSet: !!tab.canvasData
               })
+
+              // Auto-save current frame canvas data and regenerate thumbnail
+              setTimeout(() => {
+                get().saveCurrentFrameCanvas(tabId)
+              }, 100)
 
               // Critical debug: Check if React will detect this change
               // Fix: Capture values before setTimeout to avoid proxy issues
@@ -494,58 +571,85 @@ export const useProjectStore = create<ProjectStore>()(
               
               Object.assign(tab.project, updates)
               
-              // If dimensions changed, reallocate canvas data
+              // If dimensions changed, reallocate canvas data for ALL frames
               if ((updates.width && updates.width !== oldWidth) || (updates.height && updates.height !== oldHeight)) {
-                debugLog('RESIZE_CANVAS_START', 'Canvas resize operation started', {
+                debugLog('RESIZE_CANVAS_START', 'Canvas resize operation started for all frames', {
                   oldSize: `${oldWidth}x${oldHeight}`,
                   newSize: `${tab.project.width}x${tab.project.height}`,
-                  hasExistingData: !!tab.canvasData
+                  hasExistingData: !!tab.canvasData,
+                  frameCount: tab.frameCanvasData.length
                 })
-                
-                const newCanvasData = createEmptyPixelData(tab.project.width, tab.project.height)
-                
-                // Copy existing pixels if shrinking or expanding
-                if (tab.canvasData) {
-                  const oldData = tab.canvasData.data
-                  const newData = newCanvasData.data
-                  const minWidth = Math.min(oldWidth, tab.project.width)
-                  const minHeight = Math.min(oldHeight, tab.project.height)
+
+                // Utility function to resize canvas data
+                const resizeCanvasData = (originalData: PixelData): PixelData => {
+                  const newCanvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                   
-                  debugLog('RESIZE_CANVAS_COPY', 'Copying existing pixel data', {
-                    copyArea: `${minWidth}x${minHeight}`,
-                    oldDataLength: oldData.length,
-                    newDataLength: newData.length
-                  })
-                  
-                  let copiedPixels = 0
-                  for (let y = 0; y < minHeight; y++) {
-                    for (let x = 0; x < minWidth; x++) {
-                      const oldIndex = (y * oldWidth + x) * 4
-                      const newIndex = (y * tab.project.width + x) * 4
-                      
-                      // Copy pixel data
-                      newData[newIndex] = oldData[oldIndex] || 0         // R
-                      newData[newIndex + 1] = oldData[oldIndex + 1] || 0 // G
-                      newData[newIndex + 2] = oldData[oldIndex + 2] || 0 // B
-                      newData[newIndex + 3] = oldData[oldIndex + 3] || 0 // A
-                      
-                      if ((oldData[oldIndex + 3] ?? 0) > 0) copiedPixels++
+                  if (originalData) {
+                    const oldData = originalData.data
+                    const newData = newCanvasData.data
+                    const minWidth = Math.min(oldWidth, tab.project.width)
+                    const minHeight = Math.min(oldHeight, tab.project.height)
+                    
+                    let copiedPixels = 0
+                    for (let y = 0; y < minHeight; y++) {
+                      for (let x = 0; x < minWidth; x++) {
+                        const oldIndex = (y * oldWidth + x) * 4
+                        const newIndex = (y * tab.project.width + x) * 4
+                        
+                        // Copy pixel data
+                        newData[newIndex] = oldData[oldIndex] || 0         // R
+                        newData[newIndex + 1] = oldData[oldIndex + 1] || 0 // G
+                        newData[newIndex + 2] = oldData[oldIndex + 2] || 0 // B
+                        newData[newIndex + 3] = oldData[oldIndex + 3] || 0 // A
+                        
+                        if ((oldData[oldIndex + 3] ?? 0) > 0) copiedPixels++
+                      }
                     }
+                    
+                    debugLog('RESIZE_FRAME_DATA_COPY', 'Frame pixel data copied', {
+                      copiedPixels: copiedPixels,
+                      totalPixels: minWidth * minHeight
+                    })
                   }
                   
-                  debugLog('RESIZE_CANVAS_COPY_COMPLETE', 'Pixel copy completed', {
-                    copiedPixels: copiedPixels,
-                    totalPixels: minWidth * minHeight
+                  return newCanvasData
+                }
+
+                // Resize current canvas data
+                if (tab.canvasData) {
+                  tab.canvasData = resizeCanvasData(tab.canvasData)
+                  
+                  debugLog('RESIZE_CURRENT_CANVAS', 'Current canvas data resized', {
+                    newSize: `${tab.project.width}x${tab.project.height}`
                   })
                 }
-                
-                tab.canvasData = newCanvasData
+
+                // Resize all frame canvas data
+                tab.frameCanvasData = tab.frameCanvasData.map((frameData, index) => {
+                  const resizedCanvasData = resizeCanvasData(frameData.canvasData)
+                  const newThumbnail = generateThumbnail(resizedCanvasData)
+                  
+                  debugLog('RESIZE_FRAME_CANVAS', `Frame ${index + 1} canvas data resized`, {
+                    frameId: frameData.frameId,
+                    newSize: `${resizedCanvasData.width}x${resizedCanvasData.height}`,
+                    thumbnailGenerated: !!newThumbnail
+                  })
+                  
+                  return {
+                    ...frameData,
+                    canvasData: resizedCanvasData,
+                    thumbnail: newThumbnail
+                  }
+                })
                 
                 // Add history entry for dimension change
-                get().addHistoryEntry(tabId, 'resize_canvas', newCanvasData)
+                if (tab.canvasData) {
+                  get().addHistoryEntry(tabId, 'resize_canvas_all_frames', tab.canvasData)
+                }
                 
-                debugLog('RESIZE_CANVAS_COMPLETE', 'Canvas resize completed', {
+                debugLog('RESIZE_CANVAS_COMPLETE', 'All frames canvas resize completed', {
                   newSize: `${tab.project.width}x${tab.project.height}`,
+                  framesUpdated: tab.frameCanvasData.length,
                   historyAdded: true
                 })
               }
@@ -694,6 +798,8 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Add frame
         addFrame: (tabId) => {
+          debugLog('ADD_FRAME_START', `Adding new frame to tab ${tabId}`)
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             if (tab) {
@@ -707,31 +813,77 @@ export const useProjectStore = create<ProjectStore>()(
                 updatedAt: new Date().toISOString(),
               }
 
+              // Create empty canvas data for the new frame
+              const newFrameCanvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+              
+              // Add frame to arrays
               tab.frames.push(newFrame)
               tab.project.frames.push(frameId)
+              
+              // Add canvas data for the new frame
+              tab.frameCanvasData.push({
+                frameId,
+                canvasData: newFrameCanvasData,
+                thumbnail: null // Will be generated when first drawn
+              })
+              
               tab.isDirty = true
+
+              debugLog('ADD_FRAME_COMPLETE', `Frame added successfully`, {
+                frameId,
+                totalFrames: tab.frames.length,
+                frameCanvasDataCount: tab.frameCanvasData.length
+              })
             }
           })
         },
 
         // Delete frame
         deleteFrame: (tabId, frameId) => {
+          debugLog('DELETE_FRAME_START', `Deleting frame ${frameId} from tab ${tabId}`)
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             if (tab && tab.frames.length > 1) { // Don't allow deleting the last frame
               const frameIndex = tab.frames.findIndex(f => f.id === frameId)
               if (frameIndex !== -1) {
+                // Remove frame from frames array
                 tab.frames.splice(frameIndex, 1)
                 tab.project.frames = tab.frames.map(f => f.id)
+                
+                // Remove frame canvas data
+                const frameCanvasIndex = tab.frameCanvasData.findIndex(f => f.frameId === frameId)
+                if (frameCanvasIndex !== -1) {
+                  tab.frameCanvasData.splice(frameCanvasIndex, 1)
+                }
                 
                 // Update active frame if deleted
                 if (tab.project.activeFrameId === frameId) {
                   const newIndex = Math.min(frameIndex, tab.frames.length - 1)
-                  tab.project.activeFrameId = tab.frames[newIndex]?.id || null
-                  tab.currentFrame = tab.frames[newIndex] || null
+                  const newActiveFrame = tab.frames[newIndex]
+                  tab.project.activeFrameId = newActiveFrame?.id || null
+                  tab.currentFrame = newActiveFrame || null
+                  
+                  // Load canvas data for the new active frame
+                  if (newActiveFrame) {
+                    const newFrameData = tab.frameCanvasData.find(f => f.frameId === newActiveFrame.id)
+                    if (newFrameData) {
+                      tab.canvasData = {
+                        ...newFrameData.canvasData,
+                        data: new Uint8ClampedArray(newFrameData.canvasData.data)
+                      }
+                    }
+                  }
                 }
                 
                 tab.isDirty = true
+
+                debugLog('DELETE_FRAME_COMPLETE', `Frame deleted successfully`, {
+                  deletedFrameId: frameId,
+                  remainingFrames: tab.frames.length,
+                  frameCanvasDataCount: tab.frameCanvasData.length,
+                  newActiveFrameId: tab.project.activeFrameId
+                })
               }
             }
           })
@@ -739,9 +891,13 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Duplicate frame
         duplicateFrame: (tabId, frameId) => {
+          debugLog('DUPLICATE_FRAME_START', `Duplicating frame ${frameId} in tab ${tabId}`)
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             const sourceFrame = tab?.frames.find(f => f.id === frameId)
+            const sourceFrameData = tab?.frameCanvasData.find(f => f.frameId === frameId)
+            
             if (tab && sourceFrame) {
               const newFrameId = `frame-${Date.now()}-copy`
               const newFrame: Frame = {
@@ -764,21 +920,146 @@ export const useProjectStore = create<ProjectStore>()(
                 }
               }
 
+              // Duplicate frame canvas data
+              if (sourceFrameData) {
+                const duplicatedCanvasData = {
+                  ...sourceFrameData.canvasData,
+                  data: new Uint8ClampedArray(sourceFrameData.canvasData.data)
+                }
+                
+                tab.frameCanvasData.splice(insertIndex, 0, {
+                  frameId: newFrameId,
+                  canvasData: duplicatedCanvasData,
+                  thumbnail: sourceFrameData.thumbnail // Reuse thumbnail since it's the same content
+                })
+              } else {
+                // Fallback: create empty canvas data
+                tab.frameCanvasData.splice(insertIndex, 0, {
+                  frameId: newFrameId,
+                  canvasData: createEmptyPixelData(tab.project.width, tab.project.height),
+                  thumbnail: null
+                })
+              }
+
               tab.project.frames = tab.frames.map(f => f.id)
               tab.isDirty = true
+
+              debugLog('DUPLICATE_FRAME_COMPLETE', `Frame duplicated successfully`, {
+                sourceFrameId: frameId,
+                newFrameId,
+                totalFrames: tab.frames.length,
+                frameCanvasDataCount: tab.frameCanvasData.length
+              })
             }
           })
         },
 
-        // Set active frame
+        // Save current frame canvas data
+        saveCurrentFrameCanvas: (tabId) => {
+          const tab = get().getTab(tabId)
+          if (!tab || !tab.canvasData || !tab.currentFrame) return
+
+          debugLog('SAVE_FRAME_CANVAS', `Saving canvas data for frame ${tab.currentFrame.id}`, {
+            frameId: tab.currentFrame.id,
+            hasCanvasData: !!tab.canvasData,
+            dataLength: tab.canvasData.data.length
+          })
+
+          set((state) => {
+            const stateTab = state.tabs.find(t => t.id === tabId)
+            if (!stateTab || !stateTab.canvasData || !stateTab.currentFrame) return
+
+            const frameIndex = stateTab.frameCanvasData.findIndex(f => f.frameId === stateTab.currentFrame!.id)
+            
+            // Create a copy of canvas data
+            const canvasDataCopy = {
+              ...stateTab.canvasData,
+              data: new Uint8ClampedArray(stateTab.canvasData.data)
+            }
+
+            // Generate thumbnail
+            const thumbnail = generateThumbnail(canvasDataCopy)
+
+            if (frameIndex >= 0) {
+              // Update existing frame data
+              stateTab.frameCanvasData[frameIndex] = {
+                frameId: stateTab.currentFrame.id,
+                canvasData: canvasDataCopy,
+                thumbnail
+              }
+            } else {
+              // Add new frame data
+              stateTab.frameCanvasData.push({
+                frameId: stateTab.currentFrame.id,
+                canvasData: canvasDataCopy,
+                thumbnail
+              })
+            }
+
+            debugLog('SAVE_FRAME_CANVAS_COMPLETE', `Frame canvas data saved`, {
+              frameId: stateTab.currentFrame.id,
+              thumbnailGenerated: !!thumbnail,
+              frameCanvasDataCount: stateTab.frameCanvasData.length
+            })
+          })
+        },
+
+        // Get frame thumbnail
+        getFrameThumbnail: (tabId, frameId) => {
+          const tab = get().getTab(tabId)
+          if (!tab) return null
+
+          const frameData = tab.frameCanvasData.find(f => f.frameId === frameId)
+          return frameData?.thumbnail || null
+        },
+
+        // Set active frame with canvas data loading
         setActiveFrame: (tabId, frameId) => {
+          debugLog('SET_ACTIVE_FRAME_START', `Switching to frame ${frameId}`, {
+            tabId,
+            frameId
+          })
+
+          // First, save current frame's canvas data
+          get().saveCurrentFrameCanvas(tabId)
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             const frame = tab?.frames.find(f => f.id === frameId)
-            if (tab && frame) {
-              tab.project.activeFrameId = frameId
-              tab.currentFrame = frame
+            
+            if (!tab || !frame) {
+              debugLog('SET_ACTIVE_FRAME_ERROR', 'Tab or frame not found', { tabId, frameId })
+              return
             }
+
+            debugLog('SET_ACTIVE_FRAME_SWITCH', `Switching from frame ${tab.currentFrame?.id} to ${frameId}`)
+
+            // Update active frame references
+            tab.project.activeFrameId = frameId
+            tab.currentFrame = frame
+
+            // Load the target frame's canvas data
+            const frameData = tab.frameCanvasData.find(f => f.frameId === frameId)
+            if (frameData) {
+              // Load existing canvas data for this frame
+              tab.canvasData = {
+                ...frameData.canvasData,
+                data: new Uint8ClampedArray(frameData.canvasData.data)
+              }
+              debugLog('SET_ACTIVE_FRAME_LOADED', `Loaded existing canvas data for frame ${frameId}`, {
+                dataLength: frameData.canvasData.data.length,
+                hasThumbnail: !!frameData.thumbnail
+              })
+            } else {
+              // Create empty canvas data for new frame
+              tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+              debugLog('SET_ACTIVE_FRAME_EMPTY', `Created empty canvas data for new frame ${frameId}`)
+            }
+
+            // Add history entry for frame switch
+            get().addHistoryEntry(tabId, 'frame_switch', tab.canvasData)
+
+            tab.isDirty = true
           })
         },
 

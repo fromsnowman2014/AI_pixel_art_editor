@@ -15,14 +15,16 @@ type ExportType = 'image' | 'gif'
 type ImageFormat = 'png' | 'jpg' | 'webp'
 
 export function ExportModal({ open, onOpenChange }: ExportModalProps) {
-  const { activeTabId, getActiveTab, exportProject } = useProjectStore()
+  const { activeTabId, getActiveTab, exportProject, getFrameThumbnail } = useProjectStore()
   const [exportType, setExportType] = useState<ExportType>('image')
   const [imageFormat, setImageFormat] = useState<ImageFormat>('png')
   const [fileName, setFileName] = useState('')
   const [quality, setQuality] = useState(90)
   const [gifDuration, setGifDuration] = useState(500) // ms per frame
+  const [gifLoop, setGifLoop] = useState(true) // Loop GIF
   const [isExporting, setIsExporting] = useState(false)
   const [gifPreviewUrl, setGifPreviewUrl] = useState<string | null>(null)
+  const [previewFrameIndex, setPreviewFrameIndex] = useState(0)
 
   const activeTab = getActiveTab()
   const project = activeTab?.project
@@ -45,29 +47,22 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
     }
   }, [open, project])
 
-  // Generate GIF preview when switching to GIF mode
+  // Animate GIF preview
   useEffect(() => {
     if (exportType === 'gif' && frames.length > 1) {
-      generateGifPreview()
+      const interval = setInterval(() => {
+        setPreviewFrameIndex((prev) => (prev + 1) % frames.length)
+      }, gifDuration)
+      
+      return () => clearInterval(interval)
     }
-  }, [exportType, frames])
+  }, [exportType, frames.length, gifDuration])
 
-  const generateGifPreview = async () => {
-    if (!activeTab || frames.length <= 1) return
-    
-    debugLog('GIF_PREVIEW_START', 'Generating GIF preview', {
-      frameCount: frames.length,
-      duration: gifDuration
-    })
+  // Reset preview frame when switching modes
+  useEffect(() => {
+    setPreviewFrameIndex(0)
+  }, [exportType])
 
-    try {
-      // TODO: Implement GIF preview generation
-      // This would use a library like gif.js to create a preview
-      setGifPreviewUrl('/api/placeholder-gif-preview')
-    } catch (error) {
-      debugLog('GIF_PREVIEW_ERROR', 'Failed to generate GIF preview', { error })
-    }
-  }
 
   const handleExport = async () => {
     if (!activeTabId || !project) return
@@ -95,6 +90,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
         await exportProject(activeTabId, 'gif', {
           fileName,
           duration: gifDuration,
+          loop: gifLoop,
           frames: frames
         })
       }
@@ -228,15 +224,69 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                 </div>
               </div>
 
-              {/* GIF Preview Placeholder */}
+              {/* GIF Loop Setting */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="gif-loop" className="text-sm font-medium">Loop Animation</label>
+                  <input
+                    id="gif-loop"
+                    type="checkbox"
+                    checked={gifLoop}
+                    onChange={(e) => setGifLoop(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                </div>
+                <div className="text-xs text-gray-500">
+                  {gifLoop ? 'GIF will loop continuously' : 'GIF will play once and stop'}
+                </div>
+              </div>
+
+              {/* GIF Preview */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Preview</label>
-                <div className="flex items-center justify-center rounded-lg border bg-gray-50 p-4 h-32">
-                  <div className="text-center text-gray-500">
-                    <Film className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-sm">GIF preview will appear here</p>
-                    <p className="text-xs">{frames.length} frames @ {Math.round(1000 / gifDuration)} FPS</p>
-                  </div>
+                <div className="flex items-center justify-center rounded-lg border bg-gray-50 p-4 h-32 relative overflow-hidden">
+                  {(() => {
+                    if (!activeTabId || frames.length <= 1) {
+                      return (
+                        <div className="text-center text-gray-500">
+                          <Film className="h-8 w-8 mx-auto mb-2" />
+                          <p className="text-sm">Add more frames to see preview</p>
+                        </div>
+                      )
+                    }
+
+                    const currentFrame = frames[previewFrameIndex]
+                    const thumbnail = currentFrame ? getFrameThumbnail(activeTabId, currentFrame.id) : null
+                    
+                    if (thumbnail) {
+                      return (
+                        <div className="text-center">
+                          <img
+                            src={thumbnail}
+                            alt={`Frame ${previewFrameIndex + 1}`}
+                            className="h-16 w-16 mx-auto mb-2 border border-gray-200 rounded"
+                            style={{ imageRendering: 'pixelated' }}
+                          />
+                          <div className="text-xs text-gray-500">
+                            Frame {previewFrameIndex + 1} of {frames.length} @ {Math.round(1000 / gifDuration)} FPS
+                            {gifLoop && <span className="ml-2">🔄 Loop</span>}
+                          </div>
+                        </div>
+                      )
+                    } else {
+                      return (
+                        <div className="text-center text-gray-500">
+                          <div className="h-16 w-16 mx-auto mb-2 border border-gray-200 rounded bg-white flex items-center justify-center">
+                            <span className="text-xs">{previewFrameIndex + 1}</span>
+                          </div>
+                          <div className="text-xs">
+                            Frame {previewFrameIndex + 1} of {frames.length} @ {Math.round(1000 / gifDuration)} FPS
+                            {gifLoop && <span className="ml-2">🔄 Loop</span>}
+                          </div>
+                        </div>
+                      )
+                    }
+                  })()}
                 </div>
               </div>
             </div>
@@ -282,6 +332,9 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                     </div>
                     <div>
                       <span className="text-gray-600">Duration:</span> {(frames.length * gifDuration / 1000).toFixed(1)}s
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Loop:</span> {gifLoop ? 'Yes' : 'No'}
                     </div>
                   </>
                 )}
