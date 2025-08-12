@@ -14,7 +14,10 @@ import {
   Palette,
   Grid,
   FileImage,
-  Film
+  Film,
+  AlertTriangle,
+  Save,
+  Trash2
 } from 'lucide-react'
 
 export function ProjectPanel({ className }: { className?: string }) {
@@ -29,9 +32,22 @@ export function ProjectPanel({ className }: { className?: string }) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+  
+  // Canvas dimension state for deferred application
+  const [pendingWidth, setPendingWidth] = useState(project?.width || 32)
+  const [pendingHeight, setPendingHeight] = useState(project?.height || 32)
+  const [showResizeConfirm, setShowResizeConfirm] = useState(false)
 
   const activeTab = getActiveTab()
   const project = activeTab?.project
+
+  // Update pending dimensions when project changes
+  React.useEffect(() => {
+    if (project) {
+      setPendingWidth(project.width)
+      setPendingHeight(project.height)
+    }
+  }, [project?.width, project?.height])
 
   if (!activeTabId || !project) {
     return (
@@ -58,6 +74,95 @@ export function ProjectPanel({ className }: { className?: string }) {
 
   const handleModeChange = (mode: 'beginner' | 'advanced') => {
     updateProject(activeTabId, { mode })
+  }
+
+  // Debug logging utility
+  const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
+  const debugLog = (category: string, message: string, data?: any) => {
+    if (DEBUG_MODE) {
+      const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
+      console.log(`[${timestamp}] 🎛️  ProjectPanel [${category}]:`, message, data || '')
+    }
+  }
+
+  // Check if canvas has any content
+  const isCanvasEmpty = () => {
+    if (!activeTab?.canvasData) {
+      debugLog('CANVAS_EMPTY_CHECK', 'No canvas data found', { tabId: activeTabId })
+      return true
+    }
+
+    const { data } = activeTab.canvasData
+    // Check for any non-transparent pixels
+    const hasContent = Array.from(data).some((value, index) => {
+      // Check alpha channel (every 4th value)
+      return index % 4 === 3 && value > 0
+    })
+
+    debugLog('CANVAS_EMPTY_CHECK', 'Canvas content analysis', {
+      tabId: activeTabId,
+      dataLength: data.length,
+      hasContent: hasContent,
+      sampleData: Array.from(data.slice(0, 20))
+    })
+
+    return !hasContent
+  }
+
+  // Handle apply dimensions with content check
+  const handleApplyDimensions = () => {
+    debugLog('APPLY_DIMENSIONS_START', 'Apply dimensions requested', {
+      currentSize: `${project.width}x${project.height}`,
+      newSize: `${pendingWidth}x${pendingHeight}`,
+      activeTabId: activeTabId
+    })
+
+    const isEmpty = isCanvasEmpty()
+
+    if (isEmpty) {
+      // Canvas is empty, apply directly
+      debugLog('APPLY_DIMENSIONS_DIRECT', 'Canvas is empty, applying directly')
+      handleDimensionChange(pendingWidth, pendingHeight)
+    } else {
+      // Canvas has content, show confirmation modal
+      debugLog('APPLY_DIMENSIONS_CONFIRM', 'Canvas has content, showing confirmation modal')
+      setShowResizeConfirm(true)
+    }
+  }
+
+  // Handle resize confirmation actions
+  const handleResizeWithSave = async () => {
+    debugLog('RESIZE_WITH_SAVE', 'User chose to save before resizing')
+    
+    // Save current project first
+    try {
+      await saveProject(activeTabId)
+      debugLog('RESIZE_SAVE_SUCCESS', 'Project saved successfully before resize')
+    } catch (error) {
+      debugLog('RESIZE_SAVE_ERROR', 'Failed to save project before resize', error)
+      // Continue with resize even if save fails
+    }
+    
+    // Apply new dimensions
+    handleDimensionChange(pendingWidth, pendingHeight)
+    setShowResizeConfirm(false)
+  }
+
+  const handleResizeWithDiscard = () => {
+    debugLog('RESIZE_WITH_DISCARD', 'User chose to discard changes and resize')
+    
+    // Apply new dimensions directly
+    handleDimensionChange(pendingWidth, pendingHeight)
+    setShowResizeConfirm(false)
+  }
+
+  const handleResizeCancel = () => {
+    debugLog('RESIZE_CANCEL', 'User cancelled resize operation')
+    
+    // Reset pending dimensions to current project dimensions
+    setPendingWidth(project.width)
+    setPendingHeight(project.height)
+    setShowResizeConfirm(false)
   }
 
   const handleAiGenerate = async () => {
@@ -111,33 +216,46 @@ export function ProjectPanel({ className }: { className?: string }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Width
-              </label>
-              <input
-                type="number"
-                value={project.width}
-                onChange={(e) => handleDimensionChange(parseInt(e.target.value) || 32, project.height)}
-                min="8"
-                max="128"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              />
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  value={pendingWidth}
+                  onChange={(e) => setPendingWidth(parseInt(e.target.value) || 32)}
+                  min="8"
+                  max="128"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  value={pendingHeight}
+                  onChange={(e) => setPendingHeight(parseInt(e.target.value) || 32)}
+                  min="8"
+                  max="128"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Height
-              </label>
-              <input
-                type="number"
-                value={project.height}
-                onChange={(e) => handleDimensionChange(project.width, parseInt(e.target.value) || 32)}
-                min="8"
-                max="128"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
+            
+            {/* Apply button - only show if dimensions changed */}
+            {(pendingWidth !== project.width || pendingHeight !== project.height) && (
+              <Button
+                onClick={() => handleApplyDimensions()}
+                size="sm"
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                Apply Canvas Size ({pendingWidth}×{pendingHeight})
+              </Button>
+            )}
           </div>
 
           <div>
@@ -330,6 +448,61 @@ export function ProjectPanel({ className }: { className?: string }) {
           </Button>
         </div>
       </div>
+
+      {/* Canvas Resize Confirmation Modal */}
+      {showResizeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center space-x-3">
+              <AlertTriangle className="h-6 w-6 text-amber-600" />
+              <h3 className="text-lg font-semibold text-gray-800">
+                Canvas Size Change
+              </h3>
+            </div>
+            
+            <div className="mb-6 space-y-3">
+              <p className="text-sm text-gray-600">
+                You're about to change the canvas size from{' '}
+                <span className="font-medium">{project.width}×{project.height}</span> to{' '}
+                <span className="font-medium">{pendingWidth}×{pendingHeight}</span>.
+              </p>
+              
+              <p className="text-sm text-gray-600">
+                Your current artwork will be affected. What would you like to do?
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              {activeTab?.isDirty && (
+                <Button
+                  onClick={handleResizeWithSave}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Current Work & Resize
+                </Button>
+              )}
+              
+              <Button
+                onClick={handleResizeWithDiscard}
+                variant="outline"
+                className="w-full border-red-300 text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Discard Changes & Resize
+              </Button>
+              
+              <Button
+                onClick={handleResizeCancel}
+                variant="ghost"
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

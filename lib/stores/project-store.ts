@@ -474,10 +474,23 @@ export const useProjectStore = create<ProjectStore>()(
               const oldWidth = tab.project.width
               const oldHeight = tab.project.height
               
+              debugLog('UPDATE_PROJECT_START', 'Project update requested', {
+                tabId,
+                updates,
+                oldSize: `${oldWidth}x${oldHeight}`,
+                newSize: updates.width || updates.height ? `${updates.width || oldWidth}x${updates.height || oldHeight}` : 'no size change'
+              })
+              
               Object.assign(tab.project, updates)
               
               // If dimensions changed, reallocate canvas data
               if ((updates.width && updates.width !== oldWidth) || (updates.height && updates.height !== oldHeight)) {
+                debugLog('RESIZE_CANVAS_START', 'Canvas resize operation started', {
+                  oldSize: `${oldWidth}x${oldHeight}`,
+                  newSize: `${tab.project.width}x${tab.project.height}`,
+                  hasExistingData: !!tab.canvasData
+                })
+                
                 const newCanvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                 
                 // Copy existing pixels if shrinking or expanding
@@ -487,23 +500,43 @@ export const useProjectStore = create<ProjectStore>()(
                   const minWidth = Math.min(oldWidth, tab.project.width)
                   const minHeight = Math.min(oldHeight, tab.project.height)
                   
+                  debugLog('RESIZE_CANVAS_COPY', 'Copying existing pixel data', {
+                    copyArea: `${minWidth}x${minHeight}`,
+                    oldDataLength: oldData.length,
+                    newDataLength: newData.length
+                  })
+                  
+                  let copiedPixels = 0
                   for (let y = 0; y < minHeight; y++) {
                     for (let x = 0; x < minWidth; x++) {
                       const oldIndex = (y * oldWidth + x) * 4
                       const newIndex = (y * tab.project.width + x) * 4
                       
-                      newData[newIndex] = oldData[oldIndex] || 255     // R (default white)
-                      newData[newIndex + 1] = oldData[oldIndex + 1] || 255 // G
-                      newData[newIndex + 2] = oldData[oldIndex + 2] || 255 // B
-                      newData[newIndex + 3] = oldData[oldIndex + 3] || 255 // A
+                      // Copy pixel data
+                      newData[newIndex] = oldData[oldIndex] || 0         // R
+                      newData[newIndex + 1] = oldData[oldIndex + 1] || 0 // G
+                      newData[newIndex + 2] = oldData[oldIndex + 2] || 0 // B
+                      newData[newIndex + 3] = oldData[oldIndex + 3] || 0 // A
+                      
+                      if (oldData[oldIndex + 3] > 0) copiedPixels++
                     }
                   }
+                  
+                  debugLog('RESIZE_CANVAS_COPY_COMPLETE', 'Pixel copy completed', {
+                    copiedPixels: copiedPixels,
+                    totalPixels: minWidth * minHeight
+                  })
                 }
                 
                 tab.canvasData = newCanvasData
                 
                 // Add history entry for dimension change
                 get().addHistoryEntry(tabId, 'resize_canvas', newCanvasData)
+                
+                debugLog('RESIZE_CANVAS_COMPLETE', 'Canvas resize completed', {
+                  newSize: `${tab.project.width}x${tab.project.height}`,
+                  historyAdded: true
+                })
               }
               
               tab.project.updatedAt = new Date().toISOString()
