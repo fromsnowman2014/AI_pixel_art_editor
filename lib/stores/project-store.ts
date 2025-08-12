@@ -377,6 +377,17 @@ export const useProjectStore = create<ProjectStore>()(
                 isDirty: tab.isDirty,
                 canvasDataSet: !!tab.canvasData
               })
+
+              // Critical debug: Check if React will detect this change
+              setTimeout(() => {
+                debugLog('STORE_FOLLOWUP_CHECK', 'Checking store state after update', {
+                  tabId: tab.id,
+                  canvasDataLength: tab.canvasData?.data.length,
+                  tabsCount: state.tabs.length,
+                  activeTabId: state.activeTabId,
+                  timestamp: Date.now()
+                })
+              }, 25)
             } else {
               debugLog('UPDATE_CANVAS_NO_TAB', `Tab not found: ${tabId}`, {
                 availableTabs: state.tabs.map(t => ({ id: t.id, projectName: t.project.name }))

@@ -164,6 +164,15 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     updateCanvasData(activeTabId, updatedCanvasData)
     
     debugLog('DRAW_UPDATE_COMPLETE', `updateCanvasData called successfully`)
+    
+    // Critical debug: Force a manual re-render check
+    setTimeout(() => {
+      debugLog('DRAW_FOLLOWUP_CHECK', 'Checking if component re-rendered after draw', {
+        activeTabId,
+        currentCanvasDataLength: canvasData?.data.length,
+        timestamp: Date.now()
+      })
+    }, 50)
   }, [canvasData, canvasState, project, activeTabId, updateCanvasData, updateCanvasState])
 
   // Simple flood fill algorithm

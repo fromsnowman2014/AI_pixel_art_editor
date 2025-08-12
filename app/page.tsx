@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { PixelEditor } from '@/components/pixel-editor'
 import { CoppaGate } from '@/components/coppa-gate'
+import { DebugMonitor } from '@/components/debug-monitor'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { useAuthStore } from '@/lib/stores/auth-store'
 
@@ -30,6 +31,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
+      <DebugMonitor />
       <PixelEditor />
     </main>
   )
