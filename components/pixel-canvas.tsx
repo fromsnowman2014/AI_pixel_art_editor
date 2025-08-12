@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
@@ -253,17 +253,23 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     const canvasRect = canvasRef.current.getBoundingClientRect()
     const containerRect = containerRef.current.getBoundingClientRect()
     
-    // Calculate coordinates relative to canvas element, not container
-    const x = e.clientX - canvasRect.left
-    const y = e.clientY - canvasRect.top
+    // Calculate coordinates relative to canvas element, accounting for pan offset
+    const rawX = e.clientX - canvasRect.left
+    const rawY = e.clientY - canvasRect.top
+    
+    // Adjust for pan offset to get true canvas coordinates
+    const x = rawX - canvasState.panX
+    const y = rawY - canvasState.panY
 
     debugLog('MOUSE_DOWN_COORDS', 'Calculated drawing coordinates', {
-      canvasX: x,
-      canvasY: y,
+      rawX: rawX,
+      rawY: rawY,
+      adjustedX: x,
+      adjustedY: y,
       canvasRect: { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height },
       containerRect: { left: containerRect.left, top: containerRect.top, width: containerRect.width, height: containerRect.height },
       pan: { x: canvasState.panX, y: canvasState.panY },
-      coordinateMethod: 'canvas-direct'
+      coordinateMethod: 'canvas-direct-with-pan-adjustment'
     })
 
     setIsDragging(true)
@@ -293,8 +299,12 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     } else {
       // Use canvas element directly for accurate coordinates
       const canvasRect = canvasRef.current.getBoundingClientRect()
-      const x = e.clientX - canvasRect.left
-      const y = e.clientY - canvasRect.top
+      const rawX = e.clientX - canvasRect.left
+      const rawY = e.clientY - canvasRect.top
+      
+      // Adjust for pan offset to get true canvas coordinates
+      const x = rawX - canvasState.panX
+      const y = rawY - canvasState.panY
       drawPixel(x, y)
     }
 
@@ -326,7 +336,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     if (!canvasData) return 'null'
     // Create a stable ID based on content, not reference
     const sampleData = Array.from(canvasData.data.slice(0, 32))
-    const nonZeroPixels = Array.from(canvasData.data).filter((_, i) => i % 4 === 3 && canvasData.data[i] > 0).length
+    const nonZeroPixels = Array.from(canvasData.data).filter((_, i) => i % 4 === 3 && (canvasData.data[i] ?? 0) > 0).length
     return `${canvasData.width}x${canvasData.height}-${sampleData.join(',')}-pixels:${nonZeroPixels}`
   }, [canvasData])
   

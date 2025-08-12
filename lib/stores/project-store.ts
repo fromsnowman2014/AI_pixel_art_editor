@@ -518,7 +518,7 @@ export const useProjectStore = create<ProjectStore>()(
                       newData[newIndex + 2] = oldData[oldIndex + 2] || 0 // B
                       newData[newIndex + 3] = oldData[oldIndex + 3] || 0 // A
                       
-                      if (oldData[oldIndex + 3] > 0) copiedPixels++
+                      if ((oldData[oldIndex + 3] ?? 0) > 0) copiedPixels++
                     }
                   }
                   

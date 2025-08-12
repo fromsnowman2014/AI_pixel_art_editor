@@ -32,14 +32,14 @@ export function ProjectPanel({ className }: { className?: string }) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+
+  const activeTab = getActiveTab()
+  const project = activeTab?.project
   
   // Canvas dimension state for deferred application
   const [pendingWidth, setPendingWidth] = useState(project?.width || 32)
   const [pendingHeight, setPendingHeight] = useState(project?.height || 32)
   const [showResizeConfirm, setShowResizeConfirm] = useState(false)
-
-  const activeTab = getActiveTab()
-  const project = activeTab?.project
 
   // Update pending dimensions when project changes
   React.useEffect(() => {
