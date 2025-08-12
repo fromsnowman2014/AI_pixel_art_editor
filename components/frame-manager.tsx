@@ -76,10 +76,94 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   const handleFrameSelect = (frameId: string) => {
-    setActiveFrame(activeTabId, frameId)
-    if (!isPlaying) {
+    // Enhanced debug logging for frame switching
+    const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
+    const debugLog = (category: string, message: string, data?: any) => {
+      if (DEBUG_MODE) {
+        const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
+        console.log(`[${timestamp}] 🎞️  FrameManager [${category}]:`, message, data || '')
+      }
+    }
+
+    // EDGE CASE: Validate inputs
+    if (!frameId || typeof frameId !== 'string') {
+      debugLog('FRAME_SELECT_ERROR', 'Invalid frameId provided', { frameId, type: typeof frameId })
+      return
+    }
+
+    if (!activeTabId || typeof activeTabId !== 'string') {
+      debugLog('FRAME_SELECT_ERROR', 'Invalid activeTabId', { activeTabId, type: typeof activeTabId })
+      return
+    }
+
+    if (!frames || frames.length === 0) {
+      debugLog('FRAME_SELECT_ERROR', 'No frames available', { framesLength: frames?.length || 0 })
+      return
+    }
+
+    // EDGE CASE: Verify frame exists
+    const targetFrame = frames.find(f => f.id === frameId)
+    if (!targetFrame) {
+      debugLog('FRAME_SELECT_ERROR', 'Target frame not found', { 
+        frameId, 
+        availableFrames: frames.map(f => f.id),
+        totalFrames: frames.length
+      })
+      return
+    }
+
+    const currentActiveFrameId = frames.find(f => f.id === activeFrameId)?.id
+    debugLog('FRAME_SELECT_START', `User clicked frame ${frameId}`, {
+      currentActiveFrameId,
+      targetFrameId: frameId,
+      totalFrames: frames.length,
+      isPlaying,
+      activeTabId
+    })
+
+    // Check if we're actually switching frames
+    if (currentActiveFrameId === frameId) {
+      debugLog('FRAME_SELECT_SAME', 'Selected same frame, no action needed', { frameId })
+      return
+    }
+
+    // EDGE CASE: Prevent rapid clicking
+    if (isPlaying) {
+      debugLog('FRAME_SELECT_BLOCKED', 'Frame switching blocked during playback', { frameId })
+      return
+    }
+
+    debugLog('FRAME_SELECT_EXECUTE', 'Calling setActiveFrame', {
+      from: currentActiveFrameId,
+      to: frameId
+    })
+
+    try {
+      setActiveFrame(activeTabId, frameId)
+      
       const frameIndex = frames.findIndex(f => f.id === frameId)
-      setPlaybackFrame(frameIndex)
+      if (frameIndex >= 0) {
+        setPlaybackFrame(frameIndex)
+        debugLog('FRAME_SELECT_PLAYBACK_UPDATE', 'Updated playback frame index', {
+          frameIndex,
+          frameId
+        })
+      } else {
+        debugLog('FRAME_SELECT_WARNING', 'Could not find frame index for playback update', {
+          frameId,
+          availableFrames: frames.map((f, i) => ({ id: f.id, index: i }))
+        })
+      }
+
+      debugLog('FRAME_SELECT_COMPLETE', 'Frame selection process completed successfully', {
+        targetFrameId: frameId
+      })
+    } catch (error) {
+      debugLog('FRAME_SELECT_ERROR', 'Error during frame selection', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        frameId,
+        activeTabId
+      })
     }
   }
 

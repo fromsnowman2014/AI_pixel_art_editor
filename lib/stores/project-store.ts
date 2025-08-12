@@ -27,23 +27,52 @@ const downloadFile = (dataURL: string, fileName: string) => {
   document.body.removeChild(link)
 }
 
-// Utility function to generate thumbnail from pixel data
+// Utility function to generate thumbnail from pixel data - Memory optimized
 const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | null => {
+  let canvas: HTMLCanvasElement | null = null
+  let sourceCanvas: HTMLCanvasElement | null = null
+  
   try {
-    const canvas = document.createElement('canvas')
+    // Validate input data
+    if (!pixelData || !pixelData.data || pixelData.data.length === 0) {
+      debugLog('THUMBNAIL_ERROR', 'Invalid pixel data provided', { 
+        hasPixelData: !!pixelData,
+        dataLength: pixelData?.data?.length || 0
+      })
+      return null
+    }
+
+    canvas = document.createElement('canvas')
     canvas.width = thumbnailSize
     canvas.height = thumbnailSize
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: false })
     
-    if (!ctx) return null
+    if (!ctx) {
+      debugLog('THUMBNAIL_ERROR', 'Failed to get 2D context for thumbnail canvas')
+      return null
+    }
 
     // Create source canvas with original pixel data
-    const sourceCanvas = document.createElement('canvas')
+    sourceCanvas = document.createElement('canvas')
     sourceCanvas.width = pixelData.width
     sourceCanvas.height = pixelData.height
-    const sourceCtx = sourceCanvas.getContext('2d')
+    const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: false })
     
-    if (!sourceCtx) return null
+    if (!sourceCtx) {
+      debugLog('THUMBNAIL_ERROR', 'Failed to get 2D context for source canvas')
+      return null
+    }
+
+    // Create ImageData with proper validation
+    const expectedLength = pixelData.width * pixelData.height * 4
+    if (pixelData.data.length !== expectedLength) {
+      debugLog('THUMBNAIL_ERROR', 'Pixel data length mismatch', {
+        expected: expectedLength,
+        actual: pixelData.data.length,
+        dimensions: `${pixelData.width}x${pixelData.height}`
+      })
+      return null
+    }
 
     // Put original pixel data on source canvas
     const imageData = new ImageData(new Uint8ClampedArray(pixelData.data), pixelData.width, pixelData.height)
@@ -53,10 +82,40 @@ const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | n
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(sourceCanvas, 0, 0, thumbnailSize, thumbnailSize)
 
-    return canvas.toDataURL('image/png')
+    const result = canvas.toDataURL('image/png')
+    
+    debugLog('THUMBNAIL_SUCCESS', 'Thumbnail generated successfully', {
+      originalSize: `${pixelData.width}x${pixelData.height}`,
+      thumbnailSize: `${thumbnailSize}x${thumbnailSize}`,
+      resultLength: result.length
+    })
+    
+    return result
   } catch (error) {
-    debugLog('THUMBNAIL_ERROR', 'Failed to generate thumbnail', { error })
+    debugLog('THUMBNAIL_ERROR', 'Failed to generate thumbnail', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      pixelDataSize: pixelData?.data?.length || 0,
+      dimensions: pixelData ? `${pixelData.width}x${pixelData.height}` : 'unknown'
+    })
     return null
+  } finally {
+    // CRITICAL: Clean up canvas elements to prevent memory leaks
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      }
+      canvas.width = 0
+      canvas.height = 0
+    }
+    if (sourceCanvas) {
+      const sourceCtx = sourceCanvas.getContext('2d')
+      if (sourceCtx) {
+        sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height)
+      }
+      sourceCanvas.width = 0
+      sourceCanvas.height = 0
+    }
   }
 }
 
@@ -113,6 +172,7 @@ interface ProjectStore {
   setActiveFrame: (tabId: string, frameId: string) => void
   reorderFrames: (tabId: string, frameIds: string[]) => void
   saveCurrentFrameCanvas: (tabId: string) => void
+  saveAllFrameCanvasData: (tabId: string) => void
   getFrameThumbnail: (tabId: string, frameId: string) => string | null
 
   // Utility functions
@@ -461,10 +521,8 @@ export const useProjectStore = create<ProjectStore>()(
                 canvasDataSet: !!tab.canvasData
               })
 
-              // Auto-save current frame canvas data and regenerate thumbnail
-              setTimeout(() => {
-                get().saveCurrentFrameCanvas(tabId)
-              }, 100)
+              // Note: Frame canvas data will be saved when switching frames via setActiveFrame
+              // No automatic saving here to prevent conflicts with frame switching logic
 
               // Critical debug: Check if React will detect this change
               // Fix: Capture values before setTimeout to avoid proxy issues
@@ -1013,53 +1071,136 @@ export const useProjectStore = create<ProjectStore>()(
           return frameData?.thumbnail || null
         },
 
-        // Set active frame with canvas data loading
+        // Save all frame canvas data (useful for export operations)
+        saveAllFrameCanvasData: (tabId) => {
+          const tab = get().getTab(tabId)
+          if (!tab) return
+
+          debugLog('SAVE_ALL_FRAMES_START', `Saving all frame canvas data for tab ${tabId}`, {
+            totalFrames: tab.frames.length,
+            frameCanvasDataCount: tab.frameCanvasData.length
+          })
+
+          // Always save current frame first
+          get().saveCurrentFrameCanvas(tabId)
+
+          debugLog('SAVE_ALL_FRAMES_COMPLETE', `All frame canvas data saved`, {
+            tabId,
+            totalFrames: tab.frames.length
+          })
+        },
+
+        // Set active frame with canvas data loading - CRITICAL FIX: Single atomic operation
         setActiveFrame: (tabId, frameId) => {
           debugLog('SET_ACTIVE_FRAME_START', `Switching to frame ${frameId}`, {
             tabId,
             frameId
           })
 
-          // First, save current frame's canvas data
-          get().saveCurrentFrameCanvas(tabId)
-
+          // ATOMIC OPERATION: Single set() call for data integrity
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
-            const frame = tab?.frames.find(f => f.id === frameId)
+            const targetFrame = tab?.frames.find(f => f.id === frameId)
             
-            if (!tab || !frame) {
+            if (!tab || !targetFrame) {
               debugLog('SET_ACTIVE_FRAME_ERROR', 'Tab or frame not found', { tabId, frameId })
               return
             }
 
-            debugLog('SET_ACTIVE_FRAME_SWITCH', `Switching from frame ${tab.currentFrame?.id} to ${frameId}`)
+            debugLog('SET_ACTIVE_FRAME_PROCESS', `Processing frame switch from ${tab.currentFrame?.id} to ${frameId}`, {
+              hasCurrentCanvas: !!tab.canvasData,
+              currentCanvasDataLength: tab.canvasData?.data.length,
+              frameCanvasDataCount: tab.frameCanvasData.length
+            })
 
-            // Update active frame references
+            // STEP 1: Save current frame's canvas data if exists
+            if (tab.currentFrame && tab.canvasData) {
+              const currentFrameId = tab.currentFrame.id
+              const hasNonZeroPixels = Array.from(tab.canvasData.data).some((_, i) => i % 4 === 3 && (tab.canvasData?.data[i] ?? 0) > 0)
+              
+              debugLog('SET_ACTIVE_FRAME_SAVE_CURRENT', `Saving current frame ${currentFrameId}`, {
+                currentFrameId,
+                dataLength: tab.canvasData.data.length,
+                hasNonZeroPixels
+              })
+
+              const frameIndex = tab.frameCanvasData.findIndex(f => f.frameId === currentFrameId)
+              
+              // Create a deep copy of canvas data
+              const canvasDataCopy = {
+                ...tab.canvasData,
+                data: new Uint8ClampedArray(tab.canvasData.data)
+              }
+
+              // Generate thumbnail
+              const thumbnail = generateThumbnail(canvasDataCopy)
+
+              if (frameIndex >= 0) {
+                // Update existing frame data
+                tab.frameCanvasData[frameIndex] = {
+                  frameId: currentFrameId,
+                  canvasData: canvasDataCopy,
+                  thumbnail
+                }
+                debugLog('SET_ACTIVE_FRAME_SAVE_UPDATED', `Updated frame data for ${currentFrameId}`, {
+                  frameIndex,
+                  thumbnailGenerated: !!thumbnail
+                })
+              } else {
+                // Add new frame data
+                tab.frameCanvasData.push({
+                  frameId: currentFrameId,
+                  canvasData: canvasDataCopy,
+                  thumbnail
+                })
+                debugLog('SET_ACTIVE_FRAME_SAVE_ADDED', `Added frame data for ${currentFrameId}`, {
+                  frameCanvasDataCount: tab.frameCanvasData.length,
+                  thumbnailGenerated: !!thumbnail
+                })
+              }
+            }
+
+            // STEP 2: Update active frame references
             tab.project.activeFrameId = frameId
-            tab.currentFrame = frame
+            tab.currentFrame = targetFrame
 
-            // Load the target frame's canvas data
-            const frameData = tab.frameCanvasData.find(f => f.frameId === frameId)
-            if (frameData) {
-              // Load existing canvas data for this frame
+            // STEP 3: Load target frame's canvas data
+            const targetFrameData = tab.frameCanvasData.find(f => f.frameId === frameId)
+            if (targetFrameData) {
+              // Load existing canvas data for target frame
+              const hasPixelData = Array.from(targetFrameData.canvasData.data).some((_, i) => i % 4 === 3 && (targetFrameData.canvasData.data[i] ?? 0) > 0)
               tab.canvasData = {
-                ...frameData.canvasData,
-                data: new Uint8ClampedArray(frameData.canvasData.data)
+                ...targetFrameData.canvasData,
+                data: new Uint8ClampedArray(targetFrameData.canvasData.data)
               }
               debugLog('SET_ACTIVE_FRAME_LOADED', `Loaded existing canvas data for frame ${frameId}`, {
-                dataLength: frameData.canvasData.data.length,
-                hasThumbnail: !!frameData.thumbnail
+                dataLength: targetFrameData.canvasData.data.length,
+                hasThumbnail: !!targetFrameData.thumbnail,
+                hasPixelData,
+                samplePixels: Array.from(targetFrameData.canvasData.data.slice(0, 16))
               })
             } else {
               // Create empty canvas data for new frame
               tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
-              debugLog('SET_ACTIVE_FRAME_EMPTY', `Created empty canvas data for new frame ${frameId}`)
+              debugLog('SET_ACTIVE_FRAME_EMPTY', `Created empty canvas data for new frame ${frameId}`, {
+                newDataLength: tab.canvasData.data.length
+              })
             }
 
-            // Add history entry for frame switch
-            get().addHistoryEntry(tabId, 'frame_switch', tab.canvasData)
-
+            // STEP 4: Update state metadata
             tab.isDirty = true
+
+            debugLog('SET_ACTIVE_FRAME_COMPLETE', `Frame switch completed atomically`, {
+              newActiveFrameId: frameId,
+              newCanvasDataLength: tab.canvasData.data.length,
+              totalFrameCanvasData: tab.frameCanvasData.length,
+              frameCanvasDataIds: tab.frameCanvasData.map(f => f.frameId)
+            })
+
+            // STEP 5: Add history entry (separate call to avoid circular dependencies)
+            setTimeout(() => {
+              get().addHistoryEntry(tabId, 'frame_switch', tab.canvasData!)
+            }, 0)
           })
         },
 

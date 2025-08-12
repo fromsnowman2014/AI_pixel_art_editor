@@ -15,7 +15,7 @@ type ExportType = 'image' | 'gif'
 type ImageFormat = 'png' | 'jpg' | 'webp'
 
 export function ExportModal({ open, onOpenChange }: ExportModalProps) {
-  const { activeTabId, getActiveTab, exportProject, getFrameThumbnail } = useProjectStore()
+  const { activeTabId, getActiveTab, exportProject, getFrameThumbnail, saveAllFrameCanvasData } = useProjectStore()
   const [exportType, setExportType] = useState<ExportType>('image')
   const [imageFormat, setImageFormat] = useState<ImageFormat>('png')
   const [fileName, setFileName] = useState('')
@@ -78,6 +78,10 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
       quality: exportType === 'image' ? quality : undefined,
       gifDuration: exportType === 'gif' ? gifDuration : undefined
     })
+
+    // CRITICAL: Save all frame canvas data before export
+    debugLog('EXPORT_SAVE_FRAMES', 'Saving all frame data before export')
+    saveAllFrameCanvasData(activeTabId)
 
     try {
       if (exportType === 'image') {
