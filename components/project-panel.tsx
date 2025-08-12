@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { ExportModal } from '@/components/export-modal'
 import {
   Settings,
   Download,
@@ -32,6 +33,7 @@ export function ProjectPanel({ className }: { className?: string }) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
 
   const activeTab = getActiveTab()
   const project = activeTab?.project
@@ -185,12 +187,13 @@ export function ProjectPanel({ className }: { className?: string }) {
     }
   }
 
-  const handleExport = (format: 'png' | 'gif' | 'jpg') => {
-    exportProject(activeTabId, format)
-  }
-
   const handleSave = () => {
     saveProject(activeTabId)
+  }
+  
+  const handleOpenExport = () => {
+    debugLog('EXPORT_MODAL_OPEN', 'Opening export modal', { activeTabId })
+    setShowExportModal(true)
   }
 
   return (
@@ -418,35 +421,14 @@ export function ProjectPanel({ className }: { className?: string }) {
           {activeTab?.isDirty ? 'Save Project' : 'Saved'}
         </Button>
 
-        <div className="grid grid-cols-3 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport('png')}
-            className="text-xs"
-          >
-            <FileImage className="mr-1 h-3 w-3" />
-            PNG
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport('gif')}
-            className="text-xs"
-          >
-            <Film className="mr-1 h-3 w-3" />
-            GIF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport('jpg')}
-            className="text-xs"
-          >
-            <Image className="mr-1 h-3 w-3" />
-            JPG
-          </Button>
-        </div>
+        <Button
+          onClick={handleOpenExport}
+          variant="outline"
+          className="w-full"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Export Project
+        </Button>
       </div>
 
       {/* Canvas Resize Confirmation Modal */}
@@ -503,6 +485,12 @@ export function ProjectPanel({ className }: { className?: string }) {
           </div>
         </div>
       )}
+
+      {/* Export Modal */}
+      <ExportModal 
+        open={showExportModal} 
+        onOpenChange={setShowExportModal}
+      />
     </div>
   )
 }

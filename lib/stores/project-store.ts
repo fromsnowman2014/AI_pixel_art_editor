@@ -16,6 +16,17 @@ const debugLog = (category: string, message: string, data?: any) => {
   }
 }
 
+// Utility function to download files
+const downloadFile = (dataURL: string, fileName: string) => {
+  const link = document.createElement('a')
+  link.download = fileName
+  link.href = dataURL
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 interface ProjectTab {
   id: string
   project: Project
@@ -53,7 +64,7 @@ interface ProjectStore {
   // Project operations
   updateProject: (tabId: string, updates: Partial<Project>) => void
   saveProject: (tabId: string) => Promise<void>
-  exportProject: (tabId: string, format: 'png' | 'gif' | 'jpg') => Promise<void>
+  exportProject: (tabId: string, format: 'png' | 'gif' | 'jpg' | 'webp', options?: any) => Promise<void>
 
   // Frame operations
   addFrame: (tabId: string) => void
@@ -574,10 +585,19 @@ export const useProjectStore = create<ProjectStore>()(
           }
         },
 
-        // Export project (placeholder)
-        exportProject: async (tabId, format) => {
+        // Export project with file download
+        exportProject: async (tabId, format, options = {}) => {
           const tab = get().getTab(tabId)
           if (!tab || !tab.canvasData) return
+
+          // Debug logging
+          const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
+          const debugLog = (category: string, message: string, data?: any) => {
+            if (DEBUG_MODE) {
+              const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
+              console.log(`[${timestamp}] 🏪 ProjectStore [${category}]:`, message, data || '')
+            }
+          }
 
           set((state) => {
             state.isLoading = true
@@ -585,13 +605,86 @@ export const useProjectStore = create<ProjectStore>()(
           })
 
           try {
-            // TODO: Implement export logic
-            console.log(`Exporting project as ${format}:`, tab.project)
+            debugLog('EXPORT_START', `Starting export as ${format}`, {
+              projectId: tab.project.id,
+              projectSize: `${tab.project.width}x${tab.project.height}`,
+              format,
+              options
+            })
+
+            // Create a canvas from the pixel data
+            const { width, height } = tab.project
+            const canvas = document.createElement('canvas')
+            canvas.width = width
+            canvas.height = height
+            
+            const ctx = canvas.getContext('2d')
+            if (!ctx) throw new Error('Failed to get canvas context')
+
+            // Set pixel perfect rendering
+            ctx.imageSmoothingEnabled = false
+            
+            // Create ImageData from stored pixel data
+            const imageData = new ImageData(new Uint8ClampedArray(tab.canvasData.data), width, height)
+            ctx.putImageData(imageData, 0, 0)
+
+            debugLog('EXPORT_CANVAS_CREATED', 'Canvas created from pixel data', {
+              canvasSize: `${canvas.width}x${canvas.height}`,
+              hasImageData: !!imageData
+            })
+
+            // Generate filename
+            const fileName = options.fileName || `${tab.project.name}_${Date.now()}`
+            const fullFileName = `${fileName}.${format}`
+
+            if (format === 'gif') {
+              // For GIF, we need multiple frames
+              if (!tab.frames || tab.frames.length <= 1) {
+                throw new Error('Need at least 2 frames to create a GIF')
+              }
+
+              debugLog('EXPORT_GIF_START', 'Starting GIF creation', {
+                frameCount: tab.frames.length,
+                duration: options.duration || 500
+              })
+
+              // TODO: Implement actual GIF creation using a library like gif.js
+              // For now, download as PNG as fallback
+              const dataURL = canvas.toDataURL('image/png', 1.0)
+              downloadFile(dataURL, `${fileName}_frame1.png`)
+              
+              debugLog('EXPORT_GIF_FALLBACK', 'GIF creation not implemented, downloaded as PNG')
+
+            } else {
+              // Handle static image formats (PNG, JPG, WebP)
+              const quality = (format === 'jpg' ? (options.quality || 90) / 100 : 1.0)
+              
+              let mimeType = 'image/png'
+              if (format === 'jpg') mimeType = 'image/jpeg'
+              if (format === 'webp') mimeType = 'image/webp'
+
+              debugLog('EXPORT_IMAGE_CONVERT', `Converting to ${format}`, {
+                mimeType,
+                quality: format === 'jpg' ? quality : 1.0
+              })
+
+              const dataURL = canvas.toDataURL(mimeType, quality)
+              downloadFile(dataURL, fullFileName)
+
+              debugLog('EXPORT_IMAGE_SUCCESS', `Successfully exported as ${format}`, {
+                fileName: fullFileName,
+                size: `${width}x${height}`
+              })
+            }
             
             set((state) => {
               state.isLoading = false
             })
+
+            debugLog('EXPORT_COMPLETE', 'Export process completed successfully')
+
           } catch (error) {
+            debugLog('EXPORT_ERROR', 'Export failed', { error: error instanceof Error ? error.message : error })
             set((state) => {
               state.error = error instanceof Error ? error.message : 'Export failed'
               state.isLoading = false
