@@ -1065,7 +1065,7 @@ export const useProjectStore = create<ProjectStore>()(
         // Get frame thumbnail
         getFrameThumbnail: (tabId, frameId) => {
           const tab = get().getTab(tabId)
-          if (!tab) return null
+          if (!tab || !tab.frameCanvasData) return null
 
           const frameData = tab.frameCanvasData.find(f => f.frameId === frameId)
           return frameData?.thumbnail || null
