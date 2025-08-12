@@ -47,26 +47,66 @@ export function Toolbar({ className }: ToolbarProps) {
   const activeTab = getActiveTab()
   const canvasState = activeTab?.canvasState
 
+  // Debug logging utility
+  const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
+  const debugLog = (category: string, message: string, data?: any) => {
+    if (DEBUG_MODE) {
+      const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
+      console.log(`[${timestamp}] 🛠️  Toolbar [${category}]:`, message, data || '')
+    }
+  }
+
   if (!activeTabId || !canvasState) {
+    debugLog('RENDER_ERROR', 'Missing activeTabId or canvasState', { activeTabId, hasCanvasState: !!canvasState })
     return null
   }
 
   const handleToolChange = (tool: Tool) => {
+    debugLog('TOOL_CHANGE', `Tool changed from ${canvasState.tool} to ${tool}`, {
+      previousTool: canvasState.tool,
+      newTool: tool,
+      activeTabId: activeTabId
+    })
     updateCanvasState(activeTabId, { tool })
   }
 
   const handleZoomIn = () => {
     const newZoom = Math.min(32, canvasState.zoom * 1.5)
+    debugLog('ZOOM_IN', `Zoom changed from ${canvasState.zoom}x to ${newZoom}x`, {
+      previousZoom: canvasState.zoom,
+      newZoom: newZoom,
+      maxReached: newZoom === 32
+    })
     updateCanvasState(activeTabId, { zoom: newZoom })
   }
 
   const handleZoomOut = () => {
     const newZoom = Math.max(1, canvasState.zoom / 1.5)
+    debugLog('ZOOM_OUT', `Zoom changed from ${canvasState.zoom}x to ${newZoom}x`, {
+      previousZoom: canvasState.zoom,
+      newZoom: newZoom,
+      minReached: newZoom === 1
+    })
     updateCanvasState(activeTabId, { zoom: newZoom })
   }
 
-  const handleUndo = () => undo(activeTabId)
-  const handleRedo = () => redo(activeTabId)
+  const handleUndo = () => {
+    debugLog('UNDO', 'Undo action triggered', {
+      currentHistoryIndex: activeTab?.historyIndex,
+      historyLength: activeTab?.history.length,
+      canUndo: activeTab?.historyIndex && activeTab.historyIndex > 0
+    })
+    undo(activeTabId)
+  }
+  
+  const handleRedo = () => {
+    debugLog('REDO', 'Redo action triggered', {
+      currentHistoryIndex: activeTab?.historyIndex,
+      historyLength: activeTab?.history.length,
+      canRedo: activeTab?.history && activeTab.historyIndex < activeTab.history.length - 1
+    })
+    redo(activeTabId)
+  }
 
   return (
     <div className={cn('space-y-4', className)}>
