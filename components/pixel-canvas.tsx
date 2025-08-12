@@ -321,6 +321,15 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     updateCanvasState(activeTabId, { zoom: newZoom })
   }, [activeTabId, canvasState.zoom, updateCanvasState])
 
+  // Create a stable dependency that changes when canvas data actually changes
+  const canvasDataId = useMemo(() => {
+    if (!canvasData) return 'null'
+    // Create a stable ID based on content, not reference
+    const sampleData = Array.from(canvasData.data.slice(0, 32))
+    const nonZeroPixels = Array.from(canvasData.data).filter((_, i) => i % 4 === 3 && canvasData.data[i] > 0).length
+    return `${canvasData.width}x${canvasData.height}-${sampleData.join(',')}-pixels:${nonZeroPixels}`
+  }, [canvasData])
+  
   // Render canvas
   useEffect(() => {
     debugLog('RENDER_START', 'Canvas render effect triggered', {
@@ -329,7 +338,8 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       canvasDataLength: canvasData?.data.length,
       zoom: canvasState.zoom,
       projectSize: `${project.width}x${project.height}`,
-      renderTrigger: 'useEffect dependency change'
+      canvasDataId: canvasDataId,
+      triggerReason: 'useEffect dependency change'
     })
     
     // Enhanced debugging: Log what triggered this render
@@ -471,7 +481,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         ctx.stroke()
       }
     }
-  }, [canvasData, project, canvasState.zoom])
+  }, [canvasData, project, canvasState.zoom, canvasDataId])
 
   return (
     <div 
