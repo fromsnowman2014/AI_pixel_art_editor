@@ -7,6 +7,15 @@ import type { Project, Frame, PixelData, CanvasState, HistoryEntry } from '@/lib
 import { generatePalette, DEFAULT_PALETTE } from '@/lib/utils'
 import { useAuthStore } from './auth-store'
 
+// Debug logging utility
+const DEBUG_MODE = process.env.NODE_ENV === 'development' || typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true'
+const debugLog = (category: string, message: string, data?: any) => {
+  if (DEBUG_MODE) {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0]
+    console.log(`[${timestamp}] 🏪 ProjectStore [${category}]:`, message, data || '')
+  }
+}
+
 interface ProjectTab {
   id: string
   project: Project
@@ -114,17 +123,43 @@ export const useProjectStore = create<ProjectStore>()(
         // Initialize app with default project
         initializeApp: () => {
           const { tabs } = get()
+          debugLog('INIT_START', `Initializing app`, { existingTabsCount: tabs.length })
+
           if (tabs.length === 0) {
+            debugLog('INIT_NEW_PROJECT', `No existing tabs, creating new project`)
             get().createNewProject()
           } else {
+            debugLog('INIT_RESTORE_TABS', `Restoring ${tabs.length} tabs from persistence`, {
+              tabInfo: tabs.map(tab => ({
+                id: tab.id,
+                projectName: tab.project.name,
+                hasCanvasData: !!tab.canvasData,
+                canvasDataLength: tab.canvasData?.data.length,
+                dimensions: `${tab.project.width}x${tab.project.height}`,
+                hasHistory: tab.history?.length > 0
+              }))
+            })
+
             // Fix tabs loaded from persistence that have null canvasData
             set((state) => {
-              state.tabs.forEach(tab => {
+              state.tabs.forEach((tab, index) => {
+                debugLog('INIT_PROCESS_TAB', `Processing tab ${index}`, {
+                  tabId: tab.id,
+                  hasCanvasData: !!tab.canvasData,
+                  hasHistory: !!tab.history?.length
+                })
+
                 if (!tab.canvasData) {
+                  debugLog('INIT_CREATE_CANVAS_DATA', `Creating canvas data for tab ${tab.id}`, {
+                    dimensions: `${tab.project.width}x${tab.project.height}`,
+                    pixelCount: tab.project.width * tab.project.height
+                  })
                   tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                 }
+
                 // Also ensure history exists for undo/redo functionality
                 if (!tab.history || tab.history.length === 0) {
+                  debugLog('INIT_CREATE_HISTORY', `Creating history for tab ${tab.id}`)
                   tab.history = [{
                     id: `history-${Date.now()}`,
                     action: 'restored',
@@ -133,8 +168,17 @@ export const useProjectStore = create<ProjectStore>()(
                   }]
                   tab.historyIndex = 0
                 }
+
+                debugLog('INIT_TAB_COMPLETE', `Tab ${tab.id} initialization complete`, {
+                  hasCanvasData: !!tab.canvasData,
+                  canvasDataLength: tab.canvasData?.data.length,
+                  historyLength: tab.history?.length,
+                  historyIndex: tab.historyIndex
+                })
               })
             })
+
+            debugLog('INIT_COMPLETE', `App initialization complete`)
           }
         },
 
@@ -287,11 +331,56 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Update canvas data
         updateCanvasData: (tabId, data) => {
+          debugLog('UPDATE_CANVAS_START', `Updating canvas data for tab ${tabId}`, {
+            tabId,
+            dataLength: data.data.length,
+            dimensions: `${data.width}x${data.height}`
+          })
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             if (tab) {
+              const oldData = tab.canvasData
+              debugLog('UPDATE_CANVAS_FOUND_TAB', `Found tab, updating canvas data`, {
+                tabId: tab.id,
+                hadPreviousData: !!oldData,
+                previousDataLength: oldData?.data.length,
+                newDataLength: data.data.length,
+                dataChanged: !oldData || JSON.stringify(Array.from(oldData.data.slice(0, 20))) !== JSON.stringify(Array.from(data.data.slice(0, 20)))
+              })
+
+              // Sample some pixels to verify the data
+              const samplePixels = []
+              for (let i = 0; i < Math.min(10, data.data.length / 4); i++) {
+                const idx = i * 4
+                if (data.data[idx + 3] > 0) { // Only non-transparent pixels
+                  samplePixels.push({
+                    pixel: i,
+                    r: data.data[idx],
+                    g: data.data[idx + 1],
+                    b: data.data[idx + 2],
+                    a: data.data[idx + 3]
+                  })
+                }
+              }
+
+              debugLog('UPDATE_CANVAS_PIXEL_SAMPLE', `New canvas data pixel sample`, {
+                totalPixels: data.data.length / 4,
+                nonTransparentSample: samplePixels.slice(0, 3)
+              })
+
               tab.canvasData = data
               tab.isDirty = true
+
+              debugLog('UPDATE_CANVAS_COMPLETE', `Canvas data updated successfully`, {
+                tabId: tab.id,
+                isDirty: tab.isDirty,
+                canvasDataSet: !!tab.canvasData
+              })
+            } else {
+              debugLog('UPDATE_CANVAS_NO_TAB', `Tab not found: ${tabId}`, {
+                availableTabs: state.tabs.map(t => ({ id: t.id, projectName: t.project.name }))
+              })
             }
           })
         },

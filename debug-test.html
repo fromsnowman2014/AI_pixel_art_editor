@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelBuddy Debug Test</title>
+</head>
+<body>
+    <script>
+        // Enable debug mode
+        localStorage.setItem('pixelbuddy-debug', 'true');
+        
+        // Show debug status
+        console.log('✅ PixelBuddy debug mode enabled');
+        console.log('📝 You should now see detailed debug logs when using the canvas');
+        console.log('🌐 Navigate to http://localhost:3000 to test');
+        
+        // Auto-redirect to the main app
+        setTimeout(() => {
+            window.location.href = 'http://localhost:3000';
+        }, 2000);
+    </script>
+    
+    <h1>PixelBuddy Debug Mode Enabled</h1>
+    <p>Debug logging has been enabled. Redirecting to the main app...</p>
+    <p><a href="http://localhost:3000">Click here if not redirected automatically</a></p>
+    
+    <h2>Testing Instructions:</h2>
+    <ol>
+        <li>Open browser developer tools (F12)</li>
+        <li>Go to the Console tab</li>
+        <li>Select a color and tool (pencil)</li>
+        <li>Try drawing on the canvas</li>
+        <li>Watch the console for detailed debug logs</li>
+    </ol>
+</body>
+</html>
