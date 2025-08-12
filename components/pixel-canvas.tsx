@@ -57,8 +57,24 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       tool: canvasState.tool,
       color: canvasState.color,
       zoom: canvasState.zoom,
-      activeTabId
+      activeTabId,
+      updateTimestamp: Date.now(),
+      propsChangeReason: 'React props/state change detected'
     })
+    
+    // Log the actual canvas data to verify it contains the drawing
+    if (canvasData) {
+      const firstNonZeroPixel = Array.from(canvasData.data).findIndex((value, index) => {
+        // Check for non-transparent pixels
+        return index % 4 === 3 && value > 0
+      })
+      debugLog('PROPS_CANVAS_DATA_CHECK', 'Canvas data content analysis', {
+        totalPixels: canvasData.data.length / 4,
+        firstNonZeroPixelIndex: firstNonZeroPixel,
+        hasDrawnContent: firstNonZeroPixel >= 0,
+        dataPreview: Array.from(canvasData.data.slice(0, 32)).join(',')
+      })
+    }
   }, [canvasData, canvasState, activeTabId])
 
   // Handle drawing on canvas
@@ -285,7 +301,16 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       hasCanvasData: !!canvasData,
       canvasDataLength: canvasData?.data.length,
       zoom: canvasState.zoom,
-      projectSize: `${project.width}x${project.height}`
+      projectSize: `${project.width}x${project.height}`,
+      renderTrigger: 'useEffect dependency change'
+    })
+    
+    // Enhanced debugging: Log what triggered this render
+    debugLog('RENDER_TRIGGER_ANALYSIS', 'Analyzing render trigger', {
+      canvasDataPointer: canvasData ? `${canvasData.width}x${canvasData.height}@${canvasData.data.length}` : 'null',
+      projectPointer: `${project.id}-${project.width}x${project.height}`,
+      zoomLevel: canvasState.zoom,
+      effectDependencies: ['canvasData', 'project', 'canvasState.zoom']
     })
 
     const canvas = canvasRef.current
@@ -353,8 +378,39 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     debugLog('RENDER_COMPLETE', 'Canvas rendered successfully', {
       finalCanvasSize: `${canvas.width}x${canvas.height}`,
       imageDataDrawn: true,
-      gridEnabled: canvasState.zoom >= 4
+      gridEnabled: canvasState.zoom >= 4,
+      canvasElementId: canvas.id || 'no-id',
+      canvasInDOM: document.contains(canvas),
+      canvasVisible: canvas.offsetParent !== null,
+      canvasComputedStyle: typeof window !== 'undefined' ? {
+        display: window.getComputedStyle(canvas).display,
+        visibility: window.getComputedStyle(canvas).visibility,
+        opacity: window.getComputedStyle(canvas).opacity
+      } : 'server-side'
     })
+    
+    // Additional check: Verify the canvas actually shows the drawn pixels
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        try {
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            const testData = ctx.getImageData(0, 0, Math.min(10, canvas.width), Math.min(10, canvas.height))
+            const hasNonWhitePixels = Array.from(testData.data).some((value, index) => {
+              if (index % 4 === 3) return false // Skip alpha channel
+              return value !== 255 // Not white
+            })
+            debugLog('RENDER_VERIFICATION', 'Canvas content verification', {
+              hasNonWhitePixels,
+              samplePixelData: Array.from(testData.data.slice(0, 16)),
+              canvasDataChecksum: Array.from(canvasData.data.slice(0, 16)).join(',')
+            })
+          }
+        } catch (e) {
+          debugLog('RENDER_VERIFICATION_ERROR', 'Could not verify canvas content', { error: e instanceof Error ? e.message : String(e) })
+        }
+      }, 100)
+    }
 
     // Draw grid if zoomed in enough
     if (canvasState.zoom >= 4) {
