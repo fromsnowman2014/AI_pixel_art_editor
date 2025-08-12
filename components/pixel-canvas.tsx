@@ -249,27 +249,21 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       return
     }
 
-    // Use canvas element directly for accurate coordinates
+    // Simple approach: use canvas coordinates directly (no pan adjustment needed)
     const canvasRect = canvasRef.current.getBoundingClientRect()
-    const containerRect = containerRef.current.getBoundingClientRect()
-    
-    // Calculate coordinates relative to canvas element, accounting for pan offset
-    const rawX = e.clientX - canvasRect.left
-    const rawY = e.clientY - canvasRect.top
-    
-    // Adjust for pan offset to get true canvas coordinates
-    const x = rawX - canvasState.panX
-    const y = rawY - canvasState.panY
+    const x = e.clientX - canvasRect.left
+    const y = e.clientY - canvasRect.top
 
     debugLog('MOUSE_DOWN_COORDS', 'Calculated drawing coordinates', {
-      rawX: rawX,
-      rawY: rawY,
-      adjustedX: x,
-      adjustedY: y,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      canvasLeft: canvasRect.left,
+      canvasTop: canvasRect.top,
+      canvasX: x,
+      canvasY: y,
       canvasRect: { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height },
-      containerRect: { left: containerRect.left, top: containerRect.top, width: containerRect.width, height: containerRect.height },
       pan: { x: canvasState.panX, y: canvasState.panY },
-      coordinateMethod: 'canvas-direct-with-pan-adjustment'
+      coordinateMethod: 'direct-canvas-coordinates'
     })
 
     setIsDragging(true)
@@ -297,14 +291,10 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         })
       }
     } else {
-      // Use canvas element directly for accurate coordinates
+      // Use same simple coordinate calculation as mouse down
       const canvasRect = canvasRef.current.getBoundingClientRect()
-      const rawX = e.clientX - canvasRect.left
-      const rawY = e.clientY - canvasRect.top
-      
-      // Adjust for pan offset to get true canvas coordinates
-      const x = rawX - canvasState.panX
-      const y = rawY - canvasState.panY
+      const x = e.clientX - canvasRect.left
+      const y = e.clientY - canvasRect.top
       drawPixel(x, y)
     }
 
@@ -497,10 +487,6 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     <div 
       ref={containerRef}
       className="relative flex h-full items-center justify-center overflow-hidden bg-gray-100"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
       <div 
@@ -512,6 +498,10 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         <canvas
           ref={canvasRef}
           className="pixel-canvas border-2 border-gray-300 shadow-lg"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
           style={{
             cursor: canvasState.tool === 'pan' ? 'grab' : 'crosshair'
           }}
