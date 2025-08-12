@@ -169,10 +169,14 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     debugLog('DRAW_UPDATE_COMPLETE', `updateCanvasData called successfully`)
     
     // Critical debug: Force a manual re-render check
+    // Fix: Capture values to avoid closure issues
+    const followupData = {
+      activeTabId,
+      currentCanvasDataLength: canvasData?.data.length
+    }
     setTimeout(() => {
       debugLog('DRAW_FOLLOWUP_CHECK', 'Checking if component re-rendered after draw', {
-        activeTabId,
-        currentCanvasDataLength: canvasData?.data.length,
+        ...followupData,
         timestamp: Date.now()
       })
     }, 50)
@@ -345,7 +349,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       return
     }
 
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) {
       debugLog('RENDER_NO_CONTEXT', 'Failed to get 2d context')
       return
@@ -414,19 +418,32 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     
     // Additional check: Verify the canvas actually shows the drawn pixels
     if (typeof window !== 'undefined') {
+      // Fix: Capture canvas data before setTimeout
+      const capturedCanvasData = {
+        dataChecksum: Array.from(canvasData.data.slice(0, 32)).join(','),
+        nonZeroPixels: Array.from(canvasData.data).filter((_, i) => i % 4 === 3 && (canvasData.data[i] ?? 0) > 0).length
+      }
+      
       setTimeout(() => {
         try {
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            const testData = ctx.getImageData(0, 0, Math.min(10, canvas.width), Math.min(10, canvas.height))
+          const verifyCtx = canvas.getContext('2d', { willReadFrequently: true })
+          if (verifyCtx) {
+            const testData = verifyCtx.getImageData(0, 0, Math.min(32, canvas.width), Math.min(32, canvas.height))
             const hasNonWhitePixels = Array.from(testData.data).some((value, index) => {
               if (index % 4 === 3) return false // Skip alpha channel
               return value !== 255 // Not white
             })
+            
+            // Check actual rendered vs expected data
+            const renderedNonZeroPixels = Array.from(testData.data).filter((_, i) => i % 4 === 3 && (testData.data[i] ?? 0) > 0).length
+            
             debugLog('RENDER_VERIFICATION', 'Canvas content verification', {
               hasNonWhitePixels,
-              samplePixelData: Array.from(testData.data.slice(0, 16)),
-              canvasDataChecksum: Array.from(canvasData.data.slice(0, 16)).join(',')
+              expectedNonZeroPixels: capturedCanvasData.nonZeroPixels,
+              actualRenderedPixels: renderedNonZeroPixels,
+              renderingWorking: renderedNonZeroPixels > 0,
+              sampleRenderedData: Array.from(testData.data.slice(0, 16)),
+              expectedDataChecksum: capturedCanvasData.dataChecksum
             })
           }
         } catch (e) {

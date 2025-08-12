@@ -379,12 +379,16 @@ export const useProjectStore = create<ProjectStore>()(
               })
 
               // Critical debug: Check if React will detect this change
+              // Fix: Capture values before setTimeout to avoid proxy issues
+              const capturedData = {
+                tabId: tab.id,
+                canvasDataLength: tab.canvasData?.data.length,
+                tabsCount: state.tabs.length,
+                activeTabId: state.activeTabId
+              }
               setTimeout(() => {
                 debugLog('STORE_FOLLOWUP_CHECK', 'Checking store state after update', {
-                  tabId: tab.id,
-                  canvasDataLength: tab.canvasData?.data.length,
-                  tabsCount: state.tabs.length,
-                  activeTabId: state.activeTabId,
+                  ...capturedData,
                   timestamp: Date.now()
                 })
               }, 25)
