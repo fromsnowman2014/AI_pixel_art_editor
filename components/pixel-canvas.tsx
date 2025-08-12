@@ -6,10 +6,10 @@ import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
 
 // Debug logging utility
-const DEBUG_MODE = process.env.NODE_ENV === 'development' || typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true'
+const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
 const debugLog = (category: string, message: string, data?: any) => {
   if (DEBUG_MODE) {
-    const timestamp = new Date().toISOString().split('T')[1].split('.')[0]
+    const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
     console.log(`[${timestamp}] 🎨 PixelCanvas [${category}]:`, message, data || '')
   }
 }
@@ -323,13 +323,13 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     const samplePixels = []
     for (let i = 0; i < Math.min(20, canvasData.data.length / 4); i++) {
       const idx = i * 4
-      if (canvasData.data[idx + 3] > 0) { // Only non-transparent pixels
+      if (canvasData.data[idx + 3] && (canvasData.data[idx + 3] ?? 0) > 0) { // Only non-transparent pixels
         samplePixels.push({
           pixel: i,
-          r: canvasData.data[idx],
-          g: canvasData.data[idx + 1],
-          b: canvasData.data[idx + 2],
-          a: canvasData.data[idx + 3]
+          r: canvasData.data[idx] || 0,
+          g: canvasData.data[idx + 1] || 0,
+          b: canvasData.data[idx + 2] || 0,
+          a: canvasData.data[idx + 3] || 0
         })
       }
     }

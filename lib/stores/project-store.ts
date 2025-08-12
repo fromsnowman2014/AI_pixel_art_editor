@@ -8,10 +8,10 @@ import { generatePalette, DEFAULT_PALETTE } from '@/lib/utils'
 import { useAuthStore } from './auth-store'
 
 // Debug logging utility
-const DEBUG_MODE = process.env.NODE_ENV === 'development' || typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true'
+const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
 const debugLog = (category: string, message: string, data?: any) => {
   if (DEBUG_MODE) {
-    const timestamp = new Date().toISOString().split('T')[1].split('.')[0]
+    const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
     console.log(`[${timestamp}] 🏪 ProjectStore [${category}]:`, message, data || '')
   }
 }
@@ -353,13 +353,13 @@ export const useProjectStore = create<ProjectStore>()(
               const samplePixels = []
               for (let i = 0; i < Math.min(10, data.data.length / 4); i++) {
                 const idx = i * 4
-                if (data.data[idx + 3] > 0) { // Only non-transparent pixels
+                if (data.data[idx + 3] && (data.data[idx + 3] ?? 0) > 0) { // Only non-transparent pixels
                   samplePixels.push({
                     pixel: i,
-                    r: data.data[idx],
-                    g: data.data[idx + 1],
-                    b: data.data[idx + 2],
-                    a: data.data[idx + 3]
+                    r: data.data[idx] || 0,
+                    g: data.data[idx + 1] || 0,
+                    b: data.data[idx + 2] || 0,
+                    a: data.data[idx + 3] || 0
                   })
                 }
               }

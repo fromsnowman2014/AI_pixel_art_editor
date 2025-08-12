@@ -36,13 +36,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackFrame, setPlaybackFrame] = useState(0)
 
-  if (!activeTabId) {
-    return null
-  }
-
-  const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
-
-  // Animation playback (simplified)
+  // Animation playback (simplified) - moved before early return
   React.useEffect(() => {
     if (!isPlaying || frames.length <= 1) return
 
@@ -52,6 +46,12 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
 
     return () => clearInterval(interval)
   }, [isPlaying, frames.length])
+
+  if (!activeTabId) {
+    return null
+  }
+
+  const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying)
