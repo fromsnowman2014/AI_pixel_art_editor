@@ -100,18 +100,30 @@ export function ProjectTabs() {
         <Button
           variant="ghost"
           size="sm"
-          className="flex-shrink-0 h-full px-4 rounded-none border-r border-gray-200 hover:bg-gray-50"
+          className={cn(
+            "flex-shrink-0 h-full px-4 rounded-none border-r border-gray-200 hover:bg-gray-50 transition-all duration-300",
+            tabs.length === 0 && "bg-blue-50 hover:bg-blue-100 animate-pulse"
+          )}
           onClick={() => createNewProject()}
           title="Create new project"
         >
-          <Plus className="h-4 w-4 text-gray-600" />
+          <Plus className={cn(
+            "h-4 w-4 transition-all duration-300",
+            tabs.length === 0 ? "text-blue-600 animate-bounce" : "text-gray-600"
+          )} />
         </Button>
       </div>
 
       {/* Global Actions */}
       <div className="flex items-center space-x-2 px-4">
-        <div className="text-xs text-gray-500">
-          {tabs.length} project{tabs.length !== 1 ? 's' : ''}
+        <div className={cn(
+          "text-xs transition-all duration-300",
+          tabs.length === 0 ? "text-blue-600 font-medium" : "text-gray-500"
+        )}>
+          {tabs.length === 0 
+            ? "← Click + to start creating!" 
+            : `${tabs.length} project${tabs.length !== 1 ? 's' : ''}`
+          }
         </div>
       </div>
     </div>

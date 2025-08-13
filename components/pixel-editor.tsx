@@ -43,11 +43,23 @@ export function PixelEditor({ className }: PixelEditorProps) {
 
   if (tabs.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 text-2xl">🎨</div>
-          <h2 className="text-xl font-semibold text-gray-800">Welcome to PixelBuddy!</h2>
-          <p className="text-gray-600">Creating your first project...</p>
+      <div className={cn('flex h-screen flex-col bg-gray-50', className)}>
+        {/* App Header */}
+        <AppHeader />
+        
+        {/* Project tabs - show animated + button */}
+        <div className="flex-shrink-0 border-b border-gray-200 bg-white">
+          <ProjectTabs />
+        </div>
+
+        {/* Empty state in main area */}
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <div className="mb-6 text-6xl">🎨</div>
+            <h2 className="mb-2 text-2xl font-semibold text-gray-800">Welcome to PixelBuddy!</h2>
+            <p className="mb-4 text-gray-600">Create pixel art and animated GIFs with ease.</p>
+            <p className="text-gray-500">Click the + button above to create your first project!</p>
+          </div>
         </div>
       </div>
     )

@@ -1051,8 +1051,9 @@ export const useProjectStore = create<ProjectStore>()(
                     firstPixelRGBA: [frameImageData.data[0], frameImageData.data[1], frameImageData.data[2], frameImageData.data[3]]
                   })
                   
-                  // Clear source canvas with transparent background (don't fill with white)
-                  sourceFrameCtx.clearRect(0, 0, originalWidth, originalHeight)
+                  // Fill source canvas with white background (match preview behavior)
+                  sourceFrameCtx.fillStyle = '#ffffff'
+                  sourceFrameCtx.fillRect(0, 0, originalWidth, originalHeight)
                   sourceFrameCtx.putImageData(frameImageData, 0, 0)
                   
                   debugLog('EXPORT_GIF_IMAGEDATA_APPLIED', `Applied ImageData to source canvas for frame ${i + 1}`, {
@@ -1069,8 +1070,9 @@ export const useProjectStore = create<ProjectStore>()(
                     scale: scale
                   })
                   
-                  // Clear scaled canvas with transparent background (don't fill with white)
-                  frameCtx.clearRect(0, 0, scaledWidth, scaledHeight)
+                  // Fill scaled canvas with white background (match preview behavior)
+                  frameCtx.fillStyle = '#ffffff'
+                  frameCtx.fillRect(0, 0, scaledWidth, scaledHeight)
                   
                   // Configure scaling for frame
                   if (scale >= 1) {
