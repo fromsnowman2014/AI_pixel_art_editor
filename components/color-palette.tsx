@@ -29,39 +29,15 @@ export function ColorPalette({ className }: ColorPaletteProps) {
     return null
   }
 
-  // Debug logging utility
-  const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
-  const debugLog = (category: string, message: string, data?: any) => {
-    if (DEBUG_MODE) {
-      const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-      console.log(`[${timestamp}] 🎨 ColorPalette [${category}]:`, message, data || '')
-    }
-  }
 
   const handleColorSelect = (color: string) => {
-    debugLog('COLOR_SELECT', `Color changed from ${canvasState.color} to ${color}`, {
-      previousColor: canvasState.color,
-      newColor: color,
-      activeTabId: activeTabId
-    })
     updateCanvasState(activeTabId, { color })
   }
 
   const handleAddCustomColor = () => {
     if (project.palette.includes(customColor)) {
-      debugLog('ADD_COLOR_DUPLICATE', `Color ${customColor} already exists in palette`, {
-        customColor: customColor,
-        paletteLength: project.palette.length
-      })
       return // Color already exists
     }
-
-    debugLog('ADD_COLOR', `Adding custom color ${customColor}`, {
-      customColor: customColor,
-      oldPaletteLength: project.palette.length,
-      newPaletteLength: project.palette.length + 1,
-      colorLimit: project.colorLimit
-    })
 
     const newPalette = [...project.palette, customColor]
     updateProject(activeTabId, { palette: newPalette })
@@ -71,29 +47,14 @@ export function ColorPalette({ className }: ColorPaletteProps) {
 
   const handleRemoveColor = (colorToRemove: string) => {
     if (project.palette.length <= 2) {
-      debugLog('REMOVE_COLOR_BLOCKED', `Cannot remove color - only ${project.palette.length} colors left`, {
-        colorToRemove: colorToRemove,
-        currentPaletteLength: project.palette.length
-      })
       return // Don't allow removing if only 2 colors left
     }
-
-    debugLog('REMOVE_COLOR', `Removing color ${colorToRemove}`, {
-      colorToRemove: colorToRemove,
-      wasSelected: canvasState.color === colorToRemove,
-      oldPaletteLength: project.palette.length,
-      newPaletteLength: project.palette.length - 1
-    })
 
     const newPalette = project.palette.filter(color => color !== colorToRemove)
     updateProject(activeTabId, { palette: newPalette })
 
     // If removed color was selected, switch to first color
     if (canvasState.color === colorToRemove) {
-      debugLog('REMOVE_COLOR_SWITCH', `Switching color from removed ${colorToRemove} to ${newPalette[0]}`, {
-        oldColor: colorToRemove,
-        newColor: newPalette[0]
-      })
       updateCanvasState(activeTabId, { color: newPalette[0] })
     }
   }

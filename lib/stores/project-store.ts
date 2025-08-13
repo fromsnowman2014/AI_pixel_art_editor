@@ -7,14 +7,8 @@ import type { Project, Frame, PixelData, CanvasState, HistoryEntry } from '@/lib
 import { generatePalette, DEFAULT_PALETTE, createPixelCanvas } from '@/lib/utils'
 import { useAuthStore } from './auth-store'
 
-// Debug logging utility
-const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
-const debugLog = (category: string, message: string, data?: any) => {
-  if (DEBUG_MODE) {
-    const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-    console.log(`[${timestamp}] 🏪 ProjectStore [${category}]:`, message, data || '')
-  }
-}
+// Import centralized debug utility
+import { storeDebug, exportDebug } from '@/lib/utils/debug'
 
 // Utility function to download files
 const downloadFile = (dataURL: string, fileName: string) => {
@@ -35,10 +29,6 @@ const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | n
   try {
     // Validate input data
     if (!pixelData || !pixelData.data || pixelData.data.length === 0) {
-      debugLog('THUMBNAIL_ERROR', 'Invalid pixel data provided', { 
-        hasPixelData: !!pixelData,
-        dataLength: pixelData?.data?.length || 0
-      })
       return null
     }
 
@@ -48,7 +38,6 @@ const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | n
     const ctx = canvas.getContext('2d', { willReadFrequently: false })
     
     if (!ctx) {
-      debugLog('THUMBNAIL_ERROR', 'Failed to get 2D context for thumbnail canvas')
       return null
     }
 
@@ -59,18 +48,12 @@ const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | n
     const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: false })
     
     if (!sourceCtx) {
-      debugLog('THUMBNAIL_ERROR', 'Failed to get 2D context for source canvas')
       return null
     }
 
     // Create ImageData with proper validation
     const expectedLength = pixelData.width * pixelData.height * 4
     if (pixelData.data.length !== expectedLength) {
-      debugLog('THUMBNAIL_ERROR', 'Pixel data length mismatch', {
-        expected: expectedLength,
-        actual: pixelData.data.length,
-        dimensions: `${pixelData.width}x${pixelData.height}`
-      })
       return null
     }
 
@@ -83,20 +66,8 @@ const generateThumbnail = (pixelData: PixelData, thumbnailSize = 48): string | n
     ctx.drawImage(sourceCanvas, 0, 0, thumbnailSize, thumbnailSize)
 
     const result = canvas.toDataURL('image/png')
-    
-    debugLog('THUMBNAIL_SUCCESS', 'Thumbnail generated successfully', {
-      originalSize: `${pixelData.width}x${pixelData.height}`,
-      thumbnailSize: `${thumbnailSize}x${thumbnailSize}`,
-      resultLength: result.length
-    })
-    
     return result
   } catch (error) {
-    debugLog('THUMBNAIL_ERROR', 'Failed to generate thumbnail', { 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      pixelDataSize: pixelData?.data?.length || 0,
-      dimensions: pixelData ? `${pixelData.width}x${pixelData.height}` : 'unknown'
-    })
     return null
   } finally {
     // CRITICAL: Clean up canvas elements to prevent memory leaks
@@ -238,23 +209,10 @@ export const useProjectStore = create<ProjectStore>()(
         // Initialize app with default project
         initializeApp: () => {
           const { tabs } = get()
-          debugLog('INIT_START', `Initializing app`, { existingTabsCount: tabs.length })
 
           if (tabs.length === 0) {
-            debugLog('INIT_NEW_PROJECT', `No existing tabs, creating new project`)
             get().createNewProject()
           } else {
-            debugLog('INIT_RESTORE_TABS', `Restoring ${tabs.length} tabs from persistence`, {
-              tabInfo: tabs.map(tab => ({
-                id: tab.id,
-                projectName: tab.project.name,
-                hasCanvasData: !!tab.canvasData,
-                canvasDataLength: tab.canvasData?.data.length,
-                dimensions: `${tab.project.width}x${tab.project.height}`,
-                hasHistory: tab.history?.length > 0,
-                frameCount: tab.frameCanvasData?.length || 0
-              }))
-            })
             
             // CRITICAL: Regenerate thumbnails after persistence restore
             get().regenerateAllThumbnails()
@@ -262,23 +220,13 @@ export const useProjectStore = create<ProjectStore>()(
             // Fix tabs loaded from persistence that have null canvasData
             set((state) => {
               state.tabs.forEach((tab, index) => {
-                debugLog('INIT_PROCESS_TAB', `Processing tab ${index}`, {
-                  tabId: tab.id,
-                  hasCanvasData: !!tab.canvasData,
-                  hasHistory: !!tab.history?.length
-                })
 
                 if (!tab.canvasData) {
-                  debugLog('INIT_CREATE_CANVAS_DATA', `Creating canvas data for tab ${tab.id}`, {
-                    dimensions: `${tab.project.width}x${tab.project.height}`,
-                    pixelCount: tab.project.width * tab.project.height
-                  })
                   tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                 }
 
                 // Also ensure history exists for undo/redo functionality
                 if (!tab.history || tab.history.length === 0) {
-                  debugLog('INIT_CREATE_HISTORY', `Creating history for tab ${tab.id}`)
                   tab.history = [{
                     id: `history-${Date.now()}`,
                     action: 'restored',
@@ -290,7 +238,6 @@ export const useProjectStore = create<ProjectStore>()(
 
                 // Initialize frameCanvasData for tabs loaded from persistence
                 if (!tab.frameCanvasData) {
-                  debugLog('INIT_CREATE_FRAME_CANVAS_DATA', `Creating frameCanvasData for tab ${tab.id}`)
                   tab.frameCanvasData = []
                   
                   // Create frame canvas data for existing frames
@@ -308,16 +255,9 @@ export const useProjectStore = create<ProjectStore>()(
                   }
                 }
 
-                debugLog('INIT_TAB_COMPLETE', `Tab ${tab.id} initialization complete`, {
-                  hasCanvasData: !!tab.canvasData,
-                  canvasDataLength: tab.canvasData?.data.length,
-                  historyLength: tab.history?.length,
-                  historyIndex: tab.historyIndex
-                })
               })
             })
 
-            debugLog('INIT_COMPLETE', `App initialization complete`)
           }
         },
 
@@ -480,23 +420,11 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Update canvas data
         updateCanvasData: (tabId, data) => {
-          debugLog('UPDATE_CANVAS_START', `Updating canvas data for tab ${tabId}`, {
-            tabId,
-            dataLength: data.data.length,
-            dimensions: `${data.width}x${data.height}`
-          })
 
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             if (tab) {
               const oldData = tab.canvasData
-              debugLog('UPDATE_CANVAS_FOUND_TAB', `Found tab, updating canvas data`, {
-                tabId: tab.id,
-                hadPreviousData: !!oldData,
-                previousDataLength: oldData?.data.length,
-                newDataLength: data.data.length,
-                dataChanged: !oldData || JSON.stringify(Array.from(oldData.data.slice(0, 20))) !== JSON.stringify(Array.from(data.data.slice(0, 20)))
-              })
 
               // Sample some pixels to verify the data
               const samplePixels = []
@@ -513,10 +441,6 @@ export const useProjectStore = create<ProjectStore>()(
                 }
               }
 
-              debugLog('UPDATE_CANVAS_PIXEL_SAMPLE', `New canvas data pixel sample`, {
-                totalPixels: data.data.length / 4,
-                nonTransparentSample: samplePixels.slice(0, 3)
-              })
 
               tab.canvasData = data
               tab.isDirty = true
@@ -534,12 +458,6 @@ export const useProjectStore = create<ProjectStore>()(
                 // Generate thumbnail for immediate UI update - FORCE regeneration
                 const thumbnail = generateThumbnail(canvasDataCopy)
                 
-                debugLog('UPDATE_CANVAS_THUMBNAIL_REGEN', `Force regenerating thumbnail for real-time sync`, {
-                  frameId: tab.currentFrame.id,
-                  hasNonZeroPixels: Array.from(canvasDataCopy.data).some((_, i) => i % 4 === 3 && (canvasDataCopy.data[i] ?? 0) > 0),
-                  thumbnailGenerated: !!thumbnail,
-                  dataLength: canvasDataCopy.data.length
-                })
 
                 if (frameIndex >= 0) {
                   // Update existing frame data
@@ -548,11 +466,6 @@ export const useProjectStore = create<ProjectStore>()(
                     canvasData: canvasDataCopy,
                     thumbnail
                   }
-                  debugLog('UPDATE_CANVAS_FRAME_UPDATED', `Updated current frame canvas data`, {
-                    frameId: tab.currentFrame.id,
-                    frameIndex,
-                    thumbnailGenerated: !!thumbnail
-                  })
                 } else {
                   // Add new frame data
                   tab.frameCanvasData.push({
@@ -560,20 +473,9 @@ export const useProjectStore = create<ProjectStore>()(
                     canvasData: canvasDataCopy,
                     thumbnail
                   })
-                  debugLog('UPDATE_CANVAS_FRAME_ADDED', `Added new frame canvas data`, {
-                    frameId: tab.currentFrame.id,
-                    frameCanvasDataCount: tab.frameCanvasData.length,
-                    thumbnailGenerated: !!thumbnail
-                  })
                 }
               }
 
-              debugLog('UPDATE_CANVAS_COMPLETE', `Canvas data updated successfully`, {
-                tabId: tab.id,
-                isDirty: tab.isDirty,
-                canvasDataSet: !!tab.canvasData,
-                frameDataUpdated: !!tab.currentFrame
-              })
 
               // Critical debug: Check if React will detect this change
               // Fix: Capture values before setTimeout to avoid proxy issues
@@ -583,16 +485,6 @@ export const useProjectStore = create<ProjectStore>()(
                 tabsCount: state.tabs.length,
                 activeTabId: state.activeTabId
               }
-              setTimeout(() => {
-                debugLog('STORE_FOLLOWUP_CHECK', 'Checking store state after update', {
-                  ...capturedData,
-                  timestamp: Date.now()
-                })
-              }, 25)
-            } else {
-              debugLog('UPDATE_CANVAS_NO_TAB', `Tab not found: ${tabId}`, {
-                availableTabs: state.tabs.map(t => ({ id: t.id, projectName: t.project.name }))
-              })
             }
           })
         },
@@ -671,7 +563,7 @@ export const useProjectStore = create<ProjectStore>()(
               const oldWidth = tab.project.width
               const oldHeight = tab.project.height
               
-              debugLog('UPDATE_PROJECT_START', 'Project update requested', {
+              storeDebug('UPDATE_PROJECT_START', 'Project update requested', {
                 tabId,
                 updates,
                 oldSize: `${oldWidth}x${oldHeight}`,
@@ -682,7 +574,7 @@ export const useProjectStore = create<ProjectStore>()(
               
               // If dimensions changed, reallocate canvas data for ALL frames
               if ((updates.width && updates.width !== oldWidth) || (updates.height && updates.height !== oldHeight)) {
-                debugLog('RESIZE_CANVAS_START', 'Canvas resize operation started for all frames', {
+                storeDebug('RESIZE_CANVAS_START', 'Canvas resize operation started for all frames', {
                   oldSize: `${oldWidth}x${oldHeight}`,
                   newSize: `${tab.project.width}x${tab.project.height}`,
                   hasExistingData: !!tab.canvasData,
@@ -715,7 +607,7 @@ export const useProjectStore = create<ProjectStore>()(
                       }
                     }
                     
-                    debugLog('RESIZE_FRAME_DATA_COPY', 'Frame pixel data copied', {
+                    storeDebug('RESIZE_FRAME_DATA_COPY', 'Frame pixel data copied', {
                       copiedPixels: copiedPixels,
                       totalPixels: minWidth * minHeight
                     })
@@ -728,7 +620,7 @@ export const useProjectStore = create<ProjectStore>()(
                 if (tab.canvasData) {
                   tab.canvasData = resizeCanvasData(tab.canvasData)
                   
-                  debugLog('RESIZE_CURRENT_CANVAS', 'Current canvas data resized', {
+                  storeDebug('RESIZE_CURRENT_CANVAS', 'Current canvas data resized', {
                     newSize: `${tab.project.width}x${tab.project.height}`
                   })
                 }
@@ -738,7 +630,7 @@ export const useProjectStore = create<ProjectStore>()(
                   const resizedCanvasData = resizeCanvasData(frameData.canvasData)
                   const newThumbnail = generateThumbnail(resizedCanvasData)
                   
-                  debugLog('RESIZE_FRAME_CANVAS', `Frame ${index + 1} canvas data resized`, {
+                  storeDebug('RESIZE_FRAME_CANVAS', `Frame ${index + 1} canvas data resized`, {
                     frameId: frameData.frameId,
                     newSize: `${resizedCanvasData.width}x${resizedCanvasData.height}`,
                     thumbnailGenerated: !!newThumbnail
@@ -756,7 +648,7 @@ export const useProjectStore = create<ProjectStore>()(
                   get().addHistoryEntry(tabId, 'resize_canvas_all_frames', tab.canvasData)
                 }
                 
-                debugLog('RESIZE_CANVAS_COMPLETE', 'All frames canvas resize completed', {
+                storeDebug('RESIZE_CANVAS_COMPLETE', 'All frames canvas resize completed', {
                   newSize: `${tab.project.width}x${tab.project.height}`,
                   framesUpdated: tab.frameCanvasData.length,
                   historyAdded: true
@@ -803,14 +695,6 @@ export const useProjectStore = create<ProjectStore>()(
           const tab = get().getTab(tabId)
           if (!tab || !tab.canvasData) return
 
-          // Debug logging
-          const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
-          const debugLog = (category: string, message: string, data?: any) => {
-            if (DEBUG_MODE) {
-              const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-              console.log(`[${timestamp}] 🏪 ProjectStore [${category}]:`, message, data || '')
-            }
-          }
 
           set((state) => {
             state.isLoading = true
@@ -818,7 +702,7 @@ export const useProjectStore = create<ProjectStore>()(
           })
 
           try {
-            debugLog('EXPORT_START', `Starting export as ${format}`, {
+            storeDebug('EXPORT_START', `Starting export as ${format}`, {
               projectId: tab.project.id,
               projectSize: `${tab.project.width}x${tab.project.height}`,
               format,
@@ -830,7 +714,7 @@ export const useProjectStore = create<ProjectStore>()(
             
             // CRITICAL: Save current canvas data to active frame before export
             if (tab.project.activeFrameId && tab.canvasData) {
-              debugLog('EXPORT_SAVE_CURRENT_FRAME', 'Saving current canvas data to active frame before export', {
+              storeDebug('EXPORT_SAVE_CURRENT_FRAME', 'Saving current canvas data to active frame before export', {
                 activeFrameId: tab.project.activeFrameId,
                 canvasDataLength: tab.canvasData.data.length
               })
@@ -842,7 +726,7 @@ export const useProjectStore = create<ProjectStore>()(
               const updatedTab = get().tabs.find(t => t.id === tab.id)
               const updatedFrame = updatedTab?.frames.find(f => f.id === tab.project.activeFrameId)
               const frameCanvasData = updatedTab?.frameCanvasData.find(fc => fc.frameId === tab.project.activeFrameId)
-              debugLog('EXPORT_SAVE_VERIFICATION', 'Verified current frame save', {
+              storeDebug('EXPORT_SAVE_VERIFICATION', 'Verified current frame save', {
                 frameExists: !!updatedFrame,
                 frameHasCanvasData: !!(frameCanvasData?.canvasData),
                 frameCanvasDataLength: frameCanvasData?.canvasData?.data.length,
@@ -856,7 +740,7 @@ export const useProjectStore = create<ProjectStore>()(
             const scaledWidth = Math.round(originalWidth * scale)
             const scaledHeight = Math.round(originalHeight * scale)
             
-            debugLog('EXPORT_SCALING', 'Calculating scaled dimensions', {
+            storeDebug('EXPORT_SCALING', 'Calculating scaled dimensions', {
               original: `${originalWidth}x${originalHeight}`,
               scale,
               scaled: `${scaledWidth}x${scaledHeight}`
@@ -898,7 +782,7 @@ export const useProjectStore = create<ProjectStore>()(
             // Scale the image
             ctx.drawImage(sourceCanvas, 0, 0, originalWidth, originalHeight, 0, 0, scaledWidth, scaledHeight)
 
-            debugLog('EXPORT_CANVAS_CREATED', 'Canvas created from pixel data', {
+            storeDebug('EXPORT_CANVAS_CREATED', 'Canvas created from pixel data', {
               canvasSize: `${canvas.width}x${canvas.height}`,
               hasImageData: !!imageData
             })
@@ -913,17 +797,11 @@ export const useProjectStore = create<ProjectStore>()(
                 throw new Error('Need at least 2 frames to create a GIF')
               }
 
-              debugLog('EXPORT_GIF_START', 'Starting GIF creation', {
-                frameCount: tab.frames.length,
-                duration: options.duration || 500,
-                loop: options.loop !== false,
-                includeOnlyVisible: tab.frames.filter(f => f.included).length
-              })
+              storeDebug('EXPORT', 'Starting GIF creation', { frames: tab.frames.length })
 
               // Import gif.js dynamically to avoid SSR issues
               const GIF = (await import('gif.js' as any)).default
               
-              debugLog('EXPORT_GIF_LIBRARY_LOADED', 'GIF.js library loaded successfully')
               
               // Create GIF encoder with transparency support using chroma key
               const gif = new GIF({
@@ -937,126 +815,61 @@ export const useProjectStore = create<ProjectStore>()(
                 workerScript: '/gif.worker.js'
               })
               
-              debugLog('EXPORT_GIF_ENCODER_CREATED', 'GIF encoder initialized', {
-                workers: 2,
-                quality: 10,
-                dimensions: `${scaledWidth}x${scaledHeight}`,
-                repeat: options.loop !== false ? 0 : -1,
-                transparentColor: '0xFF00FF (magenta chroma key)',
-                dispose: 2,
-                transparencyHandling: 'Using magenta chroma key for transparency'
-              })
 
               // Add frames to GIF
               const frameDuration = options.duration || 500
               let framesAdded = 0
               
-              debugLog('EXPORT_GIF_FRAMES_START', 'Starting frame processing', {
-                totalFrames: tab.frames.length,
-                frameCanvasDataCount: tab.frameCanvasData.length,
-                frameDuration
-              })
               
               for (let i = 0; i < tab.frames.length; i++) {
                 const frame = tab.frames[i]
-                if (!frame) {
-                  debugLog('EXPORT_GIF_FRAME_NULL', `Frame at index ${i} is null/undefined`)
-                  continue
-                }
+                if (!frame) continue
                 
-                debugLog('EXPORT_GIF_FRAME_PROCESS', `Processing frame ${i + 1}/${tab.frames.length}`, {
-                  frameId: frame.id,
-                  frameIndex: i,
-                  frameIncluded: frame.included,
-                  frameDelayMs: frame.delayMs
-                })
                 
                 // Skip frames not included in animation
-                if (!frame.included) {
-                  debugLog('EXPORT_GIF_FRAME_SKIPPED', `Skipping frame ${i + 1} (not included)`, {
-                    frameId: frame.id,
-                    index: i
-                  })
-                  continue
-                }
+                if (!frame.included) continue
                 
                 const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
                 if (!frameData) {
-                  debugLog('EXPORT_GIF_FRAME_NO_FRAMEDATA', `No frameData found for frame ${i + 1}`, {
-                    frameId: frame.id,
-                    availableFrameDataIds: tab.frameCanvasData.map(f => f.frameId)
-                  })
+                  storeDebug('EXPORT_ERROR', `No frameData for frame ${frame.id}`)
                   continue
                 }
                 
                 if (!frameData.canvasData) {
-                  debugLog('EXPORT_GIF_FRAME_NO_CANVASDATA', `No canvasData in frameData for frame ${i + 1}`, {
-                    frameId: frame.id,
-                    frameData: Object.keys(frameData)
-                  })
+                  storeDebug('EXPORT_ERROR', `No canvasData for frame ${frame.id}`)
                   continue
                 }
                 
                 if (frameData.canvasData.data.length === 0) {
-                  debugLog('EXPORT_GIF_FRAME_EMPTY_DATA', `Empty canvas data for frame ${i + 1}`, {
-                    frameId: frame.id,
-                    dataLength: frameData.canvasData.data.length,
-                    expectedLength: originalWidth * originalHeight * 4
-                  })
+                  storeDebug('EXPORT_ERROR', `Empty canvas data for frame ${frame.id}`)
                   continue
                 }
                 
                 // Validate data length
                 const expectedDataLength = originalWidth * originalHeight * 4
                 if (frameData.canvasData.data.length !== expectedDataLength) {
-                  debugLog('EXPORT_GIF_FRAME_WRONG_DATA_LENGTH', `Incorrect data length for frame ${i + 1}`, {
-                    frameId: frame.id,
-                    actualLength: frameData.canvasData.data.length,
-                    expectedLength: expectedDataLength,
-                    dimensions: `${originalWidth}x${originalHeight}`
-                  })
+                  storeDebug('EXPORT_ERROR', `Wrong data length for frame ${frame.id}`)
                   continue
                 }
                 
-                debugLog('EXPORT_GIF_FRAME_PIXEL_ANALYSIS', `Pixel analysis for frame ${i + 1}`, {
-                  frameId: frame.id,
-                  dataLength: frameData.canvasData.data.length,
-                  firstFewPixels: Array.from(frameData.canvasData.data.slice(0, 16))
-                })
                 
-                debugLog('EXPORT_GIF_FRAME_PROCESSING', `Processing frame ${i + 1}`, {
-                  frameId: frame.id,
-                  dataLength: frameData.canvasData.data.length,
-                  delayMs: frame.delayMs || frameDuration
-                })
                 
                 // Create source canvas for this frame
                 const sourceFrameCanvas = createPixelCanvas(originalWidth, originalHeight)
                 const sourceFrameCtx = sourceFrameCanvas.getContext('2d')!
                 sourceFrameCtx.imageSmoothingEnabled = false
                 
-                debugLog('EXPORT_GIF_CANVAS_CREATED', `Created source canvas for frame ${i + 1}`, {
-                  frameId: frame.id,
-                  canvasSize: `${sourceFrameCanvas.width}x${sourceFrameCanvas.height}`,
-                  expectedSize: `${originalWidth}x${originalHeight}`
-                })
                 
                 // Create ImageData and render frame to source canvas with transparency handling
                 try {
                   const frameImageData = new ImageData(new Uint8ClampedArray(frameData.canvasData.data), originalWidth, originalHeight)
                   
-                  debugLog('EXPORT_GIF_IMAGEDATA_CREATED', `Created ImageData for frame ${i + 1}`, {
-                    frameId: frame.id,
-                    imageDataSize: `${frameImageData.width}x${frameImageData.height}`,
-                    dataLength: frameImageData.data.length,
-                    firstPixelRGBA: [frameImageData.data[0], frameImageData.data[1], frameImageData.data[2], frameImageData.data[3]]
-                  })
                   
                   // Clear source canvas for transparent background
                   sourceFrameCtx.clearRect(0, 0, originalWidth, originalHeight)
                   sourceFrameCtx.putImageData(frameImageData, 0, 0)
                   
-                  debugLog('EXPORT_GIF_IMAGEDATA_APPLIED', `Applied ImageData to source canvas for frame ${i + 1}`, {
+                  storeDebug('EXPORT_GIF_IMAGEDATA_APPLIED', `Applied ImageData to source canvas for frame ${i + 1}`, {
                     frameId: frame.id
                   })
                   
@@ -1064,7 +877,7 @@ export const useProjectStore = create<ProjectStore>()(
                   const frameCanvas = createPixelCanvas(scaledWidth, scaledHeight)
                   const frameCtx = frameCanvas.getContext('2d')!
                   
-                  debugLog('EXPORT_GIF_SCALED_CANVAS_CREATED', `Created scaled canvas for frame ${i + 1}`, {
+                  storeDebug('EXPORT_GIF_SCALED_CANVAS_CREATED', `Created scaled canvas for frame ${i + 1}`, {
                     frameId: frame.id,
                     scaledSize: `${frameCanvas.width}x${frameCanvas.height}`,
                     scale: scale
@@ -1081,7 +894,7 @@ export const useProjectStore = create<ProjectStore>()(
                     frameCtx.imageSmoothingQuality = 'high'
                   }
                   
-                  debugLog('EXPORT_GIF_BEFORE_SCALING', `About to scale frame ${i + 1}`, {
+                  storeDebug('EXPORT_GIF_BEFORE_SCALING', `About to scale frame ${i + 1}`, {
                     frameId: frame.id,
                     sourceSize: `${originalWidth}x${originalHeight}`,
                     targetSize: `${scaledWidth}x${scaledHeight}`,
@@ -1092,7 +905,7 @@ export const useProjectStore = create<ProjectStore>()(
                   // Scale the frame preserving transparency
                   frameCtx.drawImage(sourceFrameCanvas, 0, 0, originalWidth, originalHeight, 0, 0, scaledWidth, scaledHeight)
                   
-                  debugLog('EXPORT_GIF_AFTER_SCALING', `Completed scaling for frame ${i + 1}`, {
+                  storeDebug('EXPORT_GIF_AFTER_SCALING', `Completed scaling for frame ${i + 1}`, {
                     frameId: frame.id
                   })
                   
@@ -1109,7 +922,7 @@ export const useProjectStore = create<ProjectStore>()(
                     }
                   }
                   
-                  debugLog('EXPORT_GIF_SCALED_VERIFICATION', `Scaled canvas verification for frame ${i + 1}`, {
+                  storeDebug('EXPORT_GIF_SCALED_VERIFICATION', `Scaled canvas verification for frame ${i + 1}`, {
                     frameId: frame.id,
                     scaledHasVisiblePixels,
                     scaledDataLength: scaledImageData.data.length,
@@ -1140,21 +953,10 @@ export const useProjectStore = create<ProjectStore>()(
                   const chromaKeyImageData = new ImageData(chromaKeyData, scaledWidth, scaledHeight)
                   chromaKeyCtx.putImageData(chromaKeyImageData, 0, 0)
                   
-                  debugLog('EXPORT_GIF_CHROMA_CONVERSION', `Converted transparent pixels to magenta for frame ${i + 1}`, {
-                    frameId: frame.id,
-                    transparentPixelsConverted,
-                    totalPixels: chromaKeyData.length / 4
-                  })
                   
                   // Add frame to GIF with individual frame delay and transparency
                   const frameDelay = frame.delayMs || frameDuration
                   
-                  debugLog('EXPORT_GIF_ADDING_FRAME', `Adding frame ${i + 1} to GIF encoder`, {
-                    frameId: frame.id,
-                    frameDelay,
-                    hasVisibleContent: scaledHasVisiblePixels,
-                    transparentPixelsConverted
-                  })
                   
                   gif.addFrame(chromaKeyCanvas, { 
                     delay: frameDelay,
@@ -1162,17 +964,9 @@ export const useProjectStore = create<ProjectStore>()(
                   })
                   framesAdded++
                   
-                  debugLog('EXPORT_GIF_FRAME_ADDED', `Added frame ${i + 1} to GIF`, {
-                    frameId: frame.id,
-                    delay: frameDelay,
-                    totalFramesAdded: framesAdded
-                  })
                   
                 } catch (frameError) {
-                  debugLog('EXPORT_GIF_FRAME_ERROR', `Error processing frame ${i + 1}`, {
-                    frameId: frame.id,
-                    error: frameError instanceof Error ? frameError.message : String(frameError)
-                  })
+                  storeDebug('EXPORT_ERROR', `Frame processing failed: ${frameError}`)
                   // Continue with next frame
                 }
               }
@@ -1181,19 +975,11 @@ export const useProjectStore = create<ProjectStore>()(
                 throw new Error('No frames could be processed for GIF creation')
               }
               
-              debugLog('EXPORT_GIF_RENDERING_START', 'Starting GIF rendering', {
-                totalFramesAdded: framesAdded,
-                estimatedFileSize: `${Math.round(framesAdded * scaledWidth * scaledHeight * 0.1 / 1024)}KB`
-              })
+              storeDebug('EXPORT', 'Rendering GIF', { frames: framesAdded })
               
               // Set up GIF completion handler
               return new Promise<void>((resolve, reject) => {
                 gif.on('finished', function(blob: Blob) {
-                  debugLog('EXPORT_GIF_RENDER_COMPLETE', 'GIF rendering completed', {
-                    blobSize: `${Math.round(blob.size / 1024)}KB`,
-                    framesProcessed: framesAdded
-                  })
-                  
                   // Convert blob to download URL
                   const url = URL.createObjectURL(blob)
                   downloadFile(url, `${fileName}.gif`)
@@ -1201,27 +987,16 @@ export const useProjectStore = create<ProjectStore>()(
                   // Clean up
                   setTimeout(() => URL.revokeObjectURL(url), 1000)
                   
-                  debugLog('EXPORT_GIF_DOWNLOAD_SUCCESS', 'GIF download initiated', {
-                    fileName: `${fileName}.gif`,
-                    finalSize: `${Math.round(blob.size / 1024)}KB`
-                  })
+                  storeDebug('EXPORT', `GIF exported: ${Math.round(blob.size / 1024)}KB`)
                   
                   resolve()
                 })
                 
                 gif.on('error', function(error: any) {
-                  debugLog('EXPORT_GIF_ERROR', 'GIF rendering failed', {
-                    error: error instanceof Error ? error.message : String(error)
-                  })
+                  storeDebug('EXPORT_ERROR', `GIF rendering failed: ${error}`)
                   reject(new Error(`GIF creation failed: ${error}`))
                 })
                 
-                gif.on('progress', function(p: number) {
-                  debugLog('EXPORT_GIF_PROGRESS', `GIF rendering progress: ${Math.round(p * 100)}%`, {
-                    progress: p,
-                    percentage: Math.round(p * 100)
-                  })
-                })
                 
                 // Start rendering
                 gif.render()
@@ -1235,28 +1010,21 @@ export const useProjectStore = create<ProjectStore>()(
               if (format === 'jpg') mimeType = 'image/jpeg'
               if (format === 'webp') mimeType = 'image/webp'
 
-              debugLog('EXPORT_IMAGE_CONVERT', `Converting to ${format}`, {
-                mimeType,
-                quality: format === 'jpg' ? quality : 1.0
-              })
 
               const dataURL = canvas.toDataURL(mimeType, quality)
               downloadFile(dataURL, fullFileName)
 
-              debugLog('EXPORT_IMAGE_SUCCESS', `Successfully exported as ${format}`, {
-                fileName: fullFileName,
-                size: `${scaledWidth}x${scaledHeight}`
-              })
+              storeDebug('EXPORT', `Image exported as ${format}`)
             }
             
             set((state) => {
               state.isLoading = false
             })
 
-            debugLog('EXPORT_COMPLETE', 'Export process completed successfully')
+            storeDebug('EXPORT_COMPLETE', 'Export process completed successfully')
 
           } catch (error) {
-            debugLog('EXPORT_ERROR', 'Export failed', { error: error instanceof Error ? error.message : error })
+            storeDebug('EXPORT_ERROR', 'Export failed', { error: error instanceof Error ? error.message : error })
             set((state) => {
               state.error = error instanceof Error ? error.message : 'Export failed'
               state.isLoading = false
@@ -1266,12 +1034,12 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Add frame
         addFrame: (tabId) => {
-          debugLog('ADD_FRAME_START', `Adding new frame to tab ${tabId}`)
+          storeDebug('ADD_FRAME_START', `Adding new frame to tab ${tabId}`)
 
           // CRITICAL: Save current canvas data before switching
           const currentTab = get().getTab(tabId)
           if (currentTab?.currentFrame && currentTab?.canvasData) {
-            debugLog('ADD_FRAME_SAVE_CURRENT', 'Saving current canvas before adding frame', {
+            storeDebug('ADD_FRAME_SAVE_CURRENT', 'Saving current canvas before adding frame', {
               currentFrameId: currentTab.currentFrame.id,
               hasCanvasData: !!currentTab.canvasData
             })
@@ -1319,7 +1087,7 @@ export const useProjectStore = create<ProjectStore>()(
               
               tab.isDirty = true
 
-              debugLog('ADD_FRAME_COMPLETE', `Frame added and auto-switched successfully`, {
+              storeDebug('ADD_FRAME_COMPLETE', `Frame added and auto-switched successfully`, {
                 frameId,
                 totalFrames: tab.frames.length,
                 frameCanvasDataCount: tab.frameCanvasData.length,
@@ -1338,7 +1106,7 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Delete frame
         deleteFrame: (tabId, frameId) => {
-          debugLog('DELETE_FRAME_START', `Deleting frame ${frameId} from tab ${tabId}`)
+          storeDebug('DELETE_FRAME_START', `Deleting frame ${frameId} from tab ${tabId}`)
 
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
@@ -1376,7 +1144,7 @@ export const useProjectStore = create<ProjectStore>()(
                 
                 tab.isDirty = true
 
-                debugLog('DELETE_FRAME_COMPLETE', `Frame deleted successfully`, {
+                storeDebug('DELETE_FRAME_COMPLETE', `Frame deleted successfully`, {
                   deletedFrameId: frameId,
                   remainingFrames: tab.frames.length,
                   frameCanvasDataCount: tab.frameCanvasData.length,
@@ -1389,12 +1157,12 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Duplicate frame
         duplicateFrame: (tabId, frameId) => {
-          debugLog('DUPLICATE_FRAME_START', `Duplicating frame ${frameId} in tab ${tabId}`)
+          storeDebug('DUPLICATE_FRAME_START', `Duplicating frame ${frameId} in tab ${tabId}`)
 
           // CRITICAL: Save current canvas data before duplication
           const currentTab = get().getTab(tabId)
           if (currentTab?.currentFrame && currentTab?.canvasData) {
-            debugLog('DUPLICATE_FRAME_SAVE_CURRENT', 'Saving current canvas before duplication', {
+            storeDebug('DUPLICATE_FRAME_SAVE_CURRENT', 'Saving current canvas before duplication', {
               currentFrameId: currentTab.currentFrame.id,
               hasCanvasData: !!currentTab.canvasData,
               dataLength: currentTab.canvasData.data.length
@@ -1437,7 +1205,7 @@ export const useProjectStore = create<ProjectStore>()(
                   data: new Uint8ClampedArray(sourceFrameData.canvasData.data)
                 }
                 
-                debugLog('DUPLICATE_FRAME_COPY_EXISTING', `Copying existing canvas data`, {
+                storeDebug('DUPLICATE_FRAME_COPY_EXISTING', `Copying existing canvas data`, {
                   sourceDataLength: sourceFrameData.canvasData.data.length,
                   duplicatedDataLength: duplicatedCanvasData.data.length,
                   hasThumbnail: !!sourceFrameData.thumbnail
@@ -1457,7 +1225,7 @@ export const useProjectStore = create<ProjectStore>()(
                 
                 const thumbnail = generateThumbnail(duplicatedCanvasData)
                 
-                debugLog('DUPLICATE_FRAME_COPY_CURRENT', `Copying from current active canvas`, {
+                storeDebug('DUPLICATE_FRAME_COPY_CURRENT', `Copying from current active canvas`, {
                   currentDataLength: tab.canvasData.data.length,
                   duplicatedDataLength: duplicatedCanvasData.data.length,
                   thumbnailGenerated: !!thumbnail
@@ -1470,7 +1238,7 @@ export const useProjectStore = create<ProjectStore>()(
                 })
               } else {
                 // Fallback: create empty canvas data
-                debugLog('DUPLICATE_FRAME_CREATE_EMPTY', `Creating empty canvas data for duplicated frame`)
+                storeDebug('DUPLICATE_FRAME_CREATE_EMPTY', `Creating empty canvas data for duplicated frame`)
                 
                 tab.frameCanvasData.splice(insertIndex, 0, {
                   frameId: newFrameId,
@@ -1493,7 +1261,7 @@ export const useProjectStore = create<ProjectStore>()(
                   data: new Uint8ClampedArray(newFrameCanvasData.canvasData.data)
                 }
                 
-                debugLog('DUPLICATE_FRAME_CANVAS_LOADED', `Canvas data loaded for duplicated frame`, {
+                storeDebug('DUPLICATE_FRAME_CANVAS_LOADED', `Canvas data loaded for duplicated frame`, {
                   newFrameId,
                   dataLength: tab.canvasData.data.length
                 })
@@ -1501,7 +1269,7 @@ export const useProjectStore = create<ProjectStore>()(
               
               tab.isDirty = true
 
-              debugLog('DUPLICATE_FRAME_COMPLETE', `Frame duplicated and auto-switched successfully`, {
+              storeDebug('DUPLICATE_FRAME_COMPLETE', `Frame duplicated and auto-switched successfully`, {
                 sourceFrameId: frameId,
                 newFrameId,
                 totalFrames: tab.frames.length,
@@ -1517,7 +1285,7 @@ export const useProjectStore = create<ProjectStore>()(
           const tab = get().getTab(tabId)
           if (!tab || !tab.canvasData || !tab.currentFrame) return
 
-          debugLog('SAVE_FRAME_CANVAS', `Saving canvas data for frame ${tab.currentFrame.id}`, {
+          storeDebug('SAVE_FRAME_CANVAS', `Saving canvas data for frame ${tab.currentFrame.id}`, {
             frameId: tab.currentFrame.id,
             hasCanvasData: !!tab.canvasData,
             dataLength: tab.canvasData.data.length
@@ -1554,7 +1322,7 @@ export const useProjectStore = create<ProjectStore>()(
               })
             }
 
-            debugLog('SAVE_FRAME_CANVAS_COMPLETE', `Frame canvas data saved`, {
+            storeDebug('SAVE_FRAME_CANVAS_COMPLETE', `Frame canvas data saved`, {
               frameId: stateTab.currentFrame.id,
               thumbnailGenerated: !!thumbnail,
               frameCanvasDataCount: stateTab.frameCanvasData.length
@@ -1576,7 +1344,7 @@ export const useProjectStore = create<ProjectStore>()(
           const tab = get().getTab(tabId)
           if (!tab) return
 
-          debugLog('SAVE_ALL_FRAMES_START', `Saving all frame canvas data for tab ${tabId}`, {
+          storeDebug('SAVE_ALL_FRAMES_START', `Saving all frame canvas data for tab ${tabId}`, {
             totalFrames: tab.frames.length,
             frameCanvasDataCount: tab.frameCanvasData.length
           })
@@ -1584,7 +1352,7 @@ export const useProjectStore = create<ProjectStore>()(
           // Always save current frame first
           get().saveCurrentFrameCanvas(tabId)
 
-          debugLog('SAVE_ALL_FRAMES_COMPLETE', `All frame canvas data saved`, {
+          storeDebug('SAVE_ALL_FRAMES_COMPLETE', `All frame canvas data saved`, {
             tabId,
             totalFrames: tab.frames.length
           })
@@ -1592,7 +1360,7 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Set active frame with canvas data loading - CRITICAL FIX: Single atomic operation
         setActiveFrame: (tabId, frameId) => {
-          debugLog('SET_ACTIVE_FRAME_START', `Switching to frame ${frameId}`, {
+          storeDebug('SET_ACTIVE_FRAME_START', `Switching to frame ${frameId}`, {
             tabId,
             frameId
           })
@@ -1603,11 +1371,11 @@ export const useProjectStore = create<ProjectStore>()(
             const targetFrame = tab?.frames.find(f => f.id === frameId)
             
             if (!tab || !targetFrame) {
-              debugLog('SET_ACTIVE_FRAME_ERROR', 'Tab or frame not found', { tabId, frameId })
+              storeDebug('SET_ACTIVE_FRAME_ERROR', 'Tab or frame not found', { tabId, frameId })
               return
             }
 
-            debugLog('SET_ACTIVE_FRAME_PROCESS', `Processing frame switch from ${tab.currentFrame?.id} to ${frameId}`, {
+            storeDebug('SET_ACTIVE_FRAME_PROCESS', `Processing frame switch from ${tab.currentFrame?.id} to ${frameId}`, {
               hasCurrentCanvas: !!tab.canvasData,
               currentCanvasDataLength: tab.canvasData?.data.length,
               frameCanvasDataCount: tab.frameCanvasData.length
@@ -1618,7 +1386,7 @@ export const useProjectStore = create<ProjectStore>()(
               const currentFrameId = tab.currentFrame.id
               const hasNonZeroPixels = Array.from(tab.canvasData.data).some((_, i) => i % 4 === 3 && (tab.canvasData?.data[i] ?? 0) > 0)
               
-              debugLog('SET_ACTIVE_FRAME_SAVE_CURRENT', `Saving current frame ${currentFrameId}`, {
+              storeDebug('SET_ACTIVE_FRAME_SAVE_CURRENT', `Saving current frame ${currentFrameId}`, {
                 currentFrameId,
                 dataLength: tab.canvasData.data.length,
                 hasNonZeroPixels
@@ -1642,7 +1410,7 @@ export const useProjectStore = create<ProjectStore>()(
                   canvasData: canvasDataCopy,
                   thumbnail
                 }
-                debugLog('SET_ACTIVE_FRAME_SAVE_UPDATED', `Updated frame data for ${currentFrameId}`, {
+                storeDebug('SET_ACTIVE_FRAME_SAVE_UPDATED', `Updated frame data for ${currentFrameId}`, {
                   frameIndex,
                   thumbnailGenerated: !!thumbnail
                 })
@@ -1653,7 +1421,7 @@ export const useProjectStore = create<ProjectStore>()(
                   canvasData: canvasDataCopy,
                   thumbnail
                 })
-                debugLog('SET_ACTIVE_FRAME_SAVE_ADDED', `Added frame data for ${currentFrameId}`, {
+                storeDebug('SET_ACTIVE_FRAME_SAVE_ADDED', `Added frame data for ${currentFrameId}`, {
                   frameCanvasDataCount: tab.frameCanvasData.length,
                   thumbnailGenerated: !!thumbnail
                 })
@@ -1673,7 +1441,7 @@ export const useProjectStore = create<ProjectStore>()(
                 ...targetFrameData.canvasData,
                 data: new Uint8ClampedArray(targetFrameData.canvasData.data)
               }
-              debugLog('SET_ACTIVE_FRAME_LOADED', `Loaded existing canvas data for frame ${frameId}`, {
+              storeDebug('SET_ACTIVE_FRAME_LOADED', `Loaded existing canvas data for frame ${frameId}`, {
                 dataLength: targetFrameData.canvasData.data.length,
                 hasThumbnail: !!targetFrameData.thumbnail,
                 hasPixelData,
@@ -1682,7 +1450,7 @@ export const useProjectStore = create<ProjectStore>()(
             } else {
               // Create empty canvas data for new frame
               tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
-              debugLog('SET_ACTIVE_FRAME_EMPTY', `Created empty canvas data for new frame ${frameId}`, {
+              storeDebug('SET_ACTIVE_FRAME_EMPTY', `Created empty canvas data for new frame ${frameId}`, {
                 newDataLength: tab.canvasData.data.length
               })
             }
@@ -1690,7 +1458,7 @@ export const useProjectStore = create<ProjectStore>()(
             // STEP 4: Update state metadata
             tab.isDirty = true
 
-            debugLog('SET_ACTIVE_FRAME_COMPLETE', `Frame switch completed atomically`, {
+            storeDebug('SET_ACTIVE_FRAME_COMPLETE', `Frame switch completed atomically`, {
               newActiveFrameId: frameId,
               newCanvasDataLength: tab.canvasData.data.length,
               totalFrameCanvasData: tab.frameCanvasData.length,
@@ -1755,14 +1523,14 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Regenerate all thumbnails for all tabs and frames
         regenerateAllThumbnails: () => {
-          debugLog('REGENERATE_ALL_THUMBNAILS_START', 'Starting thumbnail regeneration for all tabs')
+          storeDebug('REGENERATE_ALL_THUMBNAILS_START', 'Starting thumbnail regeneration for all tabs')
           
           set((state) => {
             let totalRegenerated = 0
             
             state.tabs.forEach(tab => {
               const frames = tab.frameCanvasData || []
-              debugLog('REGENERATE_TAB_THUMBNAILS', `Regenerating thumbnails for tab ${tab.id}`, {
+              storeDebug('REGENERATE_TAB_THUMBNAILS', `Regenerating thumbnails for tab ${tab.id}`, {
                 tabId: tab.id,
                 frameCount: frames.length,
                 projectName: tab.project.name
@@ -1774,14 +1542,14 @@ export const useProjectStore = create<ProjectStore>()(
                   if (newThumbnail) {
                     frameData.thumbnail = newThumbnail
                     totalRegenerated++
-                    debugLog('REGENERATE_FRAME_THUMBNAIL', `Regenerated thumbnail for frame`, {
+                    storeDebug('REGENERATE_FRAME_THUMBNAIL', `Regenerated thumbnail for frame`, {
                       frameId: frameData.frameId,
                       tabId: tab.id,
                       hasData: frameData.canvasData.data.length > 0
                     })
                   }
                 } else {
-                  debugLog('REGENERATE_FRAME_SKIP', `Skipping thumbnail for empty frame`, {
+                  storeDebug('REGENERATE_FRAME_SKIP', `Skipping thumbnail for empty frame`, {
                     frameId: frameData.frameId,
                     dataLength: frameData.canvasData?.data.length || 0
                   })
@@ -1789,7 +1557,7 @@ export const useProjectStore = create<ProjectStore>()(
               })
             })
             
-            debugLog('REGENERATE_ALL_THUMBNAILS_COMPLETE', `Regenerated ${totalRegenerated} thumbnails`, {
+            storeDebug('REGENERATE_ALL_THUMBNAILS_COMPLETE', `Regenerated ${totalRegenerated} thumbnails`, {
               totalTabs: state.tabs.length,
               totalFrames: state.tabs.reduce(
                 (sum, tab) => sum + ((tab.frameCanvasData || []).length),
@@ -1802,18 +1570,18 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Regenerate thumbnail for specific frame
         regenerateFrameThumbnail: (tabId, frameId) => {
-          debugLog('REGENERATE_FRAME_THUMBNAIL_START', `Regenerating thumbnail for frame ${frameId}`)
+          storeDebug('REGENERATE_FRAME_THUMBNAIL_START', `Regenerating thumbnail for frame ${frameId}`)
           
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             if (!tab) {
-              debugLog('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Tab not found', { tabId })
+              storeDebug('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Tab not found', { tabId })
               return
             }
             
             const frameData = tab.frameCanvasData.find(f => f.frameId === frameId)
             if (!frameData) {
-              debugLog('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Frame data not found', { frameId, tabId })
+              storeDebug('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Frame data not found', { frameId, tabId })
               return
             }
             
@@ -1821,16 +1589,16 @@ export const useProjectStore = create<ProjectStore>()(
               const newThumbnail = generateThumbnail(frameData.canvasData)
               if (newThumbnail) {
                 frameData.thumbnail = newThumbnail
-                debugLog('REGENERATE_FRAME_THUMBNAIL_SUCCESS', `Successfully regenerated thumbnail`, {
+                storeDebug('REGENERATE_FRAME_THUMBNAIL_SUCCESS', `Successfully regenerated thumbnail`, {
                   frameId,
                   tabId,
                   thumbnailLength: newThumbnail.length
                 })
               } else {
-                debugLog('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Failed to generate thumbnail', { frameId, tabId })
+                storeDebug('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Failed to generate thumbnail', { frameId, tabId })
               }
             } else {
-              debugLog('REGENERATE_FRAME_THUMBNAIL_SKIP', 'Frame has no canvas data', {
+              storeDebug('REGENERATE_FRAME_THUMBNAIL_SKIP', 'Frame has no canvas data', {
                 frameId,
                 dataLength: frameData.canvasData?.data.length || 0
               })
