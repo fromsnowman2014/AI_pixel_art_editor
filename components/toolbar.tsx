@@ -8,7 +8,7 @@ import {
   Pencil,
   Eraser,
   Paintbrush,
-  Droplets,
+  Pipette,
   Move,
   RotateCcw,
   RotateCw,
@@ -31,7 +31,7 @@ const tools: Array<{
   { id: 'pencil', name: 'Pencil', icon: Pencil, shortcut: 'P' },
   { id: 'eraser', name: 'Eraser', icon: Eraser, shortcut: 'E' },
   { id: 'fill', name: 'Paint Bucket', icon: Paintbrush, shortcut: 'B' },
-  { id: 'eyedropper', name: 'Eyedropper', icon: Droplets, shortcut: 'I' },
+  { id: 'eyedropper', name: 'Color Picker', icon: Pipette, shortcut: 'I' },
   { id: 'pan', name: 'Pan', icon: Move, shortcut: 'H' },
 ]
 
@@ -195,8 +195,7 @@ export function Toolbar({ className }: ToolbarProps) {
           Current: {canvasState.zoom.toFixed(1)}x
         </div>
       </div>
-
-      {/* Brush Size (for future implementation) */}
+      {/* Brush Size Control */}
       <div className="border-t border-gray-200 pt-4">
         <div className="mb-2 text-xs font-medium text-gray-600">BRUSH SIZE</div>
         <div className="flex items-center space-x-2">

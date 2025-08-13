@@ -39,6 +39,11 @@ describe('Toolbar Integration Tests', () => {
   beforeEach(() => {
     (useProjectStore as jest.Mock).mockReturnValue(mockStore)
     mockStore.getActiveTab.mockReturnValue(mockTab)
+    // Reset mutable tab state before each test
+    mockTab.canvasState.tool = 'pencil'
+    mockTab.canvasState.zoom = 10
+    mockTab.history = [{}]
+    mockTab.historyIndex = 0
     jest.clearAllMocks()
   })
 
@@ -49,7 +54,7 @@ describe('Toolbar Integration Tests', () => {
       expect(screen.getByText('Pencil')).toBeInTheDocument()
       expect(screen.getByText('Eraser')).toBeInTheDocument()
       expect(screen.getByText('Paint Bucket')).toBeInTheDocument()
-      expect(screen.getByText('Eyedropper')).toBeInTheDocument()
+      expect(screen.getByText('Color Picker')).toBeInTheDocument()
       expect(screen.getByText('Pan')).toBeInTheDocument()
     })
 

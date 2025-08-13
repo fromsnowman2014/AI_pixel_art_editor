@@ -1731,13 +1731,14 @@ export const useProjectStore = create<ProjectStore>()(
             let totalRegenerated = 0
             
             state.tabs.forEach(tab => {
+              const frames = tab.frameCanvasData || []
               debugLog('REGENERATE_TAB_THUMBNAILS', `Regenerating thumbnails for tab ${tab.id}`, {
                 tabId: tab.id,
-                frameCount: tab.frameCanvasData.length,
+                frameCount: frames.length,
                 projectName: tab.project.name
               })
-              
-              tab.frameCanvasData.forEach(frameData => {
+
+              frames.forEach(frameData => {
                 if (frameData.canvasData && frameData.canvasData.data.length > 0) {
                   const newThumbnail = generateThumbnail(frameData.canvasData)
                   if (newThumbnail) {
@@ -1760,7 +1761,10 @@ export const useProjectStore = create<ProjectStore>()(
             
             debugLog('REGENERATE_ALL_THUMBNAILS_COMPLETE', `Regenerated ${totalRegenerated} thumbnails`, {
               totalTabs: state.tabs.length,
-              totalFrames: state.tabs.reduce((sum, tab) => sum + tab.frameCanvasData.length, 0),
+              totalFrames: state.tabs.reduce(
+                (sum, tab) => sum + ((tab.frameCanvasData || []).length),
+                0
+              ),
               regeneratedCount: totalRegenerated
             })
           })
@@ -1812,7 +1816,7 @@ export const useProjectStore = create<ProjectStore>()(
             ...tab,
             canvasData: null, // Don't persist heavy canvas data
             history: [], // Don't persist history
-            frameCanvasData: tab.frameCanvasData.map(frameData => ({
+            frameCanvasData: (tab.frameCanvasData || []).map(frameData => ({
               ...frameData,
               thumbnail: null // Don't persist thumbnails - regenerate on load
             }))

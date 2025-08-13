@@ -35,7 +35,7 @@ console.log('✅ Canvas click monitoring enabled. Now click on canvas and check 
 console.log('🛠️  STARTING TOOL SELECTION TEST');
 
 // Test tool selection
-const tools = ['Pencil', 'Eraser', 'Paint Bucket', 'Eyedropper', 'Pan'];
+const tools = ['Pencil', 'Eraser', 'Paint Bucket', 'Color Picker', 'Pan'];
 let currentIndex = 0;
 
 function testNextTool() {
