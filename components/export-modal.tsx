@@ -20,6 +20,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
   const [imageFormat, setImageFormat] = useState<ImageFormat>('png')
   const [fileName, setFileName] = useState('')
   const [quality, setQuality] = useState(90)
+  const [scale, setScale] = useState(1) // Image scaling factor (0.5x, 1x, 2x, 4x)
   const [gifDuration, setGifDuration] = useState(500) // ms per frame
   const [gifLoop, setGifLoop] = useState(true) // Loop GIF
   const [isExporting, setIsExporting] = useState(false)
@@ -29,6 +30,20 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
   const activeTab = getActiveTab()
   const project = activeTab?.project
   const frames = activeTab?.frames || []
+
+  // Calculate scaled dimensions and validate maximum size
+  const scaledWidth = project ? Math.round(project.width * scale) : 0
+  const scaledHeight = project ? Math.round(project.height * scale) : 0
+  const maxDimension = 2048
+  const isValidSize = scaledWidth <= maxDimension && scaledHeight <= maxDimension
+
+  // Available scale options (filtered by max size constraint)
+  const scaleOptions = [0.5, 1, 2, 4, 8].filter(s => {
+    if (!project) return true
+    const testWidth = Math.round(project.width * s)
+    const testHeight = Math.round(project.height * s)
+    return testWidth <= maxDimension && testHeight <= maxDimension
+  })
 
   // Debug logging utility
   const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
@@ -75,6 +90,9 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
       exportType,
       imageFormat: exportType === 'image' ? imageFormat : undefined,
       fileName,
+      scale,
+      scaledWidth,
+      scaledHeight,
       quality: exportType === 'image' ? quality : undefined,
       gifDuration: exportType === 'gif' ? gifDuration : undefined
     })
@@ -87,7 +105,8 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
       if (exportType === 'image') {
         await exportProject(activeTabId, imageFormat, {
           fileName,
-          quality: imageFormat === 'jpg' ? quality : 100
+          quality: imageFormat === 'jpg' ? quality : 100,
+          scale
         })
       } else {
         if (frames.length <= 1) {
@@ -125,7 +144,8 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
           duration: gifDuration,
           loop: gifLoop,
           frames: frames,
-          includedFrames: includedFrames.length
+          includedFrames: includedFrames.length,
+          scale
         })
       }
 
@@ -220,6 +240,34 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
               </select>
             </div>
           )}
+
+          {/* Image Scale Selection */}
+          <div className="space-y-3">
+            <label htmlFor="scale" className="text-sm font-medium">
+              Output Size: {scale}x ({scaledWidth} × {scaledHeight}px)
+              {!isValidSize && <span className="text-red-500 ml-2">⚠️ Exceeds max size</span>}
+            </label>
+            <select 
+              id="scale"
+              value={scale} 
+              onChange={(e) => setScale(parseFloat(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            >
+              {scaleOptions.map((scaleOption) => {
+                const width = Math.round((project?.width || 0) * scaleOption)
+                const height = Math.round((project?.height || 0) * scaleOption)
+                return (
+                  <option key={scaleOption} value={scaleOption}>
+                    {scaleOption}x - {width} × {height}px
+                    {scaleOption === 1 && ' (Original)'}
+                  </option>
+                )
+              })}
+            </select>
+            <div className="text-xs text-gray-500">
+              Maximum output size: {maxDimension} × {maxDimension}px
+            </div>
+          </div>
 
           {/* Quality Setting for JPG */}
           {exportType === 'image' && imageFormat === 'jpg' && (
@@ -357,7 +405,10 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                   {exportType === 'image' ? `${imageFormat.toUpperCase()} Image` : 'Animated GIF'}
                 </div>
                 <div>
-                  <span className="text-gray-600">Size:</span> {project.width}×{project.height}px
+                  <span className="text-gray-600">Original:</span> {project.width}×{project.height}px
+                </div>
+                <div>
+                  <span className="text-gray-600">Output:</span> {scaledWidth}×{scaledHeight}px ({scale}x)
                 </div>
                 {exportType === 'gif' && (
                   <>
@@ -390,6 +441,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
             disabled={
               isExporting || 
               !fileName.trim() || 
+              !isValidSize ||
               (exportType === 'gif' && !canExportGif)
             }
           >

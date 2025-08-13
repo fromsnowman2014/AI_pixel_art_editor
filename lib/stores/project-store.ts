@@ -825,21 +825,53 @@ export const useProjectStore = create<ProjectStore>()(
               options
             })
 
-            // Create a canvas from the pixel data
-            const { width, height } = tab.project
+            // Calculate scaled dimensions
+            const { width: originalWidth, height: originalHeight } = tab.project
+            const scale = options.scale || 1
+            const scaledWidth = Math.round(originalWidth * scale)
+            const scaledHeight = Math.round(originalHeight * scale)
+            
+            debugLog('EXPORT_SCALING', 'Calculating scaled dimensions', {
+              original: `${originalWidth}x${originalHeight}`,
+              scale,
+              scaled: `${scaledWidth}x${scaledHeight}`
+            })
+
+            // Create source canvas from pixel data
+            const sourceCanvas = document.createElement('canvas')
+            sourceCanvas.width = originalWidth
+            sourceCanvas.height = originalHeight
+            
+            const sourceCtx = sourceCanvas.getContext('2d')
+            if (!sourceCtx) throw new Error('Failed to get source canvas context')
+
+            // Set pixel perfect rendering for source
+            sourceCtx.imageSmoothingEnabled = false
+            
+            // Create ImageData from stored pixel data
+            const imageData = new ImageData(new Uint8ClampedArray(tab.canvasData.data), originalWidth, originalHeight)
+            sourceCtx.putImageData(imageData, 0, 0)
+
+            // Create final export canvas with scaling
             const canvas = document.createElement('canvas')
-            canvas.width = width
-            canvas.height = height
+            canvas.width = scaledWidth
+            canvas.height = scaledHeight
             
             const ctx = canvas.getContext('2d')
             if (!ctx) throw new Error('Failed to get canvas context')
 
-            // Set pixel perfect rendering
-            ctx.imageSmoothingEnabled = false
+            // Configure scaling context
+            if (scale >= 1) {
+              // For upscaling, use nearest-neighbor (pixelated)
+              ctx.imageSmoothingEnabled = false
+            } else {
+              // For downscaling, can use smooth interpolation
+              ctx.imageSmoothingEnabled = true
+              ctx.imageSmoothingQuality = 'high'
+            }
             
-            // Create ImageData from stored pixel data
-            const imageData = new ImageData(new Uint8ClampedArray(tab.canvasData.data), width, height)
-            ctx.putImageData(imageData, 0, 0)
+            // Scale the image
+            ctx.drawImage(sourceCanvas, 0, 0, originalWidth, originalHeight, 0, 0, scaledWidth, scaledHeight)
 
             debugLog('EXPORT_CANVAS_CREATED', 'Canvas created from pixel data', {
               canvasSize: `${canvas.width}x${canvas.height}`,
@@ -868,21 +900,22 @@ export const useProjectStore = create<ProjectStore>()(
               
               debugLog('EXPORT_GIF_LIBRARY_LOADED', 'GIF.js library loaded successfully')
               
-              // Create GIF encoder
+              // Create GIF encoder with scaled dimensions and transparency support
               const gif = new GIF({
                 workers: 2,
                 quality: 10,
-                width: width,
-                height: height,
+                width: scaledWidth,
+                height: scaledHeight,
                 repeat: options.loop !== false ? 0 : -1, // 0 = infinite loop, -1 = no loop
-                transparent: null,
+                transparent: 0x00000000, // Enable transparency with index 0
+                dispose: 2, // Restore to background color for transparency
                 workerScript: '/gif.worker.js'
               })
               
               debugLog('EXPORT_GIF_ENCODER_CREATED', 'GIF encoder initialized', {
                 workers: 2,
                 quality: 10,
-                dimensions: `${width}x${height}`,
+                dimensions: `${scaledWidth}x${scaledHeight}`,
                 repeat: options.loop !== false ? 0 : -1
               })
 
@@ -919,22 +952,43 @@ export const useProjectStore = create<ProjectStore>()(
                   delayMs: frame.delayMs || frameDuration
                 })
                 
-                // Create canvas for this frame
-                const frameCanvas = createPixelCanvas(width, height)
-                const frameCtx = frameCanvas.getContext('2d')!
+                // Create source canvas for this frame
+                const sourceFrameCanvas = createPixelCanvas(originalWidth, originalHeight)
+                const sourceFrameCtx = sourceFrameCanvas.getContext('2d')!
+                sourceFrameCtx.imageSmoothingEnabled = false
                 
-                // Clear with white background
-                frameCtx.fillStyle = '#ffffff'
-                frameCtx.fillRect(0, 0, width, height)
-                
-                // Create ImageData and render frame
+                // Create ImageData and render frame to source canvas with transparency handling
                 try {
-                  const imageData = new ImageData(new Uint8ClampedArray(frameData.canvasData.data), width, height)
-                  frameCtx.putImageData(imageData, 0, 0)
+                  const frameImageData = new ImageData(new Uint8ClampedArray(frameData.canvasData.data), originalWidth, originalHeight)
                   
-                  // Add frame to GIF with individual frame delay
+                  // Clear source canvas with transparent background (don't fill with white)
+                  sourceFrameCtx.clearRect(0, 0, originalWidth, originalHeight)
+                  sourceFrameCtx.putImageData(frameImageData, 0, 0)
+                  
+                  // Create scaled canvas for GIF frame
+                  const frameCanvas = createPixelCanvas(scaledWidth, scaledHeight)
+                  const frameCtx = frameCanvas.getContext('2d')!
+                  
+                  // Clear scaled canvas with transparent background (don't fill with white)
+                  frameCtx.clearRect(0, 0, scaledWidth, scaledHeight)
+                  
+                  // Configure scaling for frame
+                  if (scale >= 1) {
+                    frameCtx.imageSmoothingEnabled = false // Pixel perfect upscaling
+                  } else {
+                    frameCtx.imageSmoothingEnabled = true
+                    frameCtx.imageSmoothingQuality = 'high'
+                  }
+                  
+                  // Scale the frame preserving transparency
+                  frameCtx.drawImage(sourceFrameCanvas, 0, 0, originalWidth, originalHeight, 0, 0, scaledWidth, scaledHeight)
+                  
+                  // Add frame to GIF with individual frame delay and transparency
                   const frameDelay = frame.delayMs || frameDuration
-                  gif.addFrame(frameCanvas, { delay: frameDelay })
+                  gif.addFrame(frameCanvas, { 
+                    delay: frameDelay,
+                    dispose: 2 // Restore to background for proper transparency
+                  })
                   framesAdded++
                   
                   debugLog('EXPORT_GIF_FRAME_ADDED', `Added frame ${i + 1} to GIF`, {
@@ -958,7 +1012,7 @@ export const useProjectStore = create<ProjectStore>()(
               
               debugLog('EXPORT_GIF_RENDERING_START', 'Starting GIF rendering', {
                 totalFramesAdded: framesAdded,
-                estimatedFileSize: `${Math.round(framesAdded * width * height * 0.1 / 1024)}KB`
+                estimatedFileSize: `${Math.round(framesAdded * scaledWidth * scaledHeight * 0.1 / 1024)}KB`
               })
               
               // Set up GIF completion handler
@@ -1020,7 +1074,7 @@ export const useProjectStore = create<ProjectStore>()(
 
               debugLog('EXPORT_IMAGE_SUCCESS', `Successfully exported as ${format}`, {
                 fileName: fullFileName,
-                size: `${width}x${height}`
+                size: `${scaledWidth}x${scaledHeight}`
               })
             }
             
@@ -1043,10 +1097,24 @@ export const useProjectStore = create<ProjectStore>()(
         addFrame: (tabId) => {
           debugLog('ADD_FRAME_START', `Adding new frame to tab ${tabId}`)
 
+          // CRITICAL: Save current canvas data before switching
+          const currentTab = get().getTab(tabId)
+          if (currentTab?.currentFrame && currentTab?.canvasData) {
+            debugLog('ADD_FRAME_SAVE_CURRENT', 'Saving current canvas before adding frame', {
+              currentFrameId: currentTab.currentFrame.id,
+              hasCanvasData: !!currentTab.canvasData
+            })
+            get().saveCurrentFrameCanvas(tabId)
+          }
+
+          let newFrameId: string | null = null
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             if (tab) {
               const frameId = `frame-${Date.now()}`
+              newFrameId = frameId
+              
               const newFrame: Frame = {
                 id: frameId,
                 ...createDefaultFrame(),
@@ -1069,16 +1137,32 @@ export const useProjectStore = create<ProjectStore>()(
                 canvasData: newFrameCanvasData,
                 thumbnail: null // Will be generated when first drawn
               })
+
+              // AUTO-SWITCH: Set the new frame as active and load its canvas data
+              tab.project.activeFrameId = frameId
+              tab.currentFrame = newFrame
+              tab.canvasData = {
+                ...newFrameCanvasData,
+                data: new Uint8ClampedArray(newFrameCanvasData.data)
+              }
               
               tab.isDirty = true
 
-              debugLog('ADD_FRAME_COMPLETE', `Frame added successfully`, {
+              debugLog('ADD_FRAME_COMPLETE', `Frame added and auto-switched successfully`, {
                 frameId,
                 totalFrames: tab.frames.length,
-                frameCanvasDataCount: tab.frameCanvasData.length
+                frameCanvasDataCount: tab.frameCanvasData.length,
+                autoSwitchedToFrame: frameId
               })
             }
           })
+
+          // Generate thumbnail for the new empty frame
+          if (newFrameId) {
+            setTimeout(() => {
+              get().regenerateFrameThumbnail(tabId, newFrameId!)
+            }, 100)
+          }
         },
 
         // Delete frame
@@ -1225,13 +1309,33 @@ export const useProjectStore = create<ProjectStore>()(
               }
 
               tab.project.frames = tab.frames.map(f => f.id)
+
+              // AUTO-SWITCH: Set the duplicated frame as active and load its canvas data
+              tab.project.activeFrameId = newFrameId
+              tab.currentFrame = newFrame
+              
+              // Load canvas data for the new duplicated frame
+              const newFrameCanvasData = tab.frameCanvasData.find(f => f.frameId === newFrameId)
+              if (newFrameCanvasData) {
+                tab.canvasData = {
+                  ...newFrameCanvasData.canvasData,
+                  data: new Uint8ClampedArray(newFrameCanvasData.canvasData.data)
+                }
+                
+                debugLog('DUPLICATE_FRAME_CANVAS_LOADED', `Canvas data loaded for duplicated frame`, {
+                  newFrameId,
+                  dataLength: tab.canvasData.data.length
+                })
+              }
+              
               tab.isDirty = true
 
-              debugLog('DUPLICATE_FRAME_COMPLETE', `Frame duplicated successfully`, {
+              debugLog('DUPLICATE_FRAME_COMPLETE', `Frame duplicated and auto-switched successfully`, {
                 sourceFrameId: frameId,
                 newFrameId,
                 totalFrames: tab.frames.length,
-                frameCanvasDataCount: tab.frameCanvasData.length
+                frameCanvasDataCount: tab.frameCanvasData.length,
+                autoSwitchedToFrame: newFrameId
               })
             }
           })

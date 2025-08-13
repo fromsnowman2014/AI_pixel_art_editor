@@ -538,9 +538,27 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           transform: `translate(${canvasState.panX}px, ${canvasState.panY}px)`
         }}
       >
+        {/* Transparent checkerboard background */}
+        <div 
+          className="absolute border-2 border-gray-300"
+          style={{
+            width: project.width * canvasState.zoom,
+            height: project.height * canvasState.zoom,
+            backgroundImage: `
+              linear-gradient(45deg, #e5e5e5 25%, transparent 25%),
+              linear-gradient(-45deg, #e5e5e5 25%, transparent 25%),
+              linear-gradient(45deg, transparent 75%, #e5e5e5 75%),
+              linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)
+            `,
+            backgroundSize: `${Math.max(16, 8 * canvasState.zoom)}px ${Math.max(16, 8 * canvasState.zoom)}px`,
+            backgroundPosition: '0 0, 0 0, 0 0, 0 0',
+            imageRendering: 'pixelated'
+          }}
+        />
+        
         <canvas
           ref={canvasRef}
-          className="pixel-canvas border-2 border-gray-300 shadow-lg"
+          className="pixel-canvas border-2 border-gray-300 shadow-lg relative z-10"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
