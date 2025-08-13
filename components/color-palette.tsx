@@ -230,7 +230,7 @@ export function ColorPalette({ className }: ColorPaletteProps) {
             size="sm"
             className="w-full justify-start text-xs"
             onClick={() => {
-              const pastelPalette = ['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFBA', '#BAE1FF', '#FFBAF5', '#D4BAFF', '#BABAFFF']
+              const pastelPalette = ['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFBA', '#BAE1FF', '#FFBAF5', '#D4BAFF', '#BABAFF']
               updateProject(activeTabId, { palette: pastelPalette.slice(0, project.colorLimit) })
             }}
           >
