@@ -925,15 +925,15 @@ export const useProjectStore = create<ProjectStore>()(
               
               debugLog('EXPORT_GIF_LIBRARY_LOADED', 'GIF.js library loaded successfully')
               
-              // Create GIF encoder with scaled dimensions - transparency handling fixed
+              // Create GIF encoder with transparency support using chroma key
               const gif = new GIF({
                 workers: 2,
                 quality: 10,
                 width: scaledWidth,
                 height: scaledHeight,
                 repeat: options.loop !== false ? 0 : -1, // 0 = infinite loop, -1 = no loop
-                // Removed transparent setting to prevent black pixels from being treated as transparent
-                dispose: 1, // Changed to "do not dispose" to preserve frame content properly
+                transparent: 0xFF00FF, // Use magenta as transparent color (chroma key)
+                dispose: 2, // Restore to background for proper transparency
                 workerScript: '/gif.worker.js'
               })
               
@@ -942,8 +942,9 @@ export const useProjectStore = create<ProjectStore>()(
                 quality: 10,
                 dimensions: `${scaledWidth}x${scaledHeight}`,
                 repeat: options.loop !== false ? 0 : -1,
-                transparencyFixed: 'Removed transparent setting to fix black pixel issue',
-                dispose: 1
+                transparentColor: '0xFF00FF (magenta chroma key)',
+                dispose: 2,
+                transparencyHandling: 'Using magenta chroma key for transparency'
               })
 
               // Add frames to GIF
@@ -1051,9 +1052,8 @@ export const useProjectStore = create<ProjectStore>()(
                     firstPixelRGBA: [frameImageData.data[0], frameImageData.data[1], frameImageData.data[2], frameImageData.data[3]]
                   })
                   
-                  // Fill source canvas with white background (match preview behavior)
-                  sourceFrameCtx.fillStyle = '#ffffff'
-                  sourceFrameCtx.fillRect(0, 0, originalWidth, originalHeight)
+                  // Clear source canvas for transparent background
+                  sourceFrameCtx.clearRect(0, 0, originalWidth, originalHeight)
                   sourceFrameCtx.putImageData(frameImageData, 0, 0)
                   
                   debugLog('EXPORT_GIF_IMAGEDATA_APPLIED', `Applied ImageData to source canvas for frame ${i + 1}`, {
@@ -1070,9 +1070,8 @@ export const useProjectStore = create<ProjectStore>()(
                     scale: scale
                   })
                   
-                  // Fill scaled canvas with white background (match preview behavior)
-                  frameCtx.fillStyle = '#ffffff'
-                  frameCtx.fillRect(0, 0, scaledWidth, scaledHeight)
+                  // Clear scaled canvas for transparent background
+                  frameCtx.clearRect(0, 0, scaledWidth, scaledHeight)
                   
                   // Configure scaling for frame
                   if (scale >= 1) {
@@ -1117,16 +1116,47 @@ export const useProjectStore = create<ProjectStore>()(
                     firstScaledPixels: Array.from(scaledImageData.data.slice(0, 16))
                   })
                   
+                  // Convert transparent pixels to magenta chroma key for GIF transparency
+                  const chromaKeyCanvas = createPixelCanvas(scaledWidth, scaledHeight)
+                  const chromaKeyCtx = chromaKeyCanvas.getContext('2d')!
+                  
+                  // Get current frame data
+                  const currentFrameData = frameCtx.getImageData(0, 0, scaledWidth, scaledHeight)
+                  const chromaKeyData = new Uint8ClampedArray(currentFrameData.data)
+                  
+                  // Convert transparent pixels (alpha = 0) to magenta (255, 0, 255, 255)
+                  let transparentPixelsConverted = 0
+                  for (let i = 0; i < chromaKeyData.length; i += 4) {
+                    if (chromaKeyData[i + 3] === 0) { // If alpha is 0 (transparent)
+                      chromaKeyData[i] = 255     // R = 255
+                      chromaKeyData[i + 1] = 0   // G = 0  
+                      chromaKeyData[i + 2] = 255 // B = 255 (magenta)
+                      chromaKeyData[i + 3] = 255 // A = 255 (opaque)
+                      transparentPixelsConverted++
+                    }
+                  }
+                  
+                  // Apply converted data to chroma key canvas
+                  const chromaKeyImageData = new ImageData(chromaKeyData, scaledWidth, scaledHeight)
+                  chromaKeyCtx.putImageData(chromaKeyImageData, 0, 0)
+                  
+                  debugLog('EXPORT_GIF_CHROMA_CONVERSION', `Converted transparent pixels to magenta for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    transparentPixelsConverted,
+                    totalPixels: chromaKeyData.length / 4
+                  })
+                  
                   // Add frame to GIF with individual frame delay and transparency
                   const frameDelay = frame.delayMs || frameDuration
                   
                   debugLog('EXPORT_GIF_ADDING_FRAME', `Adding frame ${i + 1} to GIF encoder`, {
                     frameId: frame.id,
                     frameDelay,
-                    hasVisibleContent: scaledHasVisiblePixels
+                    hasVisibleContent: scaledHasVisiblePixels,
+                    transparentPixelsConverted
                   })
                   
-                  gif.addFrame(frameCanvas, { 
+                  gif.addFrame(chromaKeyCanvas, { 
                     delay: frameDelay,
                     dispose: 2 // Restore to background for proper transparency
                   })
