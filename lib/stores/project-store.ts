@@ -822,8 +822,33 @@ export const useProjectStore = create<ProjectStore>()(
               projectId: tab.project.id,
               projectSize: `${tab.project.width}x${tab.project.height}`,
               format,
-              options
+              options,
+              currentFrameId: tab.project.activeFrameId,
+              hasCurrentCanvasData: !!tab.canvasData,
+              canvasDataLength: tab.canvasData?.data.length
             })
+            
+            // CRITICAL: Save current canvas data to active frame before export
+            if (tab.project.activeFrameId && tab.canvasData) {
+              debugLog('EXPORT_SAVE_CURRENT_FRAME', 'Saving current canvas data to active frame before export', {
+                activeFrameId: tab.project.activeFrameId,
+                canvasDataLength: tab.canvasData.data.length
+              })
+              
+              // Force save current canvas data to the active frame
+              get().saveCurrentFrameCanvas(tab.id)
+              
+              // Verify the save worked by checking the frame data
+              const updatedTab = get().tabs.find(t => t.id === tab.id)
+              const updatedFrame = updatedTab?.frames.find(f => f.id === tab.project.activeFrameId)
+              const frameCanvasData = updatedTab?.frameCanvasData.find(fc => fc.frameId === tab.project.activeFrameId)
+              debugLog('EXPORT_SAVE_VERIFICATION', 'Verified current frame save', {
+                frameExists: !!updatedFrame,
+                frameHasCanvasData: !!(frameCanvasData?.canvasData),
+                frameCanvasDataLength: frameCanvasData?.canvasData?.data.length,
+                frameHasContent: frameCanvasData?.canvasData ? Array.from(frameCanvasData.canvasData.data).some((_, i) => i % 4 === 3 && (frameCanvasData.canvasData!.data[i] ?? 0) > 0) : false
+              })
+            }
 
             // Calculate scaled dimensions
             const { width: originalWidth, height: originalHeight } = tab.project
@@ -900,15 +925,15 @@ export const useProjectStore = create<ProjectStore>()(
               
               debugLog('EXPORT_GIF_LIBRARY_LOADED', 'GIF.js library loaded successfully')
               
-              // Create GIF encoder with scaled dimensions and transparency support
+              // Create GIF encoder with scaled dimensions - transparency handling fixed
               const gif = new GIF({
                 workers: 2,
                 quality: 10,
                 width: scaledWidth,
                 height: scaledHeight,
                 repeat: options.loop !== false ? 0 : -1, // 0 = infinite loop, -1 = no loop
-                transparent: 0x00000000, // Enable transparency with index 0
-                dispose: 2, // Restore to background color for transparency
+                // Removed transparent setting to prevent black pixels from being treated as transparent
+                dispose: 1, // Changed to "do not dispose" to preserve frame content properly
                 workerScript: '/gif.worker.js'
               })
               
@@ -916,16 +941,34 @@ export const useProjectStore = create<ProjectStore>()(
                 workers: 2,
                 quality: 10,
                 dimensions: `${scaledWidth}x${scaledHeight}`,
-                repeat: options.loop !== false ? 0 : -1
+                repeat: options.loop !== false ? 0 : -1,
+                transparencyFixed: 'Removed transparent setting to fix black pixel issue',
+                dispose: 1
               })
 
               // Add frames to GIF
               const frameDuration = options.duration || 500
               let framesAdded = 0
               
+              debugLog('EXPORT_GIF_FRAMES_START', 'Starting frame processing', {
+                totalFrames: tab.frames.length,
+                frameCanvasDataCount: tab.frameCanvasData.length,
+                frameDuration
+              })
+              
               for (let i = 0; i < tab.frames.length; i++) {
                 const frame = tab.frames[i]
-                if (!frame) continue
+                if (!frame) {
+                  debugLog('EXPORT_GIF_FRAME_NULL', `Frame at index ${i} is null/undefined`)
+                  continue
+                }
+                
+                debugLog('EXPORT_GIF_FRAME_PROCESS', `Processing frame ${i + 1}/${tab.frames.length}`, {
+                  frameId: frame.id,
+                  frameIndex: i,
+                  frameIncluded: frame.included,
+                  frameDelayMs: frame.delayMs
+                })
                 
                 // Skip frames not included in animation
                 if (!frame.included) {
@@ -937,14 +980,48 @@ export const useProjectStore = create<ProjectStore>()(
                 }
                 
                 const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
-                if (!frameData || !frameData.canvasData || frameData.canvasData.data.length === 0) {
-                  debugLog('EXPORT_GIF_FRAME_NO_DATA', `Skipping frame ${i + 1} (no canvas data)`, {
+                if (!frameData) {
+                  debugLog('EXPORT_GIF_FRAME_NO_FRAMEDATA', `No frameData found for frame ${i + 1}`, {
                     frameId: frame.id,
-                    hasFrameData: !!frameData,
-                    dataLength: frameData?.canvasData?.data.length || 0
+                    availableFrameDataIds: tab.frameCanvasData.map(f => f.frameId)
                   })
                   continue
                 }
+                
+                if (!frameData.canvasData) {
+                  debugLog('EXPORT_GIF_FRAME_NO_CANVASDATA', `No canvasData in frameData for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    frameData: Object.keys(frameData)
+                  })
+                  continue
+                }
+                
+                if (frameData.canvasData.data.length === 0) {
+                  debugLog('EXPORT_GIF_FRAME_EMPTY_DATA', `Empty canvas data for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    dataLength: frameData.canvasData.data.length,
+                    expectedLength: originalWidth * originalHeight * 4
+                  })
+                  continue
+                }
+                
+                // Validate data length
+                const expectedDataLength = originalWidth * originalHeight * 4
+                if (frameData.canvasData.data.length !== expectedDataLength) {
+                  debugLog('EXPORT_GIF_FRAME_WRONG_DATA_LENGTH', `Incorrect data length for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    actualLength: frameData.canvasData.data.length,
+                    expectedLength: expectedDataLength,
+                    dimensions: `${originalWidth}x${originalHeight}`
+                  })
+                  continue
+                }
+                
+                debugLog('EXPORT_GIF_FRAME_PIXEL_ANALYSIS', `Pixel analysis for frame ${i + 1}`, {
+                  frameId: frame.id,
+                  dataLength: frameData.canvasData.data.length,
+                  firstFewPixels: Array.from(frameData.canvasData.data.slice(0, 16))
+                })
                 
                 debugLog('EXPORT_GIF_FRAME_PROCESSING', `Processing frame ${i + 1}`, {
                   frameId: frame.id,
@@ -957,17 +1034,40 @@ export const useProjectStore = create<ProjectStore>()(
                 const sourceFrameCtx = sourceFrameCanvas.getContext('2d')!
                 sourceFrameCtx.imageSmoothingEnabled = false
                 
+                debugLog('EXPORT_GIF_CANVAS_CREATED', `Created source canvas for frame ${i + 1}`, {
+                  frameId: frame.id,
+                  canvasSize: `${sourceFrameCanvas.width}x${sourceFrameCanvas.height}`,
+                  expectedSize: `${originalWidth}x${originalHeight}`
+                })
+                
                 // Create ImageData and render frame to source canvas with transparency handling
                 try {
                   const frameImageData = new ImageData(new Uint8ClampedArray(frameData.canvasData.data), originalWidth, originalHeight)
+                  
+                  debugLog('EXPORT_GIF_IMAGEDATA_CREATED', `Created ImageData for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    imageDataSize: `${frameImageData.width}x${frameImageData.height}`,
+                    dataLength: frameImageData.data.length,
+                    firstPixelRGBA: [frameImageData.data[0], frameImageData.data[1], frameImageData.data[2], frameImageData.data[3]]
+                  })
                   
                   // Clear source canvas with transparent background (don't fill with white)
                   sourceFrameCtx.clearRect(0, 0, originalWidth, originalHeight)
                   sourceFrameCtx.putImageData(frameImageData, 0, 0)
                   
+                  debugLog('EXPORT_GIF_IMAGEDATA_APPLIED', `Applied ImageData to source canvas for frame ${i + 1}`, {
+                    frameId: frame.id
+                  })
+                  
                   // Create scaled canvas for GIF frame
                   const frameCanvas = createPixelCanvas(scaledWidth, scaledHeight)
                   const frameCtx = frameCanvas.getContext('2d')!
+                  
+                  debugLog('EXPORT_GIF_SCALED_CANVAS_CREATED', `Created scaled canvas for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    scaledSize: `${frameCanvas.width}x${frameCanvas.height}`,
+                    scale: scale
+                  })
                   
                   // Clear scaled canvas with transparent background (don't fill with white)
                   frameCtx.clearRect(0, 0, scaledWidth, scaledHeight)
@@ -980,11 +1080,50 @@ export const useProjectStore = create<ProjectStore>()(
                     frameCtx.imageSmoothingQuality = 'high'
                   }
                   
+                  debugLog('EXPORT_GIF_BEFORE_SCALING', `About to scale frame ${i + 1}`, {
+                    frameId: frame.id,
+                    sourceSize: `${originalWidth}x${originalHeight}`,
+                    targetSize: `${scaledWidth}x${scaledHeight}`,
+                    scale: scale,
+                    imageSmoothingEnabled: frameCtx.imageSmoothingEnabled
+                  })
+                  
                   // Scale the frame preserving transparency
                   frameCtx.drawImage(sourceFrameCanvas, 0, 0, originalWidth, originalHeight, 0, 0, scaledWidth, scaledHeight)
                   
+                  debugLog('EXPORT_GIF_AFTER_SCALING', `Completed scaling for frame ${i + 1}`, {
+                    frameId: frame.id
+                  })
+                  
+                  // Verify the scaled canvas has content
+                  const scaledImageData = frameCtx.getImageData(0, 0, scaledWidth, scaledHeight)
+                  let scaledHasVisiblePixels = false
+                  if (scaledImageData && scaledImageData.data) {
+                    const scaledData = scaledImageData.data
+                    for (let pixelIndex = 3; pixelIndex < scaledData.length; pixelIndex += 4) {
+                      if ((scaledData[pixelIndex] ?? 0) > 0) {
+                        scaledHasVisiblePixels = true
+                        break
+                      }
+                    }
+                  }
+                  
+                  debugLog('EXPORT_GIF_SCALED_VERIFICATION', `Scaled canvas verification for frame ${i + 1}`, {
+                    frameId: frame.id,
+                    scaledHasVisiblePixels,
+                    scaledDataLength: scaledImageData.data.length,
+                    firstScaledPixels: Array.from(scaledImageData.data.slice(0, 16))
+                  })
+                  
                   // Add frame to GIF with individual frame delay and transparency
                   const frameDelay = frame.delayMs || frameDuration
+                  
+                  debugLog('EXPORT_GIF_ADDING_FRAME', `Adding frame ${i + 1} to GIF encoder`, {
+                    frameId: frame.id,
+                    frameDelay,
+                    hasVisibleContent: scaledHasVisiblePixels
+                  })
+                  
                   gif.addFrame(frameCanvas, { 
                     delay: frameDelay,
                     dispose: 2 // Restore to background for proper transparency

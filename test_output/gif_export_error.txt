@@ -1,0 +1,262 @@
+[03:50:30] 🎛️  ProjectPanel [EXPORT_MODAL_OPEN]: Opening export modal {activeTabId: 'tab-1755056821158'}
+export-modal.tsx:53 [03:50:40] 💾 ExportModal [EXPORT_START]: Starting export process {exportType: 'gif', imageFormat: undefined, fileName: 'New Project_20250813_0350', scale: 8, scaledWidth: 256, …}
+export-modal.tsx:53 [03:50:40] 💾 ExportModal [EXPORT_SAVE_FRAMES]: Saving all frame data before export 
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [SAVE_ALL_FRAMES_START]: Saving all frame canvas data for tab tab-1755056821158 {totalFrames: 15, frameCanvasDataCount: 15}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [SAVE_FRAME_CANVAS]: Saving canvas data for frame frame-1755056876109-copy {frameId: 'frame-1755056876109-copy', hasCanvasData: true, dataLength: 4096}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [THUMBNAIL_SUCCESS]: Thumbnail generated successfully {originalSize: '32x32', thumbnailSize: '48x48', resultLength: 462}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [SAVE_FRAME_CANVAS_COMPLETE]: Frame canvas data saved {frameId: 'frame-1755056876109-copy', thumbnailGenerated: true, frameCanvasDataCount: 15}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [SAVE_ALL_FRAMES_COMPLETE]: All frame canvas data saved {tabId: 'tab-1755056821158', totalFrames: 15}
+export-modal.tsx:53 [03:50:40] 💾 ExportModal [EXPORT_GIF_PREPARATION]: Preparing GIF export {totalFrames: 15, includedFrames: 15, frameDetails: Array(15), gifDuration: 250, gifLoop: true, …}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_START]: Starting export as gif {projectId: 'project-1755056821158', projectSize: '32x32', format: 'gif', options: {…}, currentFrameId: 'frame-1755056876109-copy', …}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_SAVE_CURRENT_FRAME]: Saving current canvas data to active frame before export {activeFrameId: 'frame-1755056876109-copy', canvasDataLength: 4096}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [SAVE_FRAME_CANVAS]: Saving canvas data for frame frame-1755056876109-copy {frameId: 'frame-1755056876109-copy', hasCanvasData: true, dataLength: 4096}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [THUMBNAIL_SUCCESS]: Thumbnail generated successfully {originalSize: '32x32', thumbnailSize: '48x48', resultLength: 462}
+project-store.ts:15 [03:50:40] 🏪 ProjectStore [SAVE_FRAME_CANVAS_COMPLETE]: Frame canvas data saved {frameId: 'frame-1755056876109-copy', thumbnailGenerated: true, frameCanvasDataCount: 15}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_SAVE_VERIFICATION]: Verified current frame save {frameExists: true, frameHasCanvasData: true, frameCanvasDataLength: 4096, frameHasContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_SCALING]: Calculating scaled dimensions {original: '32x32', scale: 8, scaled: '256x256'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_CANVAS_CREATED]: Canvas created from pixel data {canvasSize: '256x256', hasImageData: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_START]: Starting GIF creation {frameCount: 15, duration: 250, loop: true, includeOnlyVisible: 15}
+debug-monitor.tsx:16 [03:50:40] 🔄 DebugMonitor [REACT_RENDER]: Component re-rendered {renderCount: 103, activeTabId: 'tab-1755056821158', tabsCount: 1, activeTabHasCanvasData: true, activeTabCanvasDataLength: 4096, …}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_LIBRARY_LOADED]: GIF.js library loaded successfully 
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ENCODER_CREATED]: GIF encoder initialized {workers: 2, quality: 10, dimensions: '256x256', repeat: 0}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAMES_START]: Starting frame processing {totalFrames: 15, frameCanvasDataCount: 15, frameDuration: 250}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 1/15 {frameId: 'frame-1755056821158', frameIndex: 0, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 1 {frameId: 'frame-1755056821158', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 1 {frameId: 'frame-1755056821158', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 1 {frameId: 'frame-1755056821158', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 1 {frameId: 'frame-1755056821158', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 1 {frameId: 'frame-1755056821158'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 1 {frameId: 'frame-1755056821158', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 1 {frameId: 'frame-1755056821158', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 1 {frameId: 'frame-1755056821158'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 1 {frameId: 'frame-1755056821158', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 1 to GIF encoder {frameId: 'frame-1755056821158', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 1 to GIF {frameId: 'frame-1755056821158', delay: 500, totalFramesAdded: 1}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 2/15 {frameId: 'frame-1755056825924-copy', frameIndex: 1, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 2 {frameId: 'frame-1755056825924-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 2 {frameId: 'frame-1755056825924-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 2 {frameId: 'frame-1755056825924-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 2 {frameId: 'frame-1755056825924-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 2 {frameId: 'frame-1755056825924-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 2 {frameId: 'frame-1755056825924-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 2 {frameId: 'frame-1755056825924-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 2 {frameId: 'frame-1755056825924-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 2 {frameId: 'frame-1755056825924-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 2 to GIF encoder {frameId: 'frame-1755056825924-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 2 to GIF {frameId: 'frame-1755056825924-copy', delay: 500, totalFramesAdded: 2}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 3/15 {frameId: 'frame-1755056832742-copy', frameIndex: 2, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 3 {frameId: 'frame-1755056832742-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 3 {frameId: 'frame-1755056832742-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 3 {frameId: 'frame-1755056832742-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 3 {frameId: 'frame-1755056832742-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 3 {frameId: 'frame-1755056832742-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 3 {frameId: 'frame-1755056832742-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 3 {frameId: 'frame-1755056832742-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 3 {frameId: 'frame-1755056832742-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 3 {frameId: 'frame-1755056832742-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 3 to GIF encoder {frameId: 'frame-1755056832742-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 3 to GIF {frameId: 'frame-1755056832742-copy', delay: 500, totalFramesAdded: 3}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 4/15 {frameId: 'frame-1755056836080-copy', frameIndex: 3, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 4 {frameId: 'frame-1755056836080-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 4 {frameId: 'frame-1755056836080-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 4 {frameId: 'frame-1755056836080-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 4 {frameId: 'frame-1755056836080-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 4 {frameId: 'frame-1755056836080-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 4 {frameId: 'frame-1755056836080-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 4 {frameId: 'frame-1755056836080-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 4 {frameId: 'frame-1755056836080-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 4 {frameId: 'frame-1755056836080-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 4 to GIF encoder {frameId: 'frame-1755056836080-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 4 to GIF {frameId: 'frame-1755056836080-copy', delay: 500, totalFramesAdded: 4}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 5/15 {frameId: 'frame-1755056840694-copy', frameIndex: 4, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 5 {frameId: 'frame-1755056840694-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 5 {frameId: 'frame-1755056840694-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 5 {frameId: 'frame-1755056840694-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 5 {frameId: 'frame-1755056840694-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 5 {frameId: 'frame-1755056840694-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 5 {frameId: 'frame-1755056840694-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 5 {frameId: 'frame-1755056840694-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 5 {frameId: 'frame-1755056840694-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 5 {frameId: 'frame-1755056840694-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 5 to GIF encoder {frameId: 'frame-1755056840694-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 5 to GIF {frameId: 'frame-1755056840694-copy', delay: 500, totalFramesAdded: 5}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 6/15 {frameId: 'frame-1755056843148-copy', frameIndex: 5, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 6 {frameId: 'frame-1755056843148-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 6 {frameId: 'frame-1755056843148-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 6 {frameId: 'frame-1755056843148-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 6 {frameId: 'frame-1755056843148-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 6 {frameId: 'frame-1755056843148-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 6 {frameId: 'frame-1755056843148-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 6 {frameId: 'frame-1755056843148-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 6 {frameId: 'frame-1755056843148-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 6 {frameId: 'frame-1755056843148-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 6 to GIF encoder {frameId: 'frame-1755056843148-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 6 to GIF {frameId: 'frame-1755056843148-copy', delay: 500, totalFramesAdded: 6}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 7/15 {frameId: 'frame-1755056845564-copy', frameIndex: 6, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 7 {frameId: 'frame-1755056845564-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 7 {frameId: 'frame-1755056845564-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 7 {frameId: 'frame-1755056845564-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 7 {frameId: 'frame-1755056845564-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 7 {frameId: 'frame-1755056845564-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 7 {frameId: 'frame-1755056845564-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 7 {frameId: 'frame-1755056845564-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 7 {frameId: 'frame-1755056845564-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 7 {frameId: 'frame-1755056845564-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 7 to GIF encoder {frameId: 'frame-1755056845564-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 7 to GIF {frameId: 'frame-1755056845564-copy', delay: 500, totalFramesAdded: 7}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 8/15 {frameId: 'frame-1755056848219-copy', frameIndex: 7, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 8 {frameId: 'frame-1755056848219-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 8 {frameId: 'frame-1755056848219-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 8 {frameId: 'frame-1755056848219-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 8 {frameId: 'frame-1755056848219-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 8 {frameId: 'frame-1755056848219-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 8 {frameId: 'frame-1755056848219-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 8 {frameId: 'frame-1755056848219-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 8 {frameId: 'frame-1755056848219-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 8 {frameId: 'frame-1755056848219-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 8 to GIF encoder {frameId: 'frame-1755056848219-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 8 to GIF {frameId: 'frame-1755056848219-copy', delay: 500, totalFramesAdded: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 9/15 {frameId: 'frame-1755056850905-copy', frameIndex: 8, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 9 {frameId: 'frame-1755056850905-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 9 {frameId: 'frame-1755056850905-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 9 {frameId: 'frame-1755056850905-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 9 {frameId: 'frame-1755056850905-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 9 {frameId: 'frame-1755056850905-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 9 {frameId: 'frame-1755056850905-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 9 {frameId: 'frame-1755056850905-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 9 {frameId: 'frame-1755056850905-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 9 {frameId: 'frame-1755056850905-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 9 to GIF encoder {frameId: 'frame-1755056850905-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 9 to GIF {frameId: 'frame-1755056850905-copy', delay: 500, totalFramesAdded: 9}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 10/15 {frameId: 'frame-1755056853617-copy', frameIndex: 9, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 10 {frameId: 'frame-1755056853617-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 10 {frameId: 'frame-1755056853617-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 10 {frameId: 'frame-1755056853617-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 10 {frameId: 'frame-1755056853617-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 10 {frameId: 'frame-1755056853617-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 10 {frameId: 'frame-1755056853617-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 10 {frameId: 'frame-1755056853617-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 10 {frameId: 'frame-1755056853617-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 10 {frameId: 'frame-1755056853617-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 10 to GIF encoder {frameId: 'frame-1755056853617-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 10 to GIF {frameId: 'frame-1755056853617-copy', delay: 500, totalFramesAdded: 10}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 11/15 {frameId: 'frame-1755056857334-copy', frameIndex: 10, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 11 {frameId: 'frame-1755056857334-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 11 {frameId: 'frame-1755056857334-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 11 {frameId: 'frame-1755056857334-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 11 {frameId: 'frame-1755056857334-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 11 {frameId: 'frame-1755056857334-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 11 {frameId: 'frame-1755056857334-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 11 {frameId: 'frame-1755056857334-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 11 {frameId: 'frame-1755056857334-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 11 {frameId: 'frame-1755056857334-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 11 to GIF encoder {frameId: 'frame-1755056857334-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 11 to GIF {frameId: 'frame-1755056857334-copy', delay: 500, totalFramesAdded: 11}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 12/15 {frameId: 'frame-1755056859646-copy', frameIndex: 11, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 12 {frameId: 'frame-1755056859646-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 12 {frameId: 'frame-1755056859646-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 12 {frameId: 'frame-1755056859646-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 12 {frameId: 'frame-1755056859646-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 12 {frameId: 'frame-1755056859646-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 12 {frameId: 'frame-1755056859646-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 12 {frameId: 'frame-1755056859646-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 12 {frameId: 'frame-1755056859646-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 12 {frameId: 'frame-1755056859646-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 12 to GIF encoder {frameId: 'frame-1755056859646-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 12 to GIF {frameId: 'frame-1755056859646-copy', delay: 500, totalFramesAdded: 12}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 13/15 {frameId: 'frame-1755056862022-copy', frameIndex: 12, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 13 {frameId: 'frame-1755056862022-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 13 {frameId: 'frame-1755056862022-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 13 {frameId: 'frame-1755056862022-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 13 {frameId: 'frame-1755056862022-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 13 {frameId: 'frame-1755056862022-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 13 {frameId: 'frame-1755056862022-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 13 {frameId: 'frame-1755056862022-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 13 {frameId: 'frame-1755056862022-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 13 {frameId: 'frame-1755056862022-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 13 to GIF encoder {frameId: 'frame-1755056862022-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 13 to GIF {frameId: 'frame-1755056862022-copy', delay: 500, totalFramesAdded: 13}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 14/15 {frameId: 'frame-1755056865433-copy', frameIndex: 13, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 14 {frameId: 'frame-1755056865433-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 14 {frameId: 'frame-1755056865433-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 14 {frameId: 'frame-1755056865433-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 14 {frameId: 'frame-1755056865433-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 14 {frameId: 'frame-1755056865433-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 14 {frameId: 'frame-1755056865433-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 14 {frameId: 'frame-1755056865433-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 14 {frameId: 'frame-1755056865433-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 14 {frameId: 'frame-1755056865433-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 14 to GIF encoder {frameId: 'frame-1755056865433-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 14 to GIF {frameId: 'frame-1755056865433-copy', delay: 500, totalFramesAdded: 14}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESS]: Processing frame 15/15 {frameId: 'frame-1755056876109-copy', frameIndex: 14, frameIncluded: true, frameDelayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PIXEL_ANALYSIS]: Pixel analysis for frame 15 {frameId: 'frame-1755056876109-copy', dataLength: 4096, firstFewPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_PROCESSING]: Processing frame 15 {frameId: 'frame-1755056876109-copy', dataLength: 4096, delayMs: 500}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_CANVAS_CREATED]: Created source canvas for frame 15 {frameId: 'frame-1755056876109-copy', canvasSize: '32x32', expectedSize: '32x32'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_CREATED]: Created ImageData for frame 15 {frameId: 'frame-1755056876109-copy', imageDataSize: '32x32', dataLength: 4096, firstPixelRGBA: Array(4)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_IMAGEDATA_APPLIED]: Applied ImageData to source canvas for frame 15 {frameId: 'frame-1755056876109-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_CANVAS_CREATED]: Created scaled canvas for frame 15 {frameId: 'frame-1755056876109-copy', scaledSize: '256x256', scale: 8}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_BEFORE_SCALING]: About to scale frame 15 {frameId: 'frame-1755056876109-copy', sourceSize: '32x32', targetSize: '256x256', scale: 8, imageSmoothingEnabled: false}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_AFTER_SCALING]: Completed scaling for frame 15 {frameId: 'frame-1755056876109-copy'}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_SCALED_VERIFICATION]: Scaled canvas verification for frame 15 {frameId: 'frame-1755056876109-copy', scaledHasVisiblePixels: true, scaledDataLength: 262144, firstScaledPixels: Array(16)}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_ADDING_FRAME]: Adding frame 15 to GIF encoder {frameId: 'frame-1755056876109-copy', frameDelay: 500, hasVisibleContent: true}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_FRAME_ADDED]: Added frame 15 to GIF {frameId: 'frame-1755056876109-copy', delay: 500, totalFramesAdded: 15}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_RENDERING_START]: Starting GIF rendering {totalFramesAdded: 15, estimatedFileSize: '96KB'}
+project-store.ts:1193 Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
+GIF.getContextData @ gif.js:2
+GIF.getImageData @ gif.js:2
+GIF.getTask @ gif.js:2
+GIF.renderNextFrame @ gif.js:2
+GIF.render @ gif.js:2
+quality @ project-store.ts:1193
+eval @ project-store.ts:1156
+step @ tslib.es6.mjs:182
+eval @ tslib.es6.mjs:163
+asyncGeneratorStep @ _async_to_generator.js:8
+_next @ _async_to_generator.js:25
+Promise.then
+asyncGeneratorStep @ _async_to_generator.js:15
+_next @ _async_to_generator.js:25
+eval @ _async_to_generator.js:32
+eval @ _async_to_generator.js:21
+eval @ project-store.ts:802
+eval @ export-modal.tsx:142
+step @ tslib.es6.mjs:182
+eval @ tslib.es6.mjs:163
+asyncGeneratorStep @ _async_to_generator.js:8
+_next @ _async_to_generator.js:25
+eval @ _async_to_generator.js:32
+eval @ _async_to_generator.js:21
+handleExport @ export-modal.tsx:85
+callCallback @ react-dom.development.js:20565
+invokeGuardedCallbackImpl @ react-dom.development.js:20614
+invokeGuardedCallback @ react-dom.development.js:20689
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:20703
+executeDispatch @ react-dom.development.js:32128
+processDispatchQueueItemsInOrder @ react-dom.development.js:32160
+processDispatchQueue @ react-dom.development.js:32173
+dispatchEventsForPlugins @ react-dom.development.js:32184
+eval @ react-dom.development.js:32374
+batchedUpdates$1 @ react-dom.development.js:24953
+batchedUpdates @ react-dom.development.js:28844
+dispatchEventForPluginEventSystem @ react-dom.development.js:32373
+dispatchEvent @ react-dom.development.js:30141
+dispatchDiscreteEvent @ react-dom.development.js:30112Understand this warning
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 0% {progress: 0, percentage: 0}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 7% {progress: 0.06666666666666667, percentage: 7}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 13% {progress: 0.13333333333333333, percentage: 13}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 20% {progress: 0.2, percentage: 20}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 27% {progress: 0.26666666666666666, percentage: 27}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 33% {progress: 0.3333333333333333, percentage: 33}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 40% {progress: 0.4, percentage: 40}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 47% {progress: 0.4666666666666667, percentage: 47}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 53% {progress: 0.5333333333333333, percentage: 53}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 60% {progress: 0.6, percentage: 60}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 67% {progress: 0.6666666666666666, percentage: 67}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 73% {progress: 0.7333333333333333, percentage: 73}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 80% {progress: 0.8, percentage: 80}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 87% {progress: 0.8666666666666667, percentage: 87}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 93% {progress: 0.9333333333333333, percentage: 93}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_PROGRESS]: GIF rendering progress: 100% {progress: 1, percentage: 100}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_RENDER_COMPLETE]: GIF rendering completed {blobSize: '21KB', framesProcessed: 15}
+project-store.ts:811 [03:50:40] 🏪 ProjectStore [EXPORT_GIF_DOWNLOAD_SUCCESS]: GIF download initiated {fileName: 'New Project_20250813_0350.gif', finalSize: '21KB'}
+export-modal.tsx:53 [03:50:40] 💾 ExportModal [EXPORT_SUCCESS]: Export completed successfully 

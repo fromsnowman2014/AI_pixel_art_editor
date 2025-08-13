@@ -136,13 +136,46 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         debugLog('DRAW_ERASER', `Applied eraser (made transparent)`)
         break
       case 'eyedropper':
-        const currentColor = `#${[
-          (newData[index] || 0).toString(16).padStart(2, '0'),
-          (newData[index + 1] || 0).toString(16).padStart(2, '0'),
-          (newData[index + 2] || 0).toString(16).padStart(2, '0')
-        ].join('')}`
-        debugLog('DRAW_EYEDROPPER', `Picked color: ${currentColor}`)
-        updateCanvasState(activeTabId, { color: currentColor })
+        // Get the color values from the pixel data
+        const r = newData[index] || 0
+        const g = newData[index + 1] || 0
+        const b = newData[index + 2] || 0
+        const alpha = newData[index + 3] || 0
+        
+        debugLog('DRAW_EYEDROPPER_RAW', `Raw pixel data at index ${index}`, {
+          r, g, b, alpha,
+          pixelX, pixelY,
+          dataLength: newData.length
+        })
+        
+        // If the pixel is completely transparent, keep current color (don't change)
+        let pickedColor: string
+        if (alpha === 0) {
+          pickedColor = canvasState.color // Keep current color for transparent pixels
+          debugLog('DRAW_EYEDROPPER_TRANSPARENT', `Picked transparent pixel, keeping current color: ${pickedColor}`)
+        } else {
+          // Convert RGB values to hex string with proper padding
+          pickedColor = `#${[
+            Math.max(0, Math.min(255, r)).toString(16).padStart(2, '0'),
+            Math.max(0, Math.min(255, g)).toString(16).padStart(2, '0'),
+            Math.max(0, Math.min(255, b)).toString(16).padStart(2, '0')
+          ].join('')}`
+          
+          debugLog('DRAW_EYEDROPPER_COLOR', `Picked color from pixel`, {
+            originalRGB: { r, g, b, alpha },
+            hexColor: pickedColor
+          })
+        }
+        
+        // Update the canvas state with the picked color
+        updateCanvasState(activeTabId, { color: pickedColor })
+        
+        debugLog('DRAW_EYEDROPPER_SUCCESS', `Eyedropper completed successfully`, {
+          pickedColor,
+          coordinatesUsed: { pixelX, pixelY },
+          wasTransparent: alpha === 0
+        })
+        
         return
       case 'fill':
         debugLog('DRAW_FILL', `Starting flood fill`)
@@ -301,8 +334,9 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           panY: canvasState.panY + deltaY
         })
       }
-    } else {
+    } else if (canvasState.tool !== 'eyedropper') {
       // Use same simple coordinate calculation as mouse down
+      // Skip drawing for eyedropper tool - it should only work on click, not drag
       const canvasRect = canvasRef.current.getBoundingClientRect()
       const x = e.clientX - canvasRect.left
       const y = e.clientY - canvasRect.top
@@ -564,13 +598,15 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           style={{
-            cursor: canvasState.tool === 'pan' ? 'grab' : 'crosshair'
+            cursor: canvasState.tool === 'pan' ? 'grab' : 
+                   canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair'
           }}
         />
         
         {/* Tool indicator */}
         <div className="absolute -top-8 left-0 rounded bg-black/75 px-2 py-1 text-xs text-white">
-          {canvasState.tool} | {canvasState.zoom}x
+          {canvasState.tool === 'eyedropper' ? 'eyedropper - click to pick color' : 
+           `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
       </div>
     </div>
