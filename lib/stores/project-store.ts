@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import type { Project, Frame, PixelData, CanvasState, HistoryEntry } from '@/lib/types/api'
-import { generatePalette, DEFAULT_PALETTE } from '@/lib/utils'
+import { generatePalette, DEFAULT_PALETTE, createPixelCanvas } from '@/lib/utils'
 import { useAuthStore } from './auth-store'
 
 // Debug logging utility
@@ -858,15 +858,149 @@ export const useProjectStore = create<ProjectStore>()(
 
               debugLog('EXPORT_GIF_START', 'Starting GIF creation', {
                 frameCount: tab.frames.length,
-                duration: options.duration || 500
+                duration: options.duration || 500,
+                loop: options.loop !== false,
+                includeOnlyVisible: tab.frames.filter(f => f.included).length
               })
 
-              // TODO: Implement actual GIF creation using a library like gif.js
-              // For now, download as PNG as fallback
-              const dataURL = canvas.toDataURL('image/png', 1.0)
-              downloadFile(dataURL, `${fileName}_frame1.png`)
+              // Import gif.js dynamically to avoid SSR issues
+              const GIF = (await import('gif.js' as any)).default
               
-              debugLog('EXPORT_GIF_FALLBACK', 'GIF creation not implemented, downloaded as PNG')
+              debugLog('EXPORT_GIF_LIBRARY_LOADED', 'GIF.js library loaded successfully')
+              
+              // Create GIF encoder
+              const gif = new GIF({
+                workers: 2,
+                quality: 10,
+                width: width,
+                height: height,
+                repeat: options.loop !== false ? 0 : -1, // 0 = infinite loop, -1 = no loop
+                transparent: null,
+                workerScript: '/gif.worker.js'
+              })
+              
+              debugLog('EXPORT_GIF_ENCODER_CREATED', 'GIF encoder initialized', {
+                workers: 2,
+                quality: 10,
+                dimensions: `${width}x${height}`,
+                repeat: options.loop !== false ? 0 : -1
+              })
+
+              // Add frames to GIF
+              const frameDuration = options.duration || 500
+              let framesAdded = 0
+              
+              for (let i = 0; i < tab.frames.length; i++) {
+                const frame = tab.frames[i]
+                if (!frame) continue
+                
+                // Skip frames not included in animation
+                if (!frame.included) {
+                  debugLog('EXPORT_GIF_FRAME_SKIPPED', `Skipping frame ${i + 1} (not included)`, {
+                    frameId: frame.id,
+                    index: i
+                  })
+                  continue
+                }
+                
+                const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
+                if (!frameData || !frameData.canvasData || frameData.canvasData.data.length === 0) {
+                  debugLog('EXPORT_GIF_FRAME_NO_DATA', `Skipping frame ${i + 1} (no canvas data)`, {
+                    frameId: frame.id,
+                    hasFrameData: !!frameData,
+                    dataLength: frameData?.canvasData?.data.length || 0
+                  })
+                  continue
+                }
+                
+                debugLog('EXPORT_GIF_FRAME_PROCESSING', `Processing frame ${i + 1}`, {
+                  frameId: frame.id,
+                  dataLength: frameData.canvasData.data.length,
+                  delayMs: frame.delayMs || frameDuration
+                })
+                
+                // Create canvas for this frame
+                const frameCanvas = createPixelCanvas(width, height)
+                const frameCtx = frameCanvas.getContext('2d')!
+                
+                // Clear with white background
+                frameCtx.fillStyle = '#ffffff'
+                frameCtx.fillRect(0, 0, width, height)
+                
+                // Create ImageData and render frame
+                try {
+                  const imageData = new ImageData(new Uint8ClampedArray(frameData.canvasData.data), width, height)
+                  frameCtx.putImageData(imageData, 0, 0)
+                  
+                  // Add frame to GIF with individual frame delay
+                  const frameDelay = frame.delayMs || frameDuration
+                  gif.addFrame(frameCanvas, { delay: frameDelay })
+                  framesAdded++
+                  
+                  debugLog('EXPORT_GIF_FRAME_ADDED', `Added frame ${i + 1} to GIF`, {
+                    frameId: frame.id,
+                    delay: frameDelay,
+                    totalFramesAdded: framesAdded
+                  })
+                  
+                } catch (frameError) {
+                  debugLog('EXPORT_GIF_FRAME_ERROR', `Error processing frame ${i + 1}`, {
+                    frameId: frame.id,
+                    error: frameError instanceof Error ? frameError.message : String(frameError)
+                  })
+                  // Continue with next frame
+                }
+              }
+              
+              if (framesAdded === 0) {
+                throw new Error('No frames could be processed for GIF creation')
+              }
+              
+              debugLog('EXPORT_GIF_RENDERING_START', 'Starting GIF rendering', {
+                totalFramesAdded: framesAdded,
+                estimatedFileSize: `${Math.round(framesAdded * width * height * 0.1 / 1024)}KB`
+              })
+              
+              // Set up GIF completion handler
+              return new Promise<void>((resolve, reject) => {
+                gif.on('finished', function(blob: Blob) {
+                  debugLog('EXPORT_GIF_RENDER_COMPLETE', 'GIF rendering completed', {
+                    blobSize: `${Math.round(blob.size / 1024)}KB`,
+                    framesProcessed: framesAdded
+                  })
+                  
+                  // Convert blob to download URL
+                  const url = URL.createObjectURL(blob)
+                  downloadFile(url, `${fileName}.gif`)
+                  
+                  // Clean up
+                  setTimeout(() => URL.revokeObjectURL(url), 1000)
+                  
+                  debugLog('EXPORT_GIF_DOWNLOAD_SUCCESS', 'GIF download initiated', {
+                    fileName: `${fileName}.gif`,
+                    finalSize: `${Math.round(blob.size / 1024)}KB`
+                  })
+                  
+                  resolve()
+                })
+                
+                gif.on('error', function(error: any) {
+                  debugLog('EXPORT_GIF_ERROR', 'GIF rendering failed', {
+                    error: error instanceof Error ? error.message : String(error)
+                  })
+                  reject(new Error(`GIF creation failed: ${error}`))
+                })
+                
+                gif.on('progress', function(p: number) {
+                  debugLog('EXPORT_GIF_PROGRESS', `GIF rendering progress: ${Math.round(p * 100)}%`, {
+                    progress: p,
+                    percentage: Math.round(p * 100)
+                  })
+                })
+                
+                // Start rendering
+                gif.render()
+              })
 
             } else {
               // Handle static image formats (PNG, JPG, WebP)

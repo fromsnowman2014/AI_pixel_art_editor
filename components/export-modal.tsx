@@ -91,14 +91,41 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
         })
       } else {
         if (frames.length <= 1) {
-          debugLog('EXPORT_GIF_ERROR', 'Insufficient frames for GIF creation')
+          debugLog('EXPORT_GIF_ERROR', 'Insufficient frames for GIF creation', {
+            totalFrames: frames.length,
+            availableFrames: frames.map(f => f.id)
+          })
           return
         }
+        
+        const includedFrames = frames.filter(f => f.included)
+        debugLog('EXPORT_GIF_PREPARATION', 'Preparing GIF export', {
+          totalFrames: frames.length,
+          includedFrames: includedFrames.length,
+          frameDetails: frames.map(f => ({
+            id: f.id,
+            included: f.included,
+            delayMs: f.delayMs
+          })),
+          gifDuration,
+          gifLoop,
+          fileName
+        })
+        
+        if (includedFrames.length === 0) {
+          debugLog('EXPORT_GIF_ERROR', 'No frames included in animation', {
+            totalFrames: frames.length,
+            includedCount: 0
+          })
+          throw new Error('No frames are included in the animation')
+        }
+        
         await exportProject(activeTabId, 'gif', {
           fileName,
           duration: gifDuration,
           loop: gifLoop,
-          frames: frames
+          frames: frames,
+          includedFrames: includedFrames.length
         })
       }
 
