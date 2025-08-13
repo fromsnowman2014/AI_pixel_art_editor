@@ -15,11 +15,13 @@ const connection_1 = require("./db/connection");
 const rateLimit_1 = require("./services/rateLimit");
 const rateLimit_2 = require("./middleware/rateLimit");
 const auth_1 = require("./middleware/auth");
+const openai_1 = require("./services/openai");
 // Import route handlers
 const ai_1 = require("./routes/ai");
 const projects_1 = require("./routes/projects");
 const frames_1 = require("./routes/frames");
 const export_1 = require("./routes/export");
+const upload_1 = require("./routes/upload");
 const fastify = (0, fastify_1.default)({
     logger: {
         level: env_1.env.LOG_LEVEL,
@@ -65,11 +67,15 @@ async function buildServer() {
         // Auth decorators are registered by the authPlugin
         // Health check endpoint
         fastify.get('/health', async () => {
-            const [dbHealth, redisHealth] = await Promise.all([
+            const [dbHealth, redisHealth, openaiHealth] = await Promise.all([
                 (0, connection_1.checkDatabaseHealth)(),
                 rateLimit_1.rateLimitService.healthCheck(),
+                openai_1.openaiService.healthCheck(),
             ]);
-            const overallHealth = dbHealth && redisHealth ? 'healthy' : 'degraded';
+            // Check if OpenAI API key is loaded
+            const openaiKeyLoaded = !!env_1.env.OPENAI_API_KEY;
+            const openaiStatus = openaiKeyLoaded && openaiHealth.status === 'healthy' ? 'healthy' : 'unhealthy';
+            const overallHealth = dbHealth && redisHealth && openaiStatus === 'healthy' ? 'healthy' : 'degraded';
             return {
                 status: overallHealth,
                 timestamp: new Date().toISOString(),
@@ -78,8 +84,10 @@ async function buildServer() {
                     database: dbHealth ? 'healthy' : 'unhealthy',
                     redis: redisHealth ? 'healthy' : 'unhealthy',
                     storage: 'healthy', // TODO: implement storage health check
-                    openai: 'healthy', // TODO: implement OpenAI health check
+                    openai: openaiStatus,
                 },
+                openaiKeyLoaded,
+                redisPing: redisHealth ? 'PONG' : 'FAILED',
                 metrics: {
                     uptime: process.uptime(),
                     memoryUsage: {
@@ -97,6 +105,7 @@ async function buildServer() {
         await fastify.register(projects_1.projectRoutes, { prefix: '/api/projects' });
         await fastify.register(frames_1.frameRoutes, { prefix: '/api/frames' });
         await fastify.register(export_1.exportRoutes, { prefix: '/api/export' });
+        await fastify.register(upload_1.uploadRoutes, { prefix: '/api/upload' });
         // Global error handler
         fastify.setErrorHandler(async (error, request, reply) => {
             logger_1.logger.error('Unhandled error', {

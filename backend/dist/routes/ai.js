@@ -23,10 +23,6 @@ const aiRoutes = (fastify, options, done) => {
                 200: api_1.AIGenerationResponseSchema,
             },
         },
-        preHandler: [
-            fastify.rateLimitAI,
-            fastify.authenticate,
-        ],
     }, async (request, reply) => {
         const startTime = Date.now();
         const requestId = (0, uuid_1.v4)();
@@ -207,10 +203,6 @@ const aiRoutes = (fastify, options, done) => {
                 },
             },
         },
-        preHandler: [
-            fastify.rateLimitAI,
-            fastify.authenticate,
-        ],
     }, async (request, reply) => {
         const startTime = Date.now();
         const requestId = (0, uuid_1.v4)();

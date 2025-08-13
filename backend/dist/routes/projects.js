@@ -19,7 +19,6 @@ const projectRoutes = (fastify, options, done) => {
                 201: api_1.ProjectResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const body = request.body;
@@ -116,7 +115,6 @@ const projectRoutes = (fastify, options, done) => {
                 },
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const query = request.query;
@@ -244,7 +242,6 @@ const projectRoutes = (fastify, options, done) => {
                 200: api_1.ProjectResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -323,7 +320,6 @@ const projectRoutes = (fastify, options, done) => {
                 200: api_1.ProjectResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -418,7 +414,6 @@ const projectRoutes = (fastify, options, done) => {
                 204: { type: 'null' },
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -484,7 +479,6 @@ const projectRoutes = (fastify, options, done) => {
                 201: api_1.ProjectResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;

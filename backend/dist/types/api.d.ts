@@ -71,18 +71,18 @@ export declare const AIGenerationResponseSchema: z.ZodObject<{
     width: number;
     height: number;
     palette: string[];
+    processingTimeMs: number;
     assetId: string;
     pngUrl: string;
     colorCount: number;
-    processingTimeMs: number;
 }, {
     width: number;
     height: number;
     palette: string[];
+    processingTimeMs: number;
     assetId: string;
     pngUrl: string;
     colorCount: number;
-    processingTimeMs: number;
 }>;
 export declare const ProjectModeSchema: z.ZodEnum<["beginner", "advanced"]>;
 export declare const CreateProjectRequestSchema: z.ZodObject<{
@@ -489,7 +489,7 @@ export declare const HealthCheckResponseSchema: z.ZodObject<{
         averageResponseTime: number;
     }>;
 }, "strip", z.ZodTypeAny, {
-    status: "healthy" | "degraded" | "unhealthy";
+    status: "healthy" | "unhealthy" | "degraded";
     timestamp: string;
     version: string;
     services: {
@@ -509,7 +509,7 @@ export declare const HealthCheckResponseSchema: z.ZodObject<{
         averageResponseTime: number;
     };
 }, {
-    status: "healthy" | "degraded" | "unhealthy";
+    status: "healthy" | "unhealthy" | "degraded";
     timestamp: string;
     version: string;
     services: {

@@ -3,7 +3,7 @@ export declare const envSchema: z.ZodObject<{
     NODE_ENV: z.ZodDefault<z.ZodEnum<["development", "production", "test"]>>;
     PORT: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
     HOST: z.ZodDefault<z.ZodString>;
-    OPENAI_API_KEY: z.ZodString;
+    OPENAI_API_KEY: z.ZodOptional<z.ZodString>;
     OPENAI_MODEL: z.ZodDefault<z.ZodString>;
     OPENAI_MAX_RETRIES: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
     OPENAI_TIMEOUT: z.ZodDefault<z.ZodPipeline<z.ZodEffects<z.ZodString, number, string>, z.ZodNumber>>;
@@ -45,7 +45,6 @@ export declare const envSchema: z.ZodObject<{
     NODE_ENV: "development" | "production" | "test";
     PORT: number;
     HOST: string;
-    OPENAI_API_KEY: string;
     OPENAI_MODEL: string;
     OPENAI_MAX_RETRIES: number;
     OPENAI_TIMEOUT: number;
@@ -71,6 +70,7 @@ export declare const envSchema: z.ZodObject<{
     LOG_LEVEL: "trace" | "debug" | "info" | "warn" | "error" | "fatal";
     HEALTH_CHECK_ENDPOINT: string;
     METRICS_ENDPOINT: string;
+    OPENAI_API_KEY?: string | undefined;
     POSTGRES_PRISMA_URL?: string | undefined;
     POSTGRES_URL_NON_POOLING?: string | undefined;
     R2_ACCOUNT_ID?: string | undefined;
@@ -84,13 +84,13 @@ export declare const envSchema: z.ZodObject<{
     SUPABASE_BUCKET_NAME?: string | undefined;
     LOG_FILE?: string | undefined;
 }, {
-    OPENAI_API_KEY: string;
     DATABASE_URL: string;
     REDIS_URL: string;
     JWT_SECRET: string;
     NODE_ENV?: "development" | "production" | "test" | undefined;
     PORT?: string | undefined;
     HOST?: string | undefined;
+    OPENAI_API_KEY?: string | undefined;
     OPENAI_MODEL?: string | undefined;
     OPENAI_MAX_RETRIES?: string | undefined;
     OPENAI_TIMEOUT?: string | undefined;
@@ -132,7 +132,6 @@ export declare const env: {
     NODE_ENV: "development" | "production" | "test";
     PORT: number;
     HOST: string;
-    OPENAI_API_KEY: string;
     OPENAI_MODEL: string;
     OPENAI_MAX_RETRIES: number;
     OPENAI_TIMEOUT: number;
@@ -158,6 +157,7 @@ export declare const env: {
     LOG_LEVEL: "trace" | "debug" | "info" | "warn" | "error" | "fatal";
     HEALTH_CHECK_ENDPOINT: string;
     METRICS_ENDPOINT: string;
+    OPENAI_API_KEY?: string | undefined;
     POSTGRES_PRISMA_URL?: string | undefined;
     POSTGRES_URL_NON_POOLING?: string | undefined;
     R2_ACCOUNT_ID?: string | undefined;

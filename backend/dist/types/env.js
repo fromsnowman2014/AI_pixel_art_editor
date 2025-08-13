@@ -1,24 +1,30 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.env = exports.envSchema = void 0;
 exports.validateEnv = validateEnv;
 const zod_1 = require("zod");
+const dotenv_1 = __importDefault(require("dotenv"));
+// Load environment variables from .env file
+dotenv_1.default.config();
 exports.envSchema = zod_1.z.object({
     // Server Configuration
     NODE_ENV: zod_1.z.enum(['development', 'production', 'test']).default('development'),
     PORT: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1).max(65535)).default('8080'),
     HOST: zod_1.z.string().default('0.0.0.0'),
     // OpenAI API Configuration
-    OPENAI_API_KEY: zod_1.z.string().min(1),
+    OPENAI_API_KEY: zod_1.z.string().min(1).optional(), // Optional for development
     OPENAI_MODEL: zod_1.z.string().default('dall-e-3'),
     OPENAI_MAX_RETRIES: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1).max(10)).default('3'),
     OPENAI_TIMEOUT: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1000)).default('30000'),
     // Database Configuration
-    DATABASE_URL: zod_1.z.string().url(),
+    DATABASE_URL: zod_1.z.string().min(1), // Allow any string for SQLite
     POSTGRES_PRISMA_URL: zod_1.z.string().url().optional(),
     POSTGRES_URL_NON_POOLING: zod_1.z.string().url().optional(),
     // Redis Configuration
-    REDIS_URL: zod_1.z.string().url(),
+    REDIS_URL: zod_1.z.string().min(1), // Allow any string for local Redis
     // Storage Configuration (Optional - either R2 or Supabase)
     R2_ACCOUNT_ID: zod_1.z.string().optional(),
     R2_ACCESS_KEY_ID: zod_1.z.string().optional(),
@@ -30,7 +36,7 @@ exports.envSchema = zod_1.z.object({
     SUPABASE_SERVICE_ROLE_KEY: zod_1.z.string().optional(),
     SUPABASE_BUCKET_NAME: zod_1.z.string().optional(),
     // JWT Configuration
-    JWT_SECRET: zod_1.z.string().min(32),
+    JWT_SECRET: zod_1.z.string().min(8), // Relaxed for development
     JWT_EXPIRES_IN: zod_1.z.string().default('7d'),
     // Rate Limiting
     RATE_LIMIT_AI_REQUESTS_PER_HOUR: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1)).default('60'),

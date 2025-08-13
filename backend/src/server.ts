@@ -10,6 +10,7 @@ import { db, checkDatabaseHealth, closeDatabaseConnection } from './db/connectio
 import { rateLimitService } from './services/rateLimit';
 import { aiGenerationRateLimit, apiRateLimit, burstProtection } from './middleware/rateLimit';
 import { authPlugin } from './middleware/auth';
+import { openaiService } from './services/openai';
 
 // Import route handlers
 import { aiRoutes } from './routes/ai';
@@ -72,12 +73,17 @@ async function buildServer() {
 
     // Health check endpoint
     fastify.get('/health', async () => {
-      const [dbHealth, redisHealth] = await Promise.all([
+      const [dbHealth, redisHealth, openaiHealth] = await Promise.all([
         checkDatabaseHealth(),
         rateLimitService.healthCheck(),
+        openaiService.healthCheck(),
       ]);
       
-      const overallHealth = dbHealth && redisHealth ? 'healthy' : 'degraded';
+      // Check if OpenAI API key is loaded
+      const openaiKeyLoaded = !!env.OPENAI_API_KEY;
+      const openaiStatus = openaiKeyLoaded && openaiHealth.status === 'healthy' ? 'healthy' : 'unhealthy';
+      
+      const overallHealth = dbHealth && redisHealth && openaiStatus === 'healthy' ? 'healthy' : 'degraded';
       
       return {
         status: overallHealth,
@@ -87,8 +93,10 @@ async function buildServer() {
           database: dbHealth ? 'healthy' : 'unhealthy',
           redis: redisHealth ? 'healthy' : 'unhealthy',
           storage: 'healthy', // TODO: implement storage health check
-          openai: 'healthy', // TODO: implement OpenAI health check
+          openai: openaiStatus,
         },
+        openaiKeyLoaded,
+        redisPing: redisHealth ? 'PONG' : 'FAILED',
         metrics: {
           uptime: process.uptime(),
           memoryUsage: {

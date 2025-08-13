@@ -19,7 +19,6 @@ const frameRoutes = (fastify, options, done) => {
                 201: api_1.FrameResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const body = request.body;
@@ -106,7 +105,6 @@ const frameRoutes = (fastify, options, done) => {
                 200: api_1.FrameResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -189,7 +187,6 @@ const frameRoutes = (fastify, options, done) => {
                 },
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { projectId } = request.params;
@@ -273,7 +270,6 @@ const frameRoutes = (fastify, options, done) => {
                 200: api_1.FrameResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -371,7 +367,6 @@ const frameRoutes = (fastify, options, done) => {
                 204: { type: 'null' },
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -472,7 +467,6 @@ const frameRoutes = (fastify, options, done) => {
                 201: api_1.FrameResponseSchema,
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { id } = request.params;
@@ -597,7 +591,6 @@ const frameRoutes = (fastify, options, done) => {
                 },
             },
         },
-        preHandler: [fastify.authenticate],
     }, async (request, reply) => {
         const userId = request.user?.id;
         const { projectId, frameIds } = request.body;

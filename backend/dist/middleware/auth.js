@@ -1,11 +1,15 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authPlugin = void 0;
+const fastify_plugin_1 = __importDefault(require("fastify-plugin"));
 require("../types/fastify");
 const logger_1 = require("../utils/logger");
 const env_1 = require("../types/env");
 const logger = (0, logger_1.createLogger)('auth-middleware');
-const authPlugin = (fastify, options, done) => {
+const authPluginCallback = (fastify, options, done) => {
     /**
      * Authentication decorator for routes
      * Supports both anonymous users (local-only mode) and authenticated users (cloud sync)
@@ -134,7 +138,6 @@ const authPlugin = (fastify, options, done) => {
     });
     done();
 };
-exports.authPlugin = authPlugin;
 /**
  * Validate JWT token (placeholder implementation)
  * In production, use jsonwebtoken library or similar
@@ -161,4 +164,8 @@ async function validateJwtToken(token) {
         return null;
     }
 }
+// Export as fastify-plugin to ensure decorators are available
+exports.authPlugin = (0, fastify_plugin_1.default)(authPluginCallback, {
+    name: 'auth-plugin'
+});
 //# sourceMappingURL=auth.js.map

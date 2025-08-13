@@ -154,6 +154,8 @@ export interface HealthCheckResponse {
   status: 'healthy' | 'degraded' | 'unhealthy'
   timestamp: string
   version: string
+  openaiKeyLoaded: boolean
+  redisPing: string
   services: {
     database: 'healthy' | 'unhealthy'
     redis: 'healthy' | 'unhealthy'
