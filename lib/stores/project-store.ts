@@ -515,14 +515,52 @@ export const useProjectStore = create<ProjectStore>()(
               tab.canvasData = data
               tab.isDirty = true
 
+              // CRITICAL: Immediately update current frame's canvas data to prevent loss
+              if (tab.currentFrame) {
+                const frameIndex = tab.frameCanvasData.findIndex(f => f.frameId === tab.currentFrame!.id)
+                
+                // Create a deep copy of canvas data
+                const canvasDataCopy = {
+                  ...data,
+                  data: new Uint8ClampedArray(data.data)
+                }
+
+                // Generate thumbnail for immediate UI update
+                const thumbnail = generateThumbnail(canvasDataCopy)
+
+                if (frameIndex >= 0) {
+                  // Update existing frame data
+                  tab.frameCanvasData[frameIndex] = {
+                    frameId: tab.currentFrame.id,
+                    canvasData: canvasDataCopy,
+                    thumbnail
+                  }
+                  debugLog('UPDATE_CANVAS_FRAME_UPDATED', `Updated current frame canvas data`, {
+                    frameId: tab.currentFrame.id,
+                    frameIndex,
+                    thumbnailGenerated: !!thumbnail
+                  })
+                } else {
+                  // Add new frame data
+                  tab.frameCanvasData.push({
+                    frameId: tab.currentFrame.id,
+                    canvasData: canvasDataCopy,
+                    thumbnail
+                  })
+                  debugLog('UPDATE_CANVAS_FRAME_ADDED', `Added new frame canvas data`, {
+                    frameId: tab.currentFrame.id,
+                    frameCanvasDataCount: tab.frameCanvasData.length,
+                    thumbnailGenerated: !!thumbnail
+                  })
+                }
+              }
+
               debugLog('UPDATE_CANVAS_COMPLETE', `Canvas data updated successfully`, {
                 tabId: tab.id,
                 isDirty: tab.isDirty,
-                canvasDataSet: !!tab.canvasData
+                canvasDataSet: !!tab.canvasData,
+                frameDataUpdated: !!tab.currentFrame
               })
-
-              // Note: Frame canvas data will be saved when switching frames via setActiveFrame
-              // No automatic saving here to prevent conflicts with frame switching logic
 
               // Critical debug: Check if React will detect this change
               // Fix: Capture values before setTimeout to avoid proxy issues
@@ -951,6 +989,17 @@ export const useProjectStore = create<ProjectStore>()(
         duplicateFrame: (tabId, frameId) => {
           debugLog('DUPLICATE_FRAME_START', `Duplicating frame ${frameId} in tab ${tabId}`)
 
+          // CRITICAL: Save current canvas data before duplication
+          const currentTab = get().getTab(tabId)
+          if (currentTab?.currentFrame && currentTab?.canvasData) {
+            debugLog('DUPLICATE_FRAME_SAVE_CURRENT', 'Saving current canvas before duplication', {
+              currentFrameId: currentTab.currentFrame.id,
+              hasCanvasData: !!currentTab.canvasData,
+              dataLength: currentTab.canvasData.data.length
+            })
+            get().saveCurrentFrameCanvas(tabId)
+          }
+
           set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             const sourceFrame = tab?.frames.find(f => f.id === frameId)
@@ -978,20 +1027,49 @@ export const useProjectStore = create<ProjectStore>()(
                 }
               }
 
-              // Duplicate frame canvas data
-              if (sourceFrameData) {
+              // Duplicate frame canvas data with improved logic
+              if (sourceFrameData && sourceFrameData.canvasData.data.length > 0) {
+                // Copy existing frame data
                 const duplicatedCanvasData = {
                   ...sourceFrameData.canvasData,
                   data: new Uint8ClampedArray(sourceFrameData.canvasData.data)
                 }
+                
+                debugLog('DUPLICATE_FRAME_COPY_EXISTING', `Copying existing canvas data`, {
+                  sourceDataLength: sourceFrameData.canvasData.data.length,
+                  duplicatedDataLength: duplicatedCanvasData.data.length,
+                  hasThumbnail: !!sourceFrameData.thumbnail
+                })
                 
                 tab.frameCanvasData.splice(insertIndex, 0, {
                   frameId: newFrameId,
                   canvasData: duplicatedCanvasData,
                   thumbnail: sourceFrameData.thumbnail // Reuse thumbnail since it's the same content
                 })
+              } else if (tab.currentFrame?.id === frameId && tab.canvasData && tab.canvasData.data.length > 0) {
+                // Copy from current active canvas if it's the source frame
+                const duplicatedCanvasData = {
+                  ...tab.canvasData,
+                  data: new Uint8ClampedArray(tab.canvasData.data)
+                }
+                
+                const thumbnail = generateThumbnail(duplicatedCanvasData)
+                
+                debugLog('DUPLICATE_FRAME_COPY_CURRENT', `Copying from current active canvas`, {
+                  currentDataLength: tab.canvasData.data.length,
+                  duplicatedDataLength: duplicatedCanvasData.data.length,
+                  thumbnailGenerated: !!thumbnail
+                })
+                
+                tab.frameCanvasData.splice(insertIndex, 0, {
+                  frameId: newFrameId,
+                  canvasData: duplicatedCanvasData,
+                  thumbnail
+                })
               } else {
                 // Fallback: create empty canvas data
+                debugLog('DUPLICATE_FRAME_CREATE_EMPTY', `Creating empty canvas data for duplicated frame`)
+                
                 tab.frameCanvasData.splice(insertIndex, 0, {
                   frameId: newFrameId,
                   canvasData: createEmptyPixelData(tab.project.width, tab.project.height),

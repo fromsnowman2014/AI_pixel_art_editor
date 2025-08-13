@@ -401,16 +401,37 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       nonTransparentSample: samplePixels.slice(0, 5)
     })
 
-    // Create ImageData from pixel data
-    const imageData = new ImageData(new Uint8ClampedArray(canvasData.data), project.width, project.height)
+    // Create ImageData from pixel data - SAFE: Handle empty data
+    if (canvasData.data.length === 0) {
+      debugLog('RENDER_EMPTY_DATA', 'Canvas data is empty, creating blank ImageData', {
+        expectedLength: project.width * project.height * 4,
+        actualLength: canvasData.data.length
+      })
+      // Create empty data with proper size
+      const emptyData = new Uint8ClampedArray(project.width * project.height * 4)
+      const imageData = new ImageData(emptyData, project.width, project.height)
+      
+      // Create temporary canvas for scaling
+      const tempCanvas = createPixelCanvas(project.width, project.height)
+      const tempCtx = tempCanvas.getContext('2d')!
+      tempCtx.putImageData(imageData, 0, 0)
+      
+      // Draw scaled image
+      ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height)
+      
+      debugLog('RENDER_EMPTY_COMPLETE', 'Empty canvas rendered successfully')
+    } else {
+      const imageData = new ImageData(new Uint8ClampedArray(canvasData.data), project.width, project.height)
+      
+      // Create temporary canvas for scaling
+      const tempCanvas = createPixelCanvas(project.width, project.height)
+      const tempCtx = tempCanvas.getContext('2d')!
+      tempCtx.putImageData(imageData, 0, 0)
+      
+      // Draw scaled image
+      ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height)
+    }
     
-    // Create temporary canvas for scaling
-    const tempCanvas = createPixelCanvas(project.width, project.height)
-    const tempCtx = tempCanvas.getContext('2d')!
-    tempCtx.putImageData(imageData, 0, 0)
-
-    // Draw scaled image
-    ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height)
 
     debugLog('RENDER_COMPLETE', 'Canvas rendered successfully', {
       finalCanvasSize: `${canvas.width}x${canvas.height}`,

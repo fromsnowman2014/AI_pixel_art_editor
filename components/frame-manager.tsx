@@ -66,7 +66,28 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   const handleDuplicateFrame = (frameId: string) => {
+    // Enhanced debug logging for frame duplication
+    const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
+    const debugLog = (category: string, message: string, data?: any) => {
+      if (DEBUG_MODE) {
+        const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
+        console.log(`[${timestamp}] 🎞️  FrameManager [${category}]:`, message, data || '')
+      }
+    }
+
+    debugLog('DUPLICATE_FRAME_START', `Initiating frame duplication`, {
+      frameId,
+      activeTabId,
+      activeFrameId,
+      totalFrames: frames.length
+    })
+
     duplicateFrame(activeTabId, frameId)
+    
+    debugLog('DUPLICATE_FRAME_COMPLETE', `Frame duplication completed`, {
+      frameId,
+      newTotalFrames: frames.length + 1
+    })
   }
 
   const handleDeleteFrame = (frameId: string) => {
