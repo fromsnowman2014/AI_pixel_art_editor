@@ -174,6 +174,8 @@ interface ProjectStore {
   saveCurrentFrameCanvas: (tabId: string) => void
   saveAllFrameCanvasData: (tabId: string) => void
   getFrameThumbnail: (tabId: string, frameId: string) => string | null
+  regenerateAllThumbnails: () => void
+  regenerateFrameThumbnail: (tabId: string, frameId: string) => void
 
   // Utility functions
   getActiveTab: () => ProjectTab | null
@@ -249,9 +251,13 @@ export const useProjectStore = create<ProjectStore>()(
                 hasCanvasData: !!tab.canvasData,
                 canvasDataLength: tab.canvasData?.data.length,
                 dimensions: `${tab.project.width}x${tab.project.height}`,
-                hasHistory: tab.history?.length > 0
+                hasHistory: tab.history?.length > 0,
+                frameCount: tab.frameCanvasData?.length || 0
               }))
             })
+            
+            // CRITICAL: Regenerate thumbnails after persistence restore
+            get().regenerateAllThumbnails()
 
             // Fix tabs loaded from persistence that have null canvasData
             set((state) => {
@@ -525,8 +531,15 @@ export const useProjectStore = create<ProjectStore>()(
                   data: new Uint8ClampedArray(data.data)
                 }
 
-                // Generate thumbnail for immediate UI update
+                // Generate thumbnail for immediate UI update - FORCE regeneration
                 const thumbnail = generateThumbnail(canvasDataCopy)
+                
+                debugLog('UPDATE_CANVAS_THUMBNAIL_REGEN', `Force regenerating thumbnail for real-time sync`, {
+                  frameId: tab.currentFrame.id,
+                  hasNonZeroPixels: Array.from(canvasDataCopy.data).some((_, i) => i % 4 === 3 && (canvasDataCopy.data[i] ?? 0) > 0),
+                  thumbnailGenerated: !!thumbnail,
+                  dataLength: canvasDataCopy.data.length
+                })
 
                 if (frameIndex >= 0) {
                   // Update existing frame data
@@ -1330,15 +1343,100 @@ export const useProjectStore = create<ProjectStore>()(
             state.error = null
           })
         },
+
+        // Regenerate all thumbnails for all tabs and frames
+        regenerateAllThumbnails: () => {
+          debugLog('REGENERATE_ALL_THUMBNAILS_START', 'Starting thumbnail regeneration for all tabs')
+          
+          set((state) => {
+            let totalRegenerated = 0
+            
+            state.tabs.forEach(tab => {
+              debugLog('REGENERATE_TAB_THUMBNAILS', `Regenerating thumbnails for tab ${tab.id}`, {
+                tabId: tab.id,
+                frameCount: tab.frameCanvasData.length,
+                projectName: tab.project.name
+              })
+              
+              tab.frameCanvasData.forEach(frameData => {
+                if (frameData.canvasData && frameData.canvasData.data.length > 0) {
+                  const newThumbnail = generateThumbnail(frameData.canvasData)
+                  if (newThumbnail) {
+                    frameData.thumbnail = newThumbnail
+                    totalRegenerated++
+                    debugLog('REGENERATE_FRAME_THUMBNAIL', `Regenerated thumbnail for frame`, {
+                      frameId: frameData.frameId,
+                      tabId: tab.id,
+                      hasData: frameData.canvasData.data.length > 0
+                    })
+                  }
+                } else {
+                  debugLog('REGENERATE_FRAME_SKIP', `Skipping thumbnail for empty frame`, {
+                    frameId: frameData.frameId,
+                    dataLength: frameData.canvasData?.data.length || 0
+                  })
+                }
+              })
+            })
+            
+            debugLog('REGENERATE_ALL_THUMBNAILS_COMPLETE', `Regenerated ${totalRegenerated} thumbnails`, {
+              totalTabs: state.tabs.length,
+              totalFrames: state.tabs.reduce((sum, tab) => sum + tab.frameCanvasData.length, 0),
+              regeneratedCount: totalRegenerated
+            })
+          })
+        },
+
+        // Regenerate thumbnail for specific frame
+        regenerateFrameThumbnail: (tabId, frameId) => {
+          debugLog('REGENERATE_FRAME_THUMBNAIL_START', `Regenerating thumbnail for frame ${frameId}`)
+          
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (!tab) {
+              debugLog('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Tab not found', { tabId })
+              return
+            }
+            
+            const frameData = tab.frameCanvasData.find(f => f.frameId === frameId)
+            if (!frameData) {
+              debugLog('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Frame data not found', { frameId, tabId })
+              return
+            }
+            
+            if (frameData.canvasData && frameData.canvasData.data.length > 0) {
+              const newThumbnail = generateThumbnail(frameData.canvasData)
+              if (newThumbnail) {
+                frameData.thumbnail = newThumbnail
+                debugLog('REGENERATE_FRAME_THUMBNAIL_SUCCESS', `Successfully regenerated thumbnail`, {
+                  frameId,
+                  tabId,
+                  thumbnailLength: newThumbnail.length
+                })
+              } else {
+                debugLog('REGENERATE_FRAME_THUMBNAIL_ERROR', 'Failed to generate thumbnail', { frameId, tabId })
+              }
+            } else {
+              debugLog('REGENERATE_FRAME_THUMBNAIL_SKIP', 'Frame has no canvas data', {
+                frameId,
+                dataLength: frameData.canvasData?.data.length || 0
+              })
+            }
+          })
+        },
       })),
       {
         name: 'pixelbuddy-projects',
         partialize: (state) => ({
-          // Only persist essential data, not the full canvas data
+          // Only persist essential data, not the full canvas data or thumbnails
           tabs: state.tabs.map(tab => ({
             ...tab,
             canvasData: null, // Don't persist heavy canvas data
             history: [], // Don't persist history
+            frameCanvasData: tab.frameCanvasData.map(frameData => ({
+              ...frameData,
+              thumbnail: null // Don't persist thumbnails - regenerate on load
+            }))
           })),
           activeTabId: state.activeTabId,
         }),

@@ -32,6 +32,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     setActiveFrame,
     updateProject,
     getFrameThumbnail,
+    regenerateFrameThumbnail,
   } = useProjectStore()
 
   const [isPlaying, setIsPlaying] = useState(false)
@@ -298,15 +299,31 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
               {/* Frame Preview with Thumbnail */}
               <div className="h-12 w-12 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
                 {(() => {
-                  const thumbnail = activeTabId ? getFrameThumbnail(activeTabId, frame.id) : null
+                  let thumbnail = activeTabId ? getFrameThumbnail(activeTabId, frame.id) : null
+                  
+                  // REAL-TIME SYNC: If no thumbnail exists but we have active frame data, try to regenerate
+                  if (!thumbnail && activeTabId && activeFrameId === frame.id) {
+                    // For active frame, force thumbnail regeneration if missing
+                    setTimeout(() => {
+                      regenerateFrameThumbnail(activeTabId, frame.id)
+                    }, 0)
+                  }
                   
                   if (thumbnail) {
                     return (
                       <img
+                        key={`${frame.id}-${thumbnail.length}`} // Force re-render when thumbnail changes
                         src={thumbnail}
                         alt={`Frame ${index + 1}`}
                         className="w-full h-full object-cover"
                         style={{ imageRendering: 'pixelated' }}
+                        onError={() => {
+                          // If thumbnail fails to load, regenerate it
+                          if (activeTabId) {
+                            console.log('Thumbnail failed to load, regenerating...')
+                            regenerateFrameThumbnail(activeTabId, frame.id)
+                          }
+                        }}
                       />
                     )
                   } else {
@@ -316,7 +333,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                       </div>
                     )
                   }
-                })()}
+                })()
               </div>
 
               {/* Frame Info */}

@@ -31,6 +31,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     updateCanvasData,
     updateCanvasState,
     addHistoryEntry,
+    regenerateFrameThumbnail,
   } = useProjectStore()
 
   // Debug component mount and props
@@ -168,6 +169,16 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     
     debugLog('DRAW_UPDATE_COMPLETE', `updateCanvasData called successfully`)
     
+    // REAL-TIME THUMBNAIL UPDATE: Regenerate thumbnail immediately after drawing
+    if (activeTabId && project.activeFrameId) {
+      setTimeout(() => {
+        regenerateFrameThumbnail(activeTabId, project.activeFrameId!)
+        debugLog('DRAW_THUMBNAIL_REGEN', `Triggered thumbnail regeneration after drawing`, {
+          frameId: project.activeFrameId
+        })
+      }, 100) // Small delay to ensure canvas data is saved
+    }
+    
     // Critical debug: Force a manual re-render check
     // Fix: Capture values to avoid closure issues
     const followupData = {
@@ -304,10 +315,21 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   const handleMouseUp = useCallback(() => {
     if (isDragging && canvasData && activeTabId && canvasState.tool !== 'pan') {
       addHistoryEntry(activeTabId, `${canvasState.tool}_draw`, canvasData)
+      
+      // FINAL THUMBNAIL UPDATE: Ensure thumbnail is updated when drawing is complete
+      if (project.activeFrameId) {
+        setTimeout(() => {
+          regenerateFrameThumbnail(activeTabId, project.activeFrameId!)
+          debugLog('DRAW_COMPLETE_THUMBNAIL', `Final thumbnail update after drawing session`, {
+            tool: canvasState.tool,
+            frameId: project.activeFrameId
+          })
+        }, 150) // Slightly longer delay for final update
+      }
     }
     setIsDragging(false)
     setLastMousePos(null)
-  }, [isDragging, canvasData, activeTabId, canvasState.tool, addHistoryEntry])
+  }, [isDragging, canvasData, activeTabId, canvasState.tool, addHistoryEntry, project.activeFrameId, regenerateFrameThumbnail])
 
   // Handle zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
