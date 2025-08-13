@@ -33,9 +33,13 @@ class ApiClient {
 
     // Request interceptor for auth
     this.client.interceptors.request.use((config) => {
-      // Add auth token if available
-      const token = localStorage.getItem('auth_token')
+      // Add auth token if available; guard against non-browser environments
+      const token = typeof window !== 'undefined'
+        ? window.localStorage.getItem('auth_token')
+        : null
       if (token) {
+        // Ensure headers object exists before assignment
+        config.headers = config.headers || {}
         config.headers.Authorization = `Bearer ${token}`
       }
       return config

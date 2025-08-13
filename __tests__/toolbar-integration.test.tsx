@@ -39,6 +39,11 @@ describe('Toolbar Integration Tests', () => {
   beforeEach(() => {
     (useProjectStore as jest.Mock).mockReturnValue(mockStore)
     mockStore.getActiveTab.mockReturnValue(mockTab)
+    // Reset mutable tab state before each test
+    mockTab.canvasState.tool = 'pencil'
+    mockTab.canvasState.zoom = 10
+    mockTab.history = [{}]
+    mockTab.historyIndex = 0
     jest.clearAllMocks()
   })
 
