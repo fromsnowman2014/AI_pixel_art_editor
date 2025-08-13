@@ -8,7 +8,7 @@
 ### **Component Structure:**
 - **Location:** `/components/toolbar.tsx`
 - **Debug Logging:** ✅ Implemented (lines 50-57)
-- **Tools Available:** 5 tools (Pencil, Eraser, Paint Bucket, Eyedropper, Pan)
+- **Tools Available:** 5 tools (Pencil, Eraser, Paint Bucket, Color Picker, Pan)
 - **Additional Features:** Undo/Redo, Zoom In/Out, Brush Size
 
 ### **Expected Debug Log Categories:**
@@ -29,7 +29,7 @@
 - ✅ Debug logs for tool changes
 
 **Manual Test Steps:**
-1. Click each tool button (Pencil, Eraser, Paint Bucket, Eyedropper, Pan)
+1. Click each tool button (Pencil, Eraser, Paint Bucket, Color Picker, Pan)
 2. Verify button highlight (blue background for active)
 3. Check canvas cursor change
 4. Monitor console for `[TOOL_CHANGE]` logs
@@ -75,7 +75,7 @@
 console.log('🛠️ STARTING TOOLBAR TESTING');
 
 // Test 1: Tool Selection
-const tools = ['Pencil', 'Eraser', 'Paint Bucket', 'Eyedropper', 'Pan'];
+const tools = ['Pencil', 'Eraser', 'Paint Bucket', 'Color Picker', 'Pan'];
 let testIndex = 0;
 
 function testNextTool() {
@@ -162,7 +162,7 @@ testNextTool();
 - [ ] Pencil: Visual feedback ✅/❌, Cursor change ✅/❌
 - [ ] Eraser: Visual feedback ✅/❌, Cursor change ✅/❌  
 - [ ] Paint Bucket: Visual feedback ✅/❌, Cursor change ✅/❌
-- [ ] Eyedropper: Visual feedback ✅/❌, Cursor change ✅/❌
+- [ ] Color Picker: Visual feedback ✅/❌, Cursor change ✅/❌
 - [ ] Pan: Visual feedback ✅/❌, Cursor change ✅/❌
 
 ### Zoom Controls:

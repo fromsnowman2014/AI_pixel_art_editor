@@ -49,7 +49,7 @@ describe('Toolbar Integration Tests', () => {
       expect(screen.getByText('Pencil')).toBeInTheDocument()
       expect(screen.getByText('Eraser')).toBeInTheDocument()
       expect(screen.getByText('Paint Bucket')).toBeInTheDocument()
-      expect(screen.getByText('Eyedropper')).toBeInTheDocument()
+      expect(screen.getByText('Color Picker')).toBeInTheDocument()
       expect(screen.getByText('Pan')).toBeInTheDocument()
     })
 

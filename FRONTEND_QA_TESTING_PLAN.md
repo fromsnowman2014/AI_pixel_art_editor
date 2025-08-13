@@ -24,7 +24,7 @@ localStorage.setItem('pixelbuddy-debug', 'true')
 **Expected Behavior:**
 - ✅ Pencil tool draws pixels immediately
 - ✅ Eraser removes pixels immediately  
-- ✅ Eyedropper picks colors correctly
+- ✅ Color Picker picks colors correctly
 - ✅ Fill tool works on enclosed areas
 
 **Test Steps:**
@@ -33,7 +33,7 @@ localStorage.setItem('pixelbuddy-debug', 'true')
 3. Click on canvas - **pixel should appear immediately**
 4. Draw several pixels in sequence
 5. Switch to eraser, test erasing
-6. Test eyedropper on existing pixels
+6. Test color picker on existing pixels
 7. Test fill tool on empty areas
 
 **Debug Logs to Monitor:**
@@ -57,7 +57,7 @@ localStorage.setItem('pixelbuddy-debug', 'true')
 - ✅ Only one tool active at time
 
 **Test Steps:**
-1. Click each tool button (pencil, eraser, eyedropper, fill, pan)
+1. Click each tool button (pencil, eraser, color picker, fill, pan)
 2. Verify visual feedback (button highlight)
 3. Verify cursor changes on canvas
 4. Test tool functionality
@@ -168,7 +168,7 @@ localStorage.setItem('pixelbuddy-debug', 'true')
 
 ## 📋 **Testing Checklist**
 
-- [ ] **Phase 1**: Canvas drawing (pencil, eraser, eyedropper, fill)
+- [ ] **Phase 1**: Canvas drawing (pencil, eraser, color picker, fill)
 - [ ] **Phase 2**: Tool selection and color palette  
 - [ ] **Phase 3**: Project panel resize functionality
 - [ ] **Phase 4**: Tab management and frames

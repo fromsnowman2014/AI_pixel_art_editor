@@ -857,10 +857,10 @@ async function testColorPicker(page) {
   const result = { status: 'unknown', details: [], issues: [] };
   
   try {
-    // Look for eyedropper/color picker tool
+    // Look for color picker tool
     const pickerSelectors = [
       '[data-testid="eyedropper"]',
-      'button:has-text("Eyedropper")',
+      'button:has-text("Color Picker")',
       '[aria-label*="pick color"]',
       '[title*="color picker"]'
     ];
