@@ -39,6 +39,14 @@ describe('Toolbar Integration Tests', () => {
   beforeEach(() => {
     (useProjectStore as jest.Mock).mockReturnValue(mockStore)
     mockStore.getActiveTab.mockReturnValue(mockTab)
+    mockTab.canvasState = {
+      tool: 'pencil',
+      zoom: 10,
+      brushSize: 1,
+      panX: 0,
+      panY: 0,
+      selectedColor: '#000000'
+    }
     jest.clearAllMocks()
   })
 
@@ -64,11 +72,38 @@ describe('Toolbar Integration Tests', () => {
 
     test('should call updateCanvasState when eraser is clicked', () => {
       render(<Toolbar />)
-      
+
       const eraserButton = screen.getByText('Eraser')
       fireEvent.click(eraserButton)
-      
+
       expect(mockStore.updateCanvasState).toHaveBeenCalledWith('test-tab', { tool: 'eraser' })
+    })
+
+    test('should call updateCanvasState when fill is clicked', () => {
+      render(<Toolbar />)
+
+      const fillButton = screen.getByText('Paint Bucket')
+      fireEvent.click(fillButton)
+
+      expect(mockStore.updateCanvasState).toHaveBeenCalledWith('test-tab', { tool: 'fill' })
+    })
+
+    test('should call updateCanvasState when eyedropper is clicked', () => {
+      render(<Toolbar />)
+
+      const eyedropperButton = screen.getByText('Eyedropper')
+      fireEvent.click(eyedropperButton)
+
+      expect(mockStore.updateCanvasState).toHaveBeenCalledWith('test-tab', { tool: 'eyedropper' })
+    })
+
+    test('should call updateCanvasState when pan is clicked', () => {
+      render(<Toolbar />)
+
+      const panButton = screen.getByText('Pan')
+      fireEvent.click(panButton)
+
+      expect(mockStore.updateCanvasState).toHaveBeenCalledWith('test-tab', { tool: 'pan' })
     })
 
     test('should highlight active tool', () => {
