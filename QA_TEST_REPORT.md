@@ -239,7 +239,7 @@ The **critical functionality gaps** have been resolved. The application now has:
 Systematic comparison against DEVELOPMENT_PRD_eng.md:
 
 ### ✅ **FULLY IMPLEMENTED FEATURES**
-- **Drawing System**: Pencil, Eraser, Fill, Eyedropper, Pan tools working
+- **Drawing System**: Pencil, Eraser, Fill, Color Picker, Pan tools working
 - **Canvas Management**: Pixel-perfect rendering with zoom/pan
 - **Project Settings**: Dimension changes, color limits, mode switching
 - **Color Palette**: 24-color system with preset palettes
@@ -287,7 +287,7 @@ Tests: 1 failed, 28 passed, 29 total (96.5% pass rate)
 #### **Core Workflow Testing**:
 
 **1. Basic Drawing Workflow** ✅ **PASS**
-- Drawing tools functional (Pencil, Eraser, Fill, Eyedropper, Pan)
+- Drawing tools functional (Pencil, Eraser, Fill, Color Picker, Pan)
 - Canvas interaction responsive and accurate
 - Undo/redo working properly
 - Zoom controls functional
