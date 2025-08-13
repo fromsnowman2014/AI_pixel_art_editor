@@ -195,8 +195,7 @@ export function Toolbar({ className }: ToolbarProps) {
           Current: {canvasState.zoom.toFixed(1)}x
         </div>
       </div>
-
-      {/* Brush Size (for future implementation) */}
+      {/* Brush Size Control */}
       <div className="border-t border-gray-200 pt-4">
         <div className="mb-2 text-xs font-medium text-gray-600">BRUSH SIZE</div>
         <div className="flex items-center space-x-2">
