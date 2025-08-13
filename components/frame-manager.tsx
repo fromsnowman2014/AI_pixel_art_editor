@@ -333,7 +333,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                       </div>
                     )
                   }
-                })()
+                })()}
               </div>
 
               {/* Frame Info */}
