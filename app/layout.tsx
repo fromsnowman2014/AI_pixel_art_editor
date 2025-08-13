@@ -10,7 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'PixelBuddy - AI Pixel Art Studio for Kids',
-  description: 'A kids-friendly AI-assisted pixel art and GIF studio. Create amazing pixel art and animations with the power of AI!',
+  description: 'A kid-friendly AI-assisted pixel art and GIF studio. Create amazing pixel art and animations with the power of AI!',
   keywords: ['pixel art', 'gif', 'kids', 'ai', 'drawing', 'animation'],
   authors: [{ name: 'PixelBuddy Team' }],
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
