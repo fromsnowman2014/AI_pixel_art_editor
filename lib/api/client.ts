@@ -16,13 +16,26 @@ import type {
   HealthCheckResponse,
 } from '@/lib/types/api'
 
-// API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://aipixelarteditor-production.up.railway.app'
+// API Configuration - Using Local Next.js API Routes
+const getApiBaseUrl = () => {
+  // Always use local Next.js API routes (no external backend needed)
+  if (typeof window !== 'undefined') {
+    // Client-side: use relative URLs
+    return '/api'
+  } else {
+    // Server-side: use full URL if needed
+    return process.env.NEXTAUTH_URL || 'http://localhost:3000' + '/api'
+  }
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 class ApiClient {
   private client: AxiosInstance
 
   constructor() {
+    console.log(`🔧 API Client initialized with baseURL: ${API_BASE_URL}`);
+    
     this.client = axios.create({
       baseURL: API_BASE_URL,
       timeout: 30000, // 30 seconds for AI operations
@@ -47,8 +60,22 @@ class ApiClient {
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log(`✅ API Success: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+        return response;
+      },
       (error) => {
+        const method = error.config?.method?.toUpperCase() || 'REQUEST';
+        const url = error.config?.url || 'unknown';
+        
+        console.error(`❌ API Error: ${method} ${url}`, error);
+
+        // Handle network errors
+        if (error.code === 'ERR_NETWORK') {
+          console.error('🚫 Network Error - check if development server is running');
+          throw new ApiError('NETWORK_ERROR', 'Unable to connect to API. Check if the server is running.', 0);
+        }
+        
         if (error.response?.data) {
           throw new ApiError(
             error.response.data.error || 'API_ERROR',
@@ -56,6 +83,7 @@ class ApiClient {
             error.response.status
           )
         }
+        
         throw new ApiError('NETWORK_ERROR', 'Failed to connect to server')
       }
     )
@@ -141,7 +169,7 @@ class ApiClient {
 
   // AI Generation API
   async generateAI(data: AIGenerateRequest): Promise<AIGenerationResponse> {
-    const response = await this.client.post<AIGenerationResponse>('/api/ai/generate', data, {
+    const response = await this.client.post<AIGenerationResponse>('/ai/generate', data, {
       timeout: 60000, // 60 seconds for AI generation
     })
     return response.data
