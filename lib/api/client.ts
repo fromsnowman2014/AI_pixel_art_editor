@@ -16,9 +16,17 @@ import type {
   HealthCheckResponse,
 } from '@/lib/types/api'
 
-// API Configuration - Using Local Next.js API Routes
+// API Configuration - Using Railway Backend in Production
 const getApiBaseUrl = () => {
-  // Always use local Next.js API routes (no external backend needed)
+  // Use Railway backend URL if configured, otherwise fallback to local API
+  const railwayUrl = process.env.NEXT_PUBLIC_API_URL;
+  
+  if (railwayUrl && railwayUrl !== 'http://localhost:3000') {
+    // Production: Use Railway backend
+    return railwayUrl + '/api'
+  }
+  
+  // Development: Use local Next.js API routes
   if (typeof window !== 'undefined') {
     // Client-side: use relative URLs
     return '/api'
