@@ -47,10 +47,10 @@ const validateCanvasSize = (size: number): boolean => {
   return Number.isInteger(size) && size >= CANVAS_SIZE_LIMITS.MIN && size <= CANVAS_SIZE_LIMITS.MAX;
 };
 
-const sanitizeCanvasSize = (value: string | number): number => {
+const parseCanvasSize = (value: string | number): number => {
   const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
-  if (isNaN(numValue)) return 32; // Default fallback
-  return Math.max(CANVAS_SIZE_LIMITS.MIN, Math.min(CANVAS_SIZE_LIMITS.MAX, numValue));
+  if (isNaN(numValue)) return 0; // Allow 0 for temporary input states
+  return numValue;
 };
 
 const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps) {
@@ -95,15 +95,13 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   const handleDimensionChange = useCallback((width: number, height: number) => {
     if (!activeTabId) return;
     
-    const validatedWidth = sanitizeCanvasSize(width);
-    const validatedHeight = sanitizeCanvasSize(height);
-    
-    if (!validateCanvasSize(validatedWidth) || !validateCanvasSize(validatedHeight)) {
+    // Validate dimensions before applying
+    if (!validateCanvasSize(width) || !validateCanvasSize(height)) {
       toast.error(`Canvas size must be between ${CANVAS_SIZE_LIMITS.MIN} and ${CANVAS_SIZE_LIMITS.MAX} pixels`);
       return;
     }
     
-    updateProject(activeTabId, { width: validatedWidth, height: validatedHeight });
+    updateProject(activeTabId, { width, height });
   }, [activeTabId, updateProject]);
 
   const handleColorLimitChange = useCallback((colorLimit: number) => {
@@ -165,6 +163,16 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
   // Get canvas empty state (memoized)
   const canvasIsEmpty = useMemo(() => isCanvasEmpty(), [isCanvasEmpty]);
+
+  // Check if pending dimensions are valid for applying
+  const arePendingDimensionsValid = useMemo(() => {
+    return validateCanvasSize(pendingWidth) && validateCanvasSize(pendingHeight);
+  }, [pendingWidth, pendingHeight]);
+
+  // Check if dimensions have changed
+  const haveDimensionsChanged = useMemo(() => {
+    return pendingWidth !== project?.width || pendingHeight !== project?.height;
+  }, [pendingWidth, pendingHeight, project?.width, project?.height]);
 
   // Handle apply dimensions with content check
   const handleApplyDimensions = useCallback(() => {
@@ -585,12 +593,15 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                   type='number'
                   value={pendingWidth}
                   onChange={e =>
-                    setPendingWidth(sanitizeCanvasSize(e.target.value))
+                    setPendingWidth(parseCanvasSize(e.target.value))
                   }
-                  min={CANVAS_SIZE_LIMITS.MIN}
-                  max={CANVAS_SIZE_LIMITS.MAX}
-                  className='w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                  className={`w-full rounded-md border px-3 py-2 text-sm ${
+                    pendingWidth === 0 || validateCanvasSize(pendingWidth)
+                      ? 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+                      : 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50'
+                  }`}
                   aria-describedby='canvas-width-hint'
+                  placeholder={`${CANVAS_SIZE_LIMITS.MIN}-${CANVAS_SIZE_LIMITS.MAX}`}
                 />
                 <div id='canvas-width-hint' className='sr-only'>
                   Canvas width in pixels, between {CANVAS_SIZE_LIMITS.MIN} and {CANVAS_SIZE_LIMITS.MAX}
@@ -608,12 +619,15 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                   type='number'
                   value={pendingHeight}
                   onChange={e =>
-                    setPendingHeight(sanitizeCanvasSize(e.target.value))
+                    setPendingHeight(parseCanvasSize(e.target.value))
                   }
-                  min={CANVAS_SIZE_LIMITS.MIN}
-                  max={CANVAS_SIZE_LIMITS.MAX}
-                  className='w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                  className={`w-full rounded-md border px-3 py-2 text-sm ${
+                    pendingHeight === 0 || validateCanvasSize(pendingHeight)
+                      ? 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+                      : 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50'
+                  }`}
                   aria-describedby='canvas-height-hint'
+                  placeholder={`${CANVAS_SIZE_LIMITS.MIN}-${CANVAS_SIZE_LIMITS.MAX}`}
                 />
                 <div id='canvas-height-hint' className='sr-only'>
                   Canvas height in pixels, between {CANVAS_SIZE_LIMITS.MIN} and {CANVAS_SIZE_LIMITS.MAX}
@@ -621,15 +635,19 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
               </div>
             </div>
 
-            {/* Apply button - only show if dimensions changed */}
-            {(pendingWidth !== project.width ||
-              pendingHeight !== project.height) && (
+            {/* Apply button - show if dimensions changed */}
+            {haveDimensionsChanged && (
               <Button
                 onClick={() => handleApplyDimensions()}
                 size='sm'
-                className='w-full bg-blue-600 hover:bg-blue-700'
+                disabled={!arePendingDimensionsValid}
+                className='w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
               >
-                Apply Canvas Size ({pendingWidth}×{pendingHeight})
+                {arePendingDimensionsValid ? (
+                  <>Apply Canvas Size ({pendingWidth}×{pendingHeight})</>
+                ) : (
+                  <>Invalid size (min: {CANVAS_SIZE_LIMITS.MIN}, max: {CANVAS_SIZE_LIMITS.MAX})</>
+                )}
               </Button>
             )}
           </div>
