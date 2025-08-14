@@ -235,7 +235,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
       // Continue with resize even if save fails
     }
 
-    // Apply new dimensions
+    // Apply new dimensions while preserving existing canvas content
     handleDimensionChange(pendingWidth, pendingHeight);
     setShowResizeConfirm(false);
   }, [activeTabId, saveProject, pendingWidth, pendingHeight, handleDimensionChange]);
@@ -247,10 +247,36 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
       'User chose to discard changes and resize'
     );
 
-    // Apply new dimensions directly
-    handleDimensionChange(pendingWidth, pendingHeight);
+    if (!activeTabId || !project) return;
+
+    // First update project dimensions
+    updateProject(activeTabId, { 
+      width: pendingWidth, 
+      height: pendingHeight 
+    });
+
+    // Then clear canvas by creating empty pixel data
+    const emptyCanvasData = {
+      width: pendingWidth,
+      height: pendingHeight,
+      data: new Uint8ClampedArray(pendingWidth * pendingHeight * 4) // RGBA, all transparent
+    };
+
+    // Update canvas with empty data
+    updateCanvasData(activeTabId, emptyCanvasData);
+
+    debugLog(
+      '🎛️  ProjectPanel',
+      'RESIZE_DISCARD_SUCCESS',
+      'Canvas cleared and resized',
+      {
+        newSize: `${pendingWidth}x${pendingHeight}`,
+        dataLength: emptyCanvasData.data.length
+      }
+    );
+
     setShowResizeConfirm(false);
-  }, [pendingWidth, pendingHeight, handleDimensionChange]);
+  }, [activeTabId, project, pendingWidth, pendingHeight, updateProject, updateCanvasData]);
 
   const handleResizeCancel = useCallback(() => {
     debugLog(
