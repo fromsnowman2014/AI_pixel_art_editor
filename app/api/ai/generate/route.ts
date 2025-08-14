@@ -57,15 +57,27 @@ interface GenerateResponse {
 }
 
 // Initialize OpenAI client with environment validation
-let openai: OpenAI;
-try {
-  const env = getEnv();
-  openai = new OpenAI({
-    apiKey: env.OPENAI_API_KEY,
-  });
-} catch (error) {
-  console.error('❌ OpenAI client initialization failed:', error);
+let openai: OpenAI | null = null;
+
+function initializeOpenAI(): OpenAI | null {
+  try {
+    const env = getEnv();
+    if (!env.OPENAI_API_KEY) {
+      console.error('❌ OpenAI API key not found in environment');
+      return null;
+    }
+    
+    return new OpenAI({
+      apiKey: env.OPENAI_API_KEY,
+    });
+  } catch (error) {
+    console.error('❌ OpenAI client initialization failed:', error);
+    return null;
+  }
 }
+
+// Initialize on module load
+openai = initializeOpenAI();
 
 /**
  * AI Image Generation API
@@ -129,12 +141,17 @@ export async function POST(request: NextRequest) {
 
     // Ensure OpenAI client is initialized
     if (!openai) {
-      logApiRequest(request, '/ai/generate', startTime, false, 'OpenAI client not initialized');
-      return createErrorResponse(
-        'AI service initialization failed',
-        'SERVICE_INIT_ERROR',
-        503
-      );
+      console.log('🔄 Attempting to re-initialize OpenAI client...');
+      openai = initializeOpenAI();
+      
+      if (!openai) {
+        logApiRequest(request, '/ai/generate', startTime, false, 'OpenAI client not initialized');
+        return createErrorResponse(
+          'AI service initialization failed - check OpenAI API key configuration',
+          'SERVICE_INIT_ERROR',
+          503
+        );
+      }
     }
 
     // Generate image with DALL-E 3
@@ -158,23 +175,29 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ DALL-E 3 generation successful, processing for pixel art...');
 
+    console.log('📥 Downloading generated image...');
     // Download the generated image with timeout
     const imageResponse = await fetch(imageUrl, {
       signal: AbortSignal.timeout(30000) // 30 second timeout
     });
     
     if (!imageResponse.ok) {
+      console.error(`❌ Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
       throw new Error(`Failed to download generated image: ${imageResponse.statusText}`);
     }
 
+    console.log('✅ Image downloaded, converting to buffer...');
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    console.log(`📊 Image buffer size: ${imageBuffer.length} bytes`);
 
+    console.log('🎨 Processing image for pixel art...');
     // Process image for pixel art
     const processed = await processImageForPixelArt(imageBuffer, width, height, {
       colorCount,
       method: 'median-cut',
       enableDithering: false // Kids-friendly: no dithering by default
     });
+    console.log('✅ Image processing completed');
 
     // Convert to base64 data URL
     const base64Image = `data:image/png;base64,${processed.buffer.toString('base64')}`;
@@ -260,8 +283,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Generic error response with security consideration (no internal details exposed)
+    // But log detailed error for debugging
+    console.error('❌ Detailed error information:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    
     return createErrorResponse(
-      'Image generation failed',
+      'Image generation failed. Check server logs for details.',
       'GENERATION_ERROR',
       500
     );

@@ -9,7 +9,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string()
     .min(1, 'OpenAI API key is required')
     .startsWith('sk-', 'OpenAI API key must start with "sk-"')
-    .min(20, 'OpenAI API key appears to be invalid (too short)'),
+    .min(20, 'OpenAI API key appears to be invalid (too short)')
+    .optional(), // Make optional to prevent initialization crashes
   
   // Next.js configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -22,7 +23,7 @@ const envSchema = z.object({
   ENABLE_GIF_EXPORT: z.string().transform(val => val === 'true').default('true'),
   
   // Rate limiting
-  RATE_LIMIT_AI_REQUESTS_PER_HOUR: z.string().transform(val => parseInt(val) || 60),
+  RATE_LIMIT_AI_REQUESTS_PER_HOUR: z.string().optional().transform(val => parseInt(val || '60') || 60),
   
   // AI configuration
   AI_MAX_IMAGE_SIZE: z.string().transform(val => parseInt(val) || 512),
