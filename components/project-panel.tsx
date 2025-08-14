@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import { useProjectStore } from '@/lib/stores/project-store';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { ExportModal } from '@/components/export-modal';
 import { api } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { debugLog } from '@/lib/utils/debug';
+import type { ProjectMode } from '@/lib/types/api';
 import {
   Settings,
   Download,
@@ -21,7 +22,38 @@ import {
   Trash2,
 } from 'lucide-react';
 
-export function ProjectPanel({ className }: { className?: string }) {
+interface ProjectPanelProps {
+  className?: string;
+}
+
+// Constants for validation
+const CANVAS_SIZE_LIMITS = {
+  MIN: 8,
+  MAX: 128,
+} as const;
+
+const COLOR_LIMIT_RANGE = {
+  MIN: 4,
+  MAX: 64,
+} as const;
+
+const AI_PROMPT_LIMITS = {
+  MIN_LENGTH: 3,
+  MAX_LENGTH: 500,
+} as const;
+
+// Utility functions
+const validateCanvasSize = (size: number): boolean => {
+  return Number.isInteger(size) && size >= CANVAS_SIZE_LIMITS.MIN && size <= CANVAS_SIZE_LIMITS.MAX;
+};
+
+const sanitizeCanvasSize = (value: string | number): number => {
+  const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
+  if (isNaN(numValue)) return 32; // Default fallback
+  return Math.max(CANVAS_SIZE_LIMITS.MIN, Math.min(CANVAS_SIZE_LIMITS.MAX, numValue));
+};
+
+const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps) {
   const {
     activeTabId,
     getActiveTab,
@@ -41,8 +73,8 @@ export function ProjectPanel({ className }: { className?: string }) {
   const project = activeTab?.project;
 
   // Canvas dimension state for deferred application
-  const [pendingWidth, setPendingWidth] = useState(project?.width || 32);
-  const [pendingHeight, setPendingHeight] = useState(project?.height || 32);
+  const [pendingWidth, setPendingWidth] = useState(() => project?.width || 32);
+  const [pendingHeight, setPendingHeight] = useState(() => project?.height || 32);
   const [showResizeConfirm, setShowResizeConfirm] = useState(false);
 
   // Update pending dimensions when project changes
@@ -51,37 +83,49 @@ export function ProjectPanel({ className }: { className?: string }) {
       setPendingWidth(project.width);
       setPendingHeight(project.height);
     }
-  }, [project?.width, project?.height]);
+  }, [project]);
 
-  if (!activeTabId || !project) {
-    return (
-      <div className='flex h-full items-center justify-center p-4 text-gray-500'>
-        <div className='text-center'>
-          <Settings className='mx-auto mb-2 h-8 w-8' />
-          <p>Select a project to view settings</p>
-        </div>
-      </div>
-    );
-  }
+  // All callback hooks must be defined before any conditional returns
+  const handleNameChange = useCallback((name: string) => {
+    if (activeTabId) {
+      updateProject(activeTabId, { name });
+    }
+  }, [activeTabId, updateProject]);
 
-  const handleNameChange = (name: string) => {
-    updateProject(activeTabId, { name });
-  };
+  const handleDimensionChange = useCallback((width: number, height: number) => {
+    if (!activeTabId) return;
+    
+    const validatedWidth = sanitizeCanvasSize(width);
+    const validatedHeight = sanitizeCanvasSize(height);
+    
+    if (!validateCanvasSize(validatedWidth) || !validateCanvasSize(validatedHeight)) {
+      toast.error(`Canvas size must be between ${CANVAS_SIZE_LIMITS.MIN} and ${CANVAS_SIZE_LIMITS.MAX} pixels`);
+      return;
+    }
+    
+    updateProject(activeTabId, { width: validatedWidth, height: validatedHeight });
+  }, [activeTabId, updateProject]);
 
-  const handleDimensionChange = (width: number, height: number) => {
-    updateProject(activeTabId, { width, height });
-  };
+  const handleColorLimitChange = useCallback((colorLimit: number) => {
+    if (!activeTabId) return;
+    
+    const validatedColorLimit = Math.max(COLOR_LIMIT_RANGE.MIN, Math.min(COLOR_LIMIT_RANGE.MAX, colorLimit));
+    
+    if (validatedColorLimit !== colorLimit) {
+      toast.error(`Color limit must be between ${COLOR_LIMIT_RANGE.MIN} and ${COLOR_LIMIT_RANGE.MAX}`);
+    }
+    
+    updateProject(activeTabId, { colorLimit: validatedColorLimit });
+  }, [activeTabId, updateProject]);
 
-  const handleColorLimitChange = (colorLimit: number) => {
-    updateProject(activeTabId, { colorLimit });
-  };
-
-  const handleModeChange = (mode: 'beginner' | 'advanced') => {
-    updateProject(activeTabId, { mode });
-  };
+  const handleModeChange = useCallback((mode: ProjectMode) => {
+    if (activeTabId) {
+      updateProject(activeTabId, { mode });
+    }
+  }, [activeTabId, updateProject]);
 
   // Check if canvas has any content
-  const isCanvasEmpty = () => {
+  const isCanvasEmpty = useCallback(() => {
     if (!activeTab?.canvasData) {
       debugLog(
         '🎛️  ProjectPanel',
@@ -93,29 +137,39 @@ export function ProjectPanel({ className }: { className?: string }) {
     }
 
     const { data } = activeTab.canvasData;
-    // Check for any non-transparent pixels
-    const hasContent = Array.from(data).some((value, index) => {
-      // Check alpha channel (every 4th value)
-      return index % 4 === 3 && value > 0;
-    });
+    if (!data) return true; // No data means empty canvas
+    
+    // Check for any non-transparent pixels (optimized loop)
+    for (let i = 3; i < data.length; i += 4) {
+      const alphaValue = data[i];
+      if (alphaValue !== undefined && alphaValue > 0) {
+        debugLog(
+          '🎛️  ProjectPanel',
+          'CANVAS_EMPTY_CHECK',
+          'Canvas has content',
+          { tabId: activeTabId, dataLength: data.length }
+        );
+        return false;
+      }
+    }
 
     debugLog(
       '🎛️  ProjectPanel',
       'CANVAS_EMPTY_CHECK',
-      'Canvas content analysis',
-      {
-        tabId: activeTabId,
-        dataLength: data.length,
-        hasContent: hasContent,
-        sampleData: Array.from(data.slice(0, 20)),
-      }
+      'Canvas is empty',
+      { tabId: activeTabId, dataLength: data.length }
     );
 
-    return !hasContent;
-  };
+    return true;
+  }, [activeTab?.canvasData, activeTabId]);
+
+  // Get canvas empty state (memoized)
+  const canvasIsEmpty = useMemo(() => isCanvasEmpty(), [isCanvasEmpty]);
 
   // Handle apply dimensions with content check
-  const handleApplyDimensions = () => {
+  const handleApplyDimensions = useCallback(() => {
+    if (!project) return;
+    
     debugLog(
       '🎛️  ProjectPanel',
       'APPLY_DIMENSIONS_START',
@@ -127,9 +181,7 @@ export function ProjectPanel({ className }: { className?: string }) {
       }
     );
 
-    const isEmpty = isCanvasEmpty();
-
-    if (isEmpty) {
+    if (canvasIsEmpty) {
       // Canvas is empty, apply directly
       debugLog(
         '🎛️  ProjectPanel',
@@ -146,10 +198,11 @@ export function ProjectPanel({ className }: { className?: string }) {
       );
       setShowResizeConfirm(true);
     }
-  };
+  }, [project, canvasIsEmpty, pendingWidth, pendingHeight, handleDimensionChange, activeTabId]);
 
   // Handle resize confirmation actions
-  const handleResizeWithSave = async () => {
+  const handleResizeWithSave = useCallback(async () => {
+    if (!activeTabId) return;
     debugLog(
       '🎛️  ProjectPanel',
       'RESIZE_WITH_SAVE',
@@ -177,9 +230,9 @@ export function ProjectPanel({ className }: { className?: string }) {
     // Apply new dimensions
     handleDimensionChange(pendingWidth, pendingHeight);
     setShowResizeConfirm(false);
-  };
+  }, [activeTabId, saveProject, pendingWidth, pendingHeight, handleDimensionChange]);
 
-  const handleResizeWithDiscard = () => {
+  const handleResizeWithDiscard = useCallback(() => {
     debugLog(
       '🎛️  ProjectPanel',
       'RESIZE_WITH_DISCARD',
@@ -189,9 +242,9 @@ export function ProjectPanel({ className }: { className?: string }) {
     // Apply new dimensions directly
     handleDimensionChange(pendingWidth, pendingHeight);
     setShowResizeConfirm(false);
-  };
+  }, [pendingWidth, pendingHeight, handleDimensionChange]);
 
-  const handleResizeCancel = () => {
+  const handleResizeCancel = useCallback(() => {
     debugLog(
       '🎛️  ProjectPanel',
       'RESIZE_CANCEL',
@@ -199,19 +252,178 @@ export function ProjectPanel({ className }: { className?: string }) {
     );
 
     // Reset pending dimensions to current project dimensions
-    setPendingWidth(project.width);
-    setPendingHeight(project.height);
+    if (project) {
+      setPendingWidth(project.width);
+      setPendingHeight(project.height);
+    }
     setShowResizeConfirm(false);
-  };
+  }, [project]);
 
-  const handleAiGenerate = async () => {
-    if (!aiPrompt.trim()) {
+  // Helper function to load image into canvas
+  const loadImageToCanvas = useCallback(async (imageUrl: string) => {
+    if (!project || !activeTabId) {
+      throw new Error('No active project or tab');
+    }
+
+    debugLog(
+      '🎛️  ProjectPanel',
+      'LOAD_IMAGE_START',
+      'Loading AI image to canvas',
+      { imageUrl }
+    );
+
+    return new Promise<void>((resolve, reject) => {
+      const img = new (globalThis.Image || window.Image)();
+      img.crossOrigin = 'anonymous';
+
+      const cleanup = () => {
+        img.onload = null;
+        img.onerror = null;
+      };
+
+      img.onload = () => {
+        let canvas: HTMLCanvasElement | null = null;
+        try {
+          // Create canvas to extract pixel data
+          canvas = document.createElement('canvas');
+          canvas.width = project.width;
+          canvas.height = project.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+          if (!ctx) {
+            throw new Error('Failed to get canvas context');
+          }
+
+          // Ensure pixel-perfect rendering
+          ctx.imageSmoothingEnabled = false;
+
+          // Draw image to canvas
+          ctx.drawImage(img, 0, 0, project.width, project.height);
+
+          // Extract pixel data
+          const imageData = ctx.getImageData(
+            0,
+            0,
+            project.width,
+            project.height
+          );
+          const pixelData = {
+            data: new Uint8ClampedArray(imageData.data),
+            width: project.width,
+            height: project.height,
+          };
+
+          debugLog(
+            '🎛️  ProjectPanel',
+            'LOAD_IMAGE_CANVAS',
+            'Extracted pixel data',
+            {
+              dataLength: pixelData.data.length,
+              dimensions: `${pixelData.width}x${pixelData.height}`,
+            }
+          );
+
+          // Check if canvas is empty, create new frame if needed
+          const isEmpty = isCanvasEmpty();
+          if (isEmpty && activeTab?.frames.length === 0) {
+            debugLog(
+              '🎛️  ProjectPanel',
+              'LOAD_IMAGE_NEW_FRAME',
+              'Creating new frame for empty project'
+            );
+            addFrame(activeTabId);
+          } else if (!isEmpty) {
+            debugLog(
+              '🎛️  ProjectPanel',
+              'LOAD_IMAGE_APPEND_FRAME',
+              'Appending new frame with AI image'
+            );
+            addFrame(activeTabId);
+          }
+
+          // Update canvas with new pixel data
+          updateCanvasData(activeTabId, pixelData);
+
+          debugLog(
+            '🎛️  ProjectPanel',
+            'LOAD_IMAGE_SUCCESS',
+            'Successfully loaded AI image to canvas'
+          );
+          cleanup();
+          resolve();
+        } catch (error) {
+          debugLog(
+            '🎛️  ProjectPanel',
+            'LOAD_IMAGE_ERROR',
+            'Failed to process image',
+            error
+          );
+          cleanup();
+          reject(error);
+        } finally {
+          // Clean up canvas to prevent memory leaks
+          if (canvas) {
+            canvas.width = 0;
+            canvas.height = 0;
+          }
+        }
+      };
+
+      img.onerror = () => {
+        debugLog(
+          '🎛️  ProjectPanel',
+          'LOAD_IMAGE_ERROR',
+          'Failed to load image from URL',
+          { imageUrl }
+        );
+        cleanup();
+        reject(new Error('Failed to load generated image'));
+      };
+
+      img.src = imageUrl;
+    });
+  }, [project, activeTabId, activeTab?.frames.length, isCanvasEmpty, addFrame, updateCanvasData]);
+
+  const handleSave = useCallback(() => {
+    if (activeTabId) {
+      saveProject(activeTabId);
+    }
+  }, [activeTabId, saveProject]);
+
+  const handleOpenExport = useCallback(() => {
+    debugLog('🎛️  ProjectPanel', 'EXPORT_MODAL_OPEN', 'Opening export modal', {
+      activeTabId,
+    });
+    setShowExportModal(true);
+  }, [activeTabId]);
+
+  const handleAiGenerate = useCallback(async () => {
+    // Enhanced input validation
+    const trimmedPrompt = aiPrompt.trim();
+    
+    if (!trimmedPrompt) {
       toast.error('Please enter a prompt first');
+      return;
+    }
+    
+    if (trimmedPrompt.length < AI_PROMPT_LIMITS.MIN_LENGTH) {
+      toast.error(`Prompt must be at least ${AI_PROMPT_LIMITS.MIN_LENGTH} characters long`);
+      return;
+    }
+    
+    if (trimmedPrompt.length > AI_PROMPT_LIMITS.MAX_LENGTH) {
+      toast.error(`Prompt must be no more than ${AI_PROMPT_LIMITS.MAX_LENGTH} characters`);
       return;
     }
 
     if (!activeTabId || !project) {
-      toast.error('No active project');
+      toast.error('No active project selected');
+      return;
+    }
+    
+    // Validate project dimensions
+    if (!validateCanvasSize(project.width) || !validateCanvasSize(project.height)) {
+      toast.error('Invalid canvas dimensions. Please check project settings.');
       return;
     }
 
@@ -312,124 +524,18 @@ export function ProjectPanel({ className }: { className?: string }) {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [aiPrompt, activeTabId, project, loadImageToCanvas]);
 
-  // Helper function to load image into canvas
-  const loadImageToCanvas = async (imageUrl: string) => {
-    debugLog(
-      '🎛️  ProjectPanel',
-      'LOAD_IMAGE_START',
-      'Loading AI image to canvas',
-      { imageUrl }
+  if (!activeTabId || !project) {
+    return (
+      <div className='flex h-full items-center justify-center p-4 text-gray-500'>
+        <div className='text-center'>
+          <Settings className='mx-auto mb-2 h-8 w-8' />
+          <p>Select a project to view settings</p>
+        </div>
+      </div>
     );
-
-    return new Promise<void>((resolve, reject) => {
-      const img = new (globalThis.Image || window.Image)();
-      img.crossOrigin = 'anonymous';
-
-      img.onload = () => {
-        try {
-          // Create canvas to extract pixel data
-          const canvas = document.createElement('canvas');
-          canvas.width = project!.width;
-          canvas.height = project!.height;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-          if (!ctx) {
-            throw new Error('Failed to get canvas context');
-          }
-
-          // Ensure pixel-perfect rendering
-          ctx.imageSmoothingEnabled = false;
-
-          // Draw image to canvas
-          ctx.drawImage(img, 0, 0, project!.width, project!.height);
-
-          // Extract pixel data
-          const imageData = ctx.getImageData(
-            0,
-            0,
-            project!.width,
-            project!.height
-          );
-          const pixelData = {
-            data: new Uint8ClampedArray(imageData.data),
-            width: project!.width,
-            height: project!.height,
-          };
-
-          debugLog(
-            '🎛️  ProjectPanel',
-            'LOAD_IMAGE_CANVAS',
-            'Extracted pixel data',
-            {
-              dataLength: pixelData.data.length,
-              dimensions: `${pixelData.width}x${pixelData.height}`,
-            }
-          );
-
-          // Check if canvas is empty, create new frame if needed
-          const isEmpty = isCanvasEmpty();
-          if (isEmpty && activeTab?.frames.length === 0) {
-            debugLog(
-              '🎛️  ProjectPanel',
-              'LOAD_IMAGE_NEW_FRAME',
-              'Creating new frame for empty project'
-            );
-            addFrame(activeTabId);
-          } else if (!isEmpty) {
-            debugLog(
-              '🎛️  ProjectPanel',
-              'LOAD_IMAGE_APPEND_FRAME',
-              'Appending new frame with AI image'
-            );
-            addFrame(activeTabId);
-          }
-
-          // Update canvas with new pixel data
-          updateCanvasData(activeTabId, pixelData);
-
-          debugLog(
-            '🎛️  ProjectPanel',
-            'LOAD_IMAGE_SUCCESS',
-            'Successfully loaded AI image to canvas'
-          );
-          resolve();
-        } catch (error) {
-          debugLog(
-            '🎛️  ProjectPanel',
-            'LOAD_IMAGE_ERROR',
-            'Failed to process image',
-            error
-          );
-          reject(error);
-        }
-      };
-
-      img.onerror = () => {
-        debugLog(
-          '🎛️  ProjectPanel',
-          'LOAD_IMAGE_ERROR',
-          'Failed to load image from URL',
-          { imageUrl }
-        );
-        reject(new Error('Failed to load generated image'));
-      };
-
-      img.src = imageUrl;
-    });
-  };
-
-  const handleSave = () => {
-    saveProject(activeTabId);
-  };
-
-  const handleOpenExport = () => {
-    debugLog('🎛️  ProjectPanel', 'EXPORT_MODAL_OPEN', 'Opening export modal', {
-      activeTabId,
-    });
-    setShowExportModal(true);
-  };
+  }
 
   return (
     <div className={cn('flex h-full flex-col bg-white', className)}>
@@ -444,49 +550,74 @@ export function ProjectPanel({ className }: { className?: string }) {
         {/* Project Info */}
         <div className='space-y-4 p-4'>
           <div>
-            <label className='mb-2 block text-sm font-medium text-gray-700'>
+            <label 
+              htmlFor='project-name'
+              className='mb-2 block text-sm font-medium text-gray-700'
+            >
               Project Name
             </label>
             <input
+              id='project-name'
               type='text'
               value={project.name}
               onChange={e => handleNameChange(e.target.value)}
               className='w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
               placeholder='My Pixel Art'
+              aria-describedby='project-name-hint'
+              maxLength={100}
             />
+            <div id='project-name-hint' className='sr-only'>
+              Enter a descriptive name for your pixel art project
+            </div>
           </div>
 
           <div className='space-y-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div>
-                <label className='mb-1 block text-sm font-medium text-gray-700'>
+                <label 
+                  htmlFor='canvas-width'
+                  className='mb-1 block text-sm font-medium text-gray-700'
+                >
                   Width
                 </label>
                 <input
+                  id='canvas-width'
                   type='number'
                   value={pendingWidth}
                   onChange={e =>
-                    setPendingWidth(parseInt(e.target.value) || 32)
+                    setPendingWidth(sanitizeCanvasSize(e.target.value))
                   }
-                  min='8'
-                  max='128'
+                  min={CANVAS_SIZE_LIMITS.MIN}
+                  max={CANVAS_SIZE_LIMITS.MAX}
                   className='w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                  aria-describedby='canvas-width-hint'
                 />
+                <div id='canvas-width-hint' className='sr-only'>
+                  Canvas width in pixels, between {CANVAS_SIZE_LIMITS.MIN} and {CANVAS_SIZE_LIMITS.MAX}
+                </div>
               </div>
               <div>
-                <label className='mb-1 block text-sm font-medium text-gray-700'>
+                <label 
+                  htmlFor='canvas-height'
+                  className='mb-1 block text-sm font-medium text-gray-700'
+                >
                   Height
                 </label>
                 <input
+                  id='canvas-height'
                   type='number'
                   value={pendingHeight}
                   onChange={e =>
-                    setPendingHeight(parseInt(e.target.value) || 32)
+                    setPendingHeight(sanitizeCanvasSize(e.target.value))
                   }
-                  min='8'
-                  max='128'
+                  min={CANVAS_SIZE_LIMITS.MIN}
+                  max={CANVAS_SIZE_LIMITS.MAX}
                   className='w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                  aria-describedby='canvas-height-hint'
                 />
+                <div id='canvas-height-hint' className='sr-only'>
+                  Canvas height in pixels, between {CANVAS_SIZE_LIMITS.MIN} and {CANVAS_SIZE_LIMITS.MAX}
+                </div>
               </div>
             </div>
 
@@ -547,27 +678,36 @@ export function ProjectPanel({ className }: { className?: string }) {
         </div>
 
         {/* AI Generation */}
-        <div className='border-t border-gray-200 p-4'>
+        <section className='border-t border-gray-200 p-4' aria-labelledby='ai-assistant-heading'>
           <div className='mb-3 flex items-center space-x-2'>
-            <Sparkles className='h-5 w-5 text-purple-600' />
-            <h3 className='text-sm font-semibold text-gray-800'>
+            <Sparkles className='h-5 w-5 text-purple-600' aria-hidden='true' />
+            <h3 id='ai-assistant-heading' className='text-sm font-semibold text-gray-800'>
               AI Assistant
             </h3>
           </div>
 
           <div className='space-y-3'>
-            <textarea
-              value={aiPrompt}
-              onChange={e => setAiPrompt(e.target.value)}
-              placeholder="Describe what you want to create... e.g., 'a cute cat pixel art', 'medieval castle', 'space ship'"
-              className='w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-500'
-              rows={3}
-              disabled={isGenerating}
-              maxLength={500}
-            />
+            <div>
+              <label htmlFor='ai-prompt' className='sr-only'>
+                AI Generation Prompt
+              </label>
+              <textarea
+                id='ai-prompt'
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                placeholder="Describe what you want to create... e.g., 'a cute cat pixel art', 'medieval castle', 'space ship'"
+                className='w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-500'
+                rows={3}
+                disabled={isGenerating}
+                maxLength={AI_PROMPT_LIMITS.MAX_LENGTH}
+                minLength={AI_PROMPT_LIMITS.MIN_LENGTH}
+                aria-describedby='ai-prompt-hint ai-prompt-count'
+                aria-invalid={aiPrompt.trim().length > 0 && aiPrompt.trim().length < AI_PROMPT_LIMITS.MIN_LENGTH}
+              />
+            </div>
 
-            <div className='text-right text-xs text-gray-500'>
-              {aiPrompt.length}/500 characters
+            <div id='ai-prompt-count' className='text-right text-xs text-gray-500' aria-live='polite'>
+              {aiPrompt.length}/{AI_PROMPT_LIMITS.MAX_LENGTH} characters
             </div>
 
             <Button
@@ -604,7 +744,7 @@ export function ProjectPanel({ className }: { className?: string }) {
               <li>Add mood keywords like "happy", "dark", "cute"</li>
             </ul>
           </div>
-        </div>
+        </section>
 
         {/* Advanced Settings */}
         <div className='border-t border-gray-200 p-4'>
@@ -755,4 +895,6 @@ export function ProjectPanel({ className }: { className?: string }) {
       <ExportModal open={showExportModal} onOpenChange={setShowExportModal} />
     </div>
   );
-}
+});
+
+export { ProjectPanel };
