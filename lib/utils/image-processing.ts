@@ -260,6 +260,7 @@ export async function processImageForPixelArt(
 
   try {
     console.log(`🎨 Starting image processing: ${targetWidth}x${targetHeight}, ${options.colorCount} colors`);
+    console.log(`📊 Input buffer size: ${inputBuffer.length} bytes`);
 
     // Step 1: Resize with nearest neighbor (pixel perfect)
     const resizedBuffer = await sharp(inputBuffer)
@@ -274,6 +275,15 @@ export async function processImageForPixelArt(
     // Step 2: Apply color quantization
     const { data: imageData, info } = resizedBuffer;
     
+    console.log(`📊 Resized image info:`, {
+      width: info.width,
+      height: info.height,
+      channels: info.channels,
+      size: info.size,
+      dataLength: imageData.length,
+      expectedSize: targetWidth * targetHeight * 4
+    });
+    
     // Convert Buffer to Uint8ClampedArray if needed
     const pixelData = imageData instanceof Uint8ClampedArray ? imageData : new Uint8ClampedArray(imageData);
     
@@ -286,6 +296,8 @@ export async function processImageForPixelArt(
     const quantizedData = applyQuantization(pixelData, info.width, info.height, palette);
 
     // Step 4: Convert back to PNG buffer
+    console.log(`📊 Quantized data length: ${quantizedData.length}, expected: ${targetWidth * targetHeight * 4}`);
+    
     const outputBuffer = await sharp(quantizedData, {
       raw: {
         width: targetWidth,
