@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { processImageForPixelArt, validateImageConstraints } from '@/lib/utils/image-processing';
+import { processImageWithCanvas } from '@/lib/utils/canvas-image-processing';
 import { 
   validateRequestBody, 
   applyRateLimit, 
@@ -229,15 +230,32 @@ export async function POST(request: NextRequest) {
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     console.log(`📊 [${requestId}] Image buffer size: ${imageBuffer.length} bytes`);
 
-    // Step 9: Process image for pixel art conversion
+    // Step 9: Process image for pixel art conversion (try Canvas first, fallback to Sharp)
     console.log(`🎨 [${requestId}] Step 9: Processing image for pixel art...`);
     console.log(`⚙️ [${requestId}] Processing parameters:`, { targetWidth: width, targetHeight: height, colorCount, method: 'median-cut', dithering: false });
     
-    const processed = await processImageForPixelArt(imageBuffer, width, height, {
-      colorCount,
-      method: 'median-cut',
-      enableDithering: false // Kids-friendly: no dithering by default
-    });
+    let processed;
+    
+    try {
+      // Try Canvas-based processing first (Railway-compatible)
+      console.log(`🖼️ [${requestId}] Attempting Canvas-based processing...`);
+      processed = await processImageWithCanvas(imageBuffer, width, height, {
+        colorCount,
+        method: 'median-cut',
+        enableDithering: false
+      });
+      console.log(`✅ [${requestId}] Canvas processing successful`);
+    } catch (canvasError) {
+      console.log(`⚠️ [${requestId}] Canvas processing failed, falling back to Sharp:`, canvasError instanceof Error ? canvasError.message : 'Unknown error');
+      
+      // Fallback to Sharp-based processing
+      processed = await processImageForPixelArt(imageBuffer, width, height, {
+        colorCount,
+        method: 'median-cut',
+        enableDithering: false
+      });
+      console.log(`✅ [${requestId}] Sharp fallback processing successful`);
+    }
     console.log(`✅ [${requestId}] Image processing completed successfully`);
     console.log(`📊 [${requestId}] Processed result:`, { 
       width: processed.width, 
