@@ -12,6 +12,13 @@ export interface HealthCheckResponse {
   openaiKeyLoaded: boolean;
   environment: string;
   uptime: number;
+  debug?: {
+    openaiKeyFormat: string;
+    openaiKeyLength: number;
+    envVarsPresent: string[];
+    buildId: string;
+    deploymentInfo: any;
+  };
 }
 
 // Track application start time for uptime calculation
@@ -34,13 +41,33 @@ export async function GET() {
     // Check OpenAI API key availability
     const openaiKeyLoaded = Boolean(process.env.OPENAI_API_KEY);
     
+    // Collect debug information
+    const apiKey = process.env.OPENAI_API_KEY;
+    const debugInfo = {
+      openaiKeyFormat: apiKey ? (apiKey.startsWith('sk-') ? 'valid_prefix' : 'invalid_prefix') : 'missing',
+      openaiKeyLength: apiKey ? apiKey.length : 0,
+      envVarsPresent: Object.keys(process.env).filter(key => 
+        key.includes('OPENAI') || 
+        key.includes('NEXT') || 
+        key.includes('NODE') ||
+        key.includes('RAILWAY') ||
+        key.includes('VERCEL')
+      ),
+      buildId: process.env.NEXT_BUILD_ID || 'unknown',
+      deploymentInfo: {
+        platform: process.env.RAILWAY_PROJECT_ID ? 'Railway' : 
+                  process.env.VERCEL ? 'Vercel' : 'Unknown',
+        projectId: process.env.RAILWAY_PROJECT_ID || process.env.VERCEL_PROJECT_ID || 'unknown',
+        environment: process.env.RAILWAY_ENVIRONMENT || process.env.VERCEL_ENV || 'unknown'
+      }
+    };
+    
     // Test OpenAI connectivity (lightweight check)
     let openaiStatus: 'healthy' | 'unhealthy' | 'unknown' = 'unknown';
     
     if (openaiKeyLoaded) {
       try {
         // Simple test to validate OpenAI key format
-        const apiKey = process.env.OPENAI_API_KEY;
         if (apiKey && apiKey.startsWith('sk-') && apiKey.length > 20) {
           openaiStatus = 'healthy';
         } else {
@@ -71,6 +98,7 @@ export async function GET() {
       openaiKeyLoaded,
       environment: process.env.NODE_ENV || 'development',
       uptime: Math.floor(uptime / 1000), // Convert to seconds
+      debug: debugInfo
     };
 
     console.log(`✅ Health check completed:`, {
