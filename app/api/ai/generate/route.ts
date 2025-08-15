@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       modelUsed: "dall-e-3",
       promptLength: enhancedPrompt.length,
       targetSize: "1024x1024",
-      timeout: "60s"
+      timeout: "10min"
     });
     
     // Add timeout wrapper for OpenAI API call
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
         response_format: "url",
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('OpenAI API call timed out after 60 seconds')), 60000)
+        setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)
       )
     ]) as any;
 
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     // Step 8: Download generated image
     console.log(`📥 [${requestId}] Step 8: Downloading generated image...`);
     const imageResponse = await fetch(imageUrl, {
-      signal: AbortSignal.timeout(60000) // 60 second timeout
+      signal: AbortSignal.timeout(600000) // 10 minute timeout
     });
     
     if (!imageResponse.ok) {
@@ -324,7 +324,7 @@ export async function POST(request: NextRequest) {
     
     if (errorMessage.includes('timeout') || errorMessage.includes('etimedout')) {
       return createErrorResponse(
-        'Generation timeout - please try with a simpler prompt',
+        'Generation timeout after 10 minutes - please try with a simpler prompt or check OpenAI service status',
         'TIMEOUT_ERROR',
         408
       );
