@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       modelUsed: "dall-e-3",
       promptLength: enhancedPrompt.length,
       targetSize: "1024x1024",
-      timeout: "30s"
+      timeout: "60s"
     });
     
     // Add timeout wrapper for OpenAI API call
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
         response_format: "url",
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('OpenAI API call timed out after 30 seconds')), 30000)
+        setTimeout(() => reject(new Error('OpenAI API call timed out after 60 seconds')), 60000)
       )
     ]) as any;
 
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     // Step 8: Download generated image
     console.log(`📥 [${requestId}] Step 8: Downloading generated image...`);
     const imageResponse = await fetch(imageUrl, {
-      signal: AbortSignal.timeout(30000) // 30 second timeout
+      signal: AbortSignal.timeout(60000) // 60 second timeout
     });
     
     if (!imageResponse.ok) {
