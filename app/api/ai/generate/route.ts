@@ -94,9 +94,11 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const requestId = crypto.randomUUID();
   
-  // Check for bypass parameter
+  // Check for bypass parameter (query param or header)
   const { searchParams } = new URL(request.url);
-  const bypassProcessing = searchParams.get('bypass') === 'true';
+  const bypassFromParam = searchParams.get('bypass') === 'true';
+  const bypassFromHeader = request.headers.get('x-bypass-processing') === 'true';
+  const bypassProcessing = bypassFromParam || bypassFromHeader;
   
   console.log(`🎨 [${requestId}] AI image generation requested at ${new Date().toISOString()}`);
   console.log(`🔧 [${requestId}] Environment check: NODE_ENV=${process.env.NODE_ENV}`);
@@ -220,7 +222,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ [${requestId}] DALL-E 3 generation successful, image URL received`);
     console.log(`🔗 [${requestId}] Image URL: ${imageUrl.substring(0, 50)}...`);
 
-    // Bypass processing if requested - return raw DALL-E output
+    // CRITICAL: Bypass processing BEFORE any Sharp/VIPS operations to avoid RGB/RGBA issues
     if (bypassProcessing) {
       const totalTime = Date.now() - startTime;
       
