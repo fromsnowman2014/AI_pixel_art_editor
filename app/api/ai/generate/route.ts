@@ -235,17 +235,13 @@ export async function POST(request: NextRequest) {
       });
 
       const responseData = {
-        imageUrl: imageUrl, // Return raw OpenAI image URL
-        originalImageUrl: imageUrl,
+        assetId: requestId, // Use request ID as asset ID
+        pngUrl: imageUrl, // Return raw OpenAI image URL using pngUrl field
+        palette: [], // No palette generated in bypass mode  
         width: 1024, // Actual DALL-E 3 size
         height: 1024,
-        requestedWidth: width,
-        requestedHeight: height,
         colorCount: colorCount,
-        palette: [], // No palette generated in bypass mode
-        processingTimeMs: totalTime,
-        prompt: sanitizedPrompt,
-        note: "Raw DALL-E 3 output without pixel art processing (Sharp/VIPS bypassed)"
+        processingTimeMs: totalTime
       };
 
       logApiRequest(request, '/ai/generate?bypass=true', startTime, true, { 
@@ -308,13 +304,13 @@ export async function POST(request: NextRequest) {
     });
 
     const responseData = {
-      imageUrl: base64Image,
+      assetId: requestId, // Use request ID as asset ID
+      pngUrl: base64Image, // Use pngUrl to match frontend expectations
+      palette: processed.palette.map(color => `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a || 1})`),
       width: processed.width,
       height: processed.height,
       colorCount: processed.colorCount,
-      palette: processed.palette,
-      processingTimeMs: totalTime,
-      prompt: sanitizedPrompt
+      processingTimeMs: totalTime
     };
 
     logApiRequest(request, '/ai/generate', startTime, true, { 

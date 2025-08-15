@@ -215,10 +215,28 @@ class ApiClient {
 
   // AI Generation API
   async generateAI(data: AIGenerateRequest): Promise<AIGenerationResponse> {
-    const response = await this.client.post<AIGenerationResponse>('/ai/generate', data, {
-      timeout: 60000, // 60 seconds for AI generation
+    console.log('🔧 API Client: Sending AI generation request:', data);
+    
+    const response = await this.client.post<{success: boolean, data: AIGenerationResponse}>('/ai/generate', data, {
+      timeout: 600000, // 10 minutes for AI generation to match backend processing time
     })
-    return response.data
+    
+    console.log('📥 API Client: Raw response received:', {
+      status: response.status,
+      success: response.data?.success,
+      dataKeys: response.data?.data ? Object.keys(response.data.data) : 'no data',
+      responseStructure: response.data
+    });
+    
+    // Backend returns {success: true, data: AIGenerationResponse}
+    // Extract the actual data from the wrapper
+    if (response.data.success && response.data.data) {
+      console.log('✅ API Client: Extracted data:', response.data.data);
+      return response.data.data
+    } else {
+      console.error('❌ API Client: Invalid response format:', response.data);
+      throw new Error('AI generation failed - invalid response format')
+    }
   }
 
   async generateVariations(data: AIVariationsRequest): Promise<AIGenerationResponse[]> {
