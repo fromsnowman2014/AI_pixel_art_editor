@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
         status: 'success',
         imageGenerated: hasImage,
         imageUrl: hasImage ? 'URL_PROVIDED' : null,
-        responseFormat: testResponse.data[0]?.url ? 'url' : 'unknown'
+        responseFormat: testResponse.data?.[0]?.url ? 'url' : 'unknown'
       };
       console.log('✅ Basic image generation test passed');
     } catch (error) {

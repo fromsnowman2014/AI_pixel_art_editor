@@ -341,6 +341,50 @@ export const sanitize = {
 };
 
 /**
+ * Safe error information extraction
+ */
+export function getErrorInfo(error: unknown): {
+  name: string;
+  message: string;
+  stack?: string;
+  cause?: unknown;
+} {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: 'cause' in error ? (error as any).cause : undefined
+    };
+  }
+  
+  if (typeof error === 'string') {
+    return {
+      name: 'StringError',
+      message: error,
+      stack: undefined,
+      cause: undefined
+    };
+  }
+  
+  if (error && typeof error === 'object' && 'message' in error) {
+    return {
+      name: 'UnknownError',
+      message: String(error.message),
+      stack: undefined,
+      cause: error
+    };
+  }
+  
+  return {
+    name: 'UnknownError',
+    message: 'An unknown error occurred',
+    stack: undefined,
+    cause: error
+  };
+}
+
+/**
  * Logging utility for API requests
  */
 export function logApiRequest(
