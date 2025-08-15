@@ -94,8 +94,13 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const requestId = crypto.randomUUID();
   
+  // Check for bypass parameter
+  const { searchParams } = new URL(request.url);
+  const bypassProcessing = searchParams.get('bypass') === 'true';
+  
   console.log(`🎨 [${requestId}] AI image generation requested at ${new Date().toISOString()}`);
   console.log(`🔧 [${requestId}] Environment check: NODE_ENV=${process.env.NODE_ENV}`);
+  console.log(`🔄 [${requestId}] Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
 
   try {
     // Step 1: Check AI service availability
@@ -215,6 +220,46 @@ export async function POST(request: NextRequest) {
     console.log(`✅ [${requestId}] DALL-E 3 generation successful, image URL received`);
     console.log(`🔗 [${requestId}] Image URL: ${imageUrl.substring(0, 50)}...`);
 
+    // Bypass processing if requested - return raw DALL-E output
+    if (bypassProcessing) {
+      const totalTime = Date.now() - startTime;
+      
+      console.log(`🚀 [${requestId}] Bypass mode: Returning raw DALL-E output without processing`);
+      console.log(`🎉 Bypass AI image generation complete:`, {
+        dimensions: `${width}x${height} (requested)`,
+        actualSize: "1024x1024 (DALL-E 3)",
+        colors: colorCount,
+        totalTime: `${totalTime}ms`,
+        note: "Raw DALL-E output without pixel art processing"
+      });
+
+      const responseData = {
+        imageUrl: imageUrl, // Return raw OpenAI image URL
+        originalImageUrl: imageUrl,
+        width: 1024, // Actual DALL-E 3 size
+        height: 1024,
+        requestedWidth: width,
+        requestedHeight: height,
+        colorCount: colorCount,
+        palette: [], // No palette generated in bypass mode
+        processingTimeMs: totalTime,
+        prompt: sanitizedPrompt,
+        note: "Raw DALL-E 3 output without pixel art processing (Sharp/VIPS bypassed)"
+      };
+
+      logApiRequest(request, '/ai/generate?bypass=true', startTime, true, { 
+        actualSize: "1024x1024",
+        requestedSize: `${width}x${height}`,
+        colors: colorCount,
+        bypass: true
+      });
+
+      return createSuccessResponse(responseData, 200, {
+        ...rateLimitResult.headers,
+        ...CORS_HEADERS
+      });
+    }
+
     // Step 8: Download generated image
     console.log(`📥 [${requestId}] Step 8: Downloading generated image...`);
     const imageResponse = await fetch(imageUrl, {
@@ -230,7 +275,7 @@ export async function POST(request: NextRequest) {
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     console.log(`📊 [${requestId}] Image buffer size: ${imageBuffer.length} bytes`);
 
-    // Step 9: Process image for pixel art conversion (try Canvas first, fallback to Sharp)
+    // Step 9: Process image for pixel art conversion (try Canvas first, fallback to Sharp with RGBA fix)
     console.log(`🎨 [${requestId}] Step 9: Processing image for pixel art...`);
     console.log(`⚙️ [${requestId}] Processing parameters:`, { targetWidth: width, targetHeight: height, colorCount, method: 'median-cut', dithering: false });
     
@@ -246,15 +291,21 @@ export async function POST(request: NextRequest) {
       });
       console.log(`✅ [${requestId}] Canvas processing successful`);
     } catch (canvasError) {
-      console.log(`⚠️ [${requestId}] Canvas processing failed, falling back to Sharp:`, canvasError instanceof Error ? canvasError.message : 'Unknown error');
+      console.log(`⚠️ [${requestId}] Canvas processing failed, falling back to Sharp with RGBA fix:`, canvasError instanceof Error ? canvasError.message : 'Unknown error');
       
-      // Fallback to Sharp-based processing
-      processed = await processImageForPixelArt(imageBuffer, width, height, {
-        colorCount,
-        method: 'median-cut',
-        enableDithering: false
-      });
-      console.log(`✅ [${requestId}] Sharp fallback processing successful`);
+      try {
+        // Enhanced Sharp processing with forced RGBA conversion
+        console.log(`🔧 [${requestId}] Attempting Sharp processing with forced RGBA conversion...`);
+        processed = await processImageForPixelArt(imageBuffer, width, height, {
+          colorCount,
+          method: 'median-cut',
+          enableDithering: false
+        });
+        console.log(`✅ [${requestId}] Sharp processing with RGBA fix successful`);
+      } catch (sharpError) {
+        console.log(`❌ [${requestId}] Sharp processing also failed:`, sharpError instanceof Error ? sharpError.message : 'Unknown error');
+        throw new Error(`Both Canvas and Sharp processing failed. Canvas: ${canvasError instanceof Error ? canvasError.message : 'Unknown'}. Sharp: ${sharpError instanceof Error ? sharpError.message : 'Unknown'}`);
+      }
     }
     console.log(`✅ [${requestId}] Image processing completed successfully`);
     console.log(`📊 [${requestId}] Processed result:`, { 

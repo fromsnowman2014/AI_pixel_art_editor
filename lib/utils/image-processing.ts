@@ -290,14 +290,22 @@ export async function processImageForPixelArt(
     console.log(`🎨 Starting image processing: ${targetWidth}x${targetHeight}, ${options.colorCount} colors`);
     console.log(`📊 Input buffer size: ${inputBuffer.length} bytes`);
 
-    // Step 1: Force RGBA conversion using explicit channel manipulation
-    console.log(`🔧 Converting to RGBA using explicit channel expansion...`);
+    // Step 1: Force RGBA conversion using explicit channel manipulation and VIPS-safe processing
+    console.log(`🔧 Converting to RGBA using explicit channel expansion with VIPS safety...`);
     
-    const resizedRgbBuffer = await sharp(inputBuffer)
+    // First, ensure we have consistent RGBA processing by forcing PNG intermediate
+    const pngBuffer = await sharp(inputBuffer)
       .resize(targetWidth, targetHeight, {
         kernel: sharp.kernel.nearest, // Pixel perfect scaling
         fit: 'fill' // Stretch to exact dimensions
       })
+      .png() // Force PNG format to ensure RGBA
+      .toBuffer();
+
+    console.log(`📊 PNG intermediate buffer: ${pngBuffer.length} bytes`);
+
+    // Now extract raw RGBA data from the PNG
+    const resizedRgbBuffer = await sharp(pngBuffer)
       .raw()
       .toBuffer({ resolveWithObject: true });
 
