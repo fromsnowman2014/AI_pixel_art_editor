@@ -35,17 +35,45 @@ class MedianCutQuantizer {
   private pixels: Color[] = [];
   
   constructor(imageData: Uint8ClampedArray, width: number, height: number) {
-    // Convert image data to color array
-    for (let i = 0; i < imageData.length; i += 4) {
-      const r = imageData[i] ?? 0;
-      const g = imageData[i + 1] ?? 0;
-      const b = imageData[i + 2] ?? 0;
-      const a = imageData[i + 3] ?? 0;
-      
-      // Skip fully transparent pixels
-      if (a > 0) {
+    const expectedSize = width * height;
+    const actualChannels = imageData.length / expectedSize;
+    
+    console.log(`🔍 MedianCutQuantizer input analysis:`, {
+      dataLength: imageData.length,
+      expectedPixels: expectedSize,
+      detectedChannels: actualChannels,
+      isRGBA: Math.abs(actualChannels - 4) < 0.1,
+      isRGB: Math.abs(actualChannels - 3) < 0.1
+    });
+    
+    if (Math.abs(actualChannels - 4) < 0.1) {
+      // RGBA data (4 channels)
+      for (let i = 0; i < imageData.length; i += 4) {
+        const r = imageData[i] ?? 0;
+        const g = imageData[i + 1] ?? 0;
+        const b = imageData[i + 2] ?? 0;
+        const a = imageData[i + 3] ?? 0;
+        
+        // Skip fully transparent pixels
+        if (a > 0) {
+          this.pixels.push({ r, g, b, a });
+        }
+      }
+      console.log(`✅ Processed as RGBA: ${this.pixels.length} pixels`);
+    } else if (Math.abs(actualChannels - 3) < 0.1) {
+      // RGB data (3 channels) - convert to RGBA
+      console.log(`🔄 Converting RGB to RGBA internally...`);
+      for (let i = 0; i < imageData.length; i += 3) {
+        const r = imageData[i] ?? 0;
+        const g = imageData[i + 1] ?? 0;
+        const b = imageData[i + 2] ?? 0;
+        const a = 255; // Fully opaque
+        
         this.pixels.push({ r, g, b, a });
       }
+      console.log(`✅ Converted RGB to RGBA: ${this.pixels.length} pixels`);
+    } else {
+      throw new Error(`Unsupported channel count: ${actualChannels}. Expected 3 (RGB) or 4 (RGBA).`);
     }
   }
 
