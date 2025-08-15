@@ -10,6 +10,7 @@ import {
   createSuccessResponse,
   sanitize,
   logApiRequest,
+  getErrorInfo,
   CORS_HEADERS
 } from '@/lib/utils/api-middleware';
 import { getEnv } from '@/lib/utils/env-validation';
@@ -90,29 +91,40 @@ openai = initializeOpenAI();
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  const requestId = crypto.randomUUID();
   
-  console.log('🎨 AI image generation requested');
+  console.log(`🎨 [${requestId}] AI image generation requested at ${new Date().toISOString()}`);
+  console.log(`🔧 [${requestId}] Environment check: NODE_ENV=${process.env.NODE_ENV}`);
 
   try {
-    // Check AI service availability
+    // Step 1: Check AI service availability
+    console.log(`📋 [${requestId}] Step 1: Checking AI service availability...`);
     const serviceCheck = checkAIServiceAvailability();
     if (!serviceCheck.available) {
+      console.log(`❌ [${requestId}] Service unavailable:`, serviceCheck);
       logApiRequest(request, '/ai/generate', startTime, false, 'Service unavailable');
       return serviceCheck.response;
     }
+    console.log(`✅ [${requestId}] AI service availability check passed`);
 
-    // Validate request body
+    // Step 2: Validate request body
+    console.log(`📝 [${requestId}] Step 2: Validating request body...`);
     const validation = await validateRequestBody(request, GenerateRequestSchema);
     if (!validation.success) {
+      console.log(`❌ [${requestId}] Request validation failed:`, validation);
       logApiRequest(request, '/ai/generate', startTime, false, 'Validation failed');
       return validation.response;
     }
+    console.log(`✅ [${requestId}] Request validation passed`);
 
     const { prompt, width, height, colorCount = 24, style } = validation.data;
+    console.log(`📊 [${requestId}] Request parameters:`, { prompt: prompt.substring(0, 50) + '...', width, height, colorCount, style });
 
-    // Validate image constraints  
+    // Step 3: Validate image constraints  
+    console.log(`🔍 [${requestId}] Step 3: Validating image constraints...`);
     const constraintValidation = validateImageConstraints(width, height, colorCount);
     if (!constraintValidation.valid) {
+      console.log(`❌ [${requestId}] Constraint validation failed:`, constraintValidation);
       logApiRequest(request, '/ai/generate', startTime, false, 'Constraint validation failed');
       return createErrorResponse(
         constraintValidation.error || 'Invalid image constraints',
@@ -120,31 +132,39 @@ export async function POST(request: NextRequest) {
         400
       );
     }
+    console.log(`✅ [${requestId}] Image constraints validation passed`);
 
-    // Apply rate limiting
+    // Step 4: Apply rate limiting
+    console.log(`⏱️ [${requestId}] Step 4: Applying rate limiting...`);
     const rateLimitResult = applyRateLimit(request);
     if (!rateLimitResult.success) {
+      console.log(`❌ [${requestId}] Rate limit exceeded:`, rateLimitResult);
       logApiRequest(request, '/ai/generate', startTime, false, 'Rate limit exceeded');
       return rateLimitResult.response;
     }
+    console.log(`✅ [${requestId}] Rate limiting passed`);
 
-    // Sanitize and enhance prompt for pixel art generation
+    // Step 5: Sanitize and enhance prompt
+    console.log(`🎭 [${requestId}] Step 5: Processing prompt...`);
     const sanitizedPrompt = sanitize.prompt(prompt);
     const enhancedPrompt = `${sanitizedPrompt}, pixel art style, ${style}, low resolution, limited color palette, crisp pixels, no anti-aliasing, retro gaming aesthetic`;
+    console.log(`✅ [${requestId}] Prompt processed: "${enhancedPrompt.substring(0, 100)}..."`);
     
-    console.log(`🎯 Generating image with DALL-E 3:`, {
+    console.log(`🎯 [${requestId}] Preparing DALL-E 3 generation:`, {
       prompt: enhancedPrompt.substring(0, 100) + '...',
       targetSize: `${width}x${height}`,
       colorCount,
       style
     });
 
-    // Ensure OpenAI client is initialized
+    // Step 6: Ensure OpenAI client is initialized
+    console.log(`🤖 [${requestId}] Step 6: Checking OpenAI client...`);
     if (!openai) {
-      console.log('🔄 Attempting to re-initialize OpenAI client...');
+      console.log(`🔄 [${requestId}] OpenAI client not initialized, attempting to re-initialize...`);
       openai = initializeOpenAI();
       
       if (!openai) {
+        console.log(`❌ [${requestId}] OpenAI client initialization failed`);
         logApiRequest(request, '/ai/generate', startTime, false, 'OpenAI client not initialized');
         return createErrorResponse(
           'AI service initialization failed - check OpenAI API key configuration',
@@ -153,51 +173,66 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+    console.log(`✅ [${requestId}] OpenAI client ready`);
 
-    // Generate image with DALL-E 3
-    const dalleResponse = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: enhancedPrompt,
-      n: 1,
-      size: "1024x1024", // Generate at high res, then downscale
-      quality: "standard",
-      response_format: "url",
-    });
+    // Step 7: Generate image with DALL-E 3
+    console.log(`🎨 [${requestId}] Step 7: Calling DALL-E 3 API...`);
+    try {
+      const dalleResponse = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: enhancedPrompt,
+        n: 1,
+        size: "1024x1024", // Generate at high res, then downscale
+        quality: "standard",
+        response_format: "url",
+      });
 
-    if (!dalleResponse.data || dalleResponse.data.length === 0) {
-      throw new Error('No image generated by DALL-E 3');
-    }
-    
-    const imageUrl = dalleResponse.data[0]?.url;
-    if (!imageUrl) {
-      throw new Error('No image URL returned from DALL-E 3');
-    }
+      console.log(`🎉 [${requestId}] DALL-E 3 API call successful`);
+      console.log(`📊 [${requestId}] Response data length:`, dalleResponse.data?.length || 0);
 
-    console.log('✅ DALL-E 3 generation successful, processing for pixel art...');
+      if (!dalleResponse.data || dalleResponse.data.length === 0) {
+        throw new Error('No image generated by DALL-E 3');
+      }
+      
+      const imageUrl = dalleResponse.data[0]?.url;
+      if (!imageUrl) {
+        throw new Error('No image URL returned from DALL-E 3');
+      }
 
-    console.log('📥 Downloading generated image...');
-    // Download the generated image with timeout
-    const imageResponse = await fetch(imageUrl, {
-      signal: AbortSignal.timeout(30000) // 30 second timeout
-    });
-    
-    if (!imageResponse.ok) {
-      console.error(`❌ Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
-      throw new Error(`Failed to download generated image: ${imageResponse.statusText}`);
-    }
+      console.log(`✅ [${requestId}] DALL-E 3 generation successful, image URL received`);
+      console.log(`🔗 [${requestId}] Image URL: ${imageUrl.substring(0, 50)}...`);
 
-    console.log('✅ Image downloaded, converting to buffer...');
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    console.log(`📊 Image buffer size: ${imageBuffer.length} bytes`);
+      // Step 8: Download generated image
+      console.log(`📥 [${requestId}] Step 8: Downloading generated image...`);
+      const imageResponse = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      });
+      
+      if (!imageResponse.ok) {
+        console.error(`❌ [${requestId}] Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+        throw new Error(`Failed to download generated image: ${imageResponse.statusText}`);
+      }
 
-    console.log('🎨 Processing image for pixel art...');
-    // Process image for pixel art
-    const processed = await processImageForPixelArt(imageBuffer, width, height, {
-      colorCount,
-      method: 'median-cut',
-      enableDithering: false // Kids-friendly: no dithering by default
-    });
-    console.log('✅ Image processing completed');
+      console.log(`✅ [${requestId}] Image downloaded, converting to buffer...`);
+      const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      console.log(`📊 [${requestId}] Image buffer size: ${imageBuffer.length} bytes`);
+
+      // Step 9: Process image for pixel art conversion
+      console.log(`🎨 [${requestId}] Step 9: Processing image for pixel art...`);
+      console.log(`⚙️ [${requestId}] Processing parameters:`, { targetWidth: width, targetHeight: height, colorCount, method: 'median-cut', dithering: false });
+      
+      const processed = await processImageForPixelArt(imageBuffer, width, height, {
+        colorCount,
+        method: 'median-cut',
+        enableDithering: false // Kids-friendly: no dithering by default
+      });
+      console.log(`✅ [${requestId}] Image processing completed successfully`);
+      console.log(`📊 [${requestId}] Processed result:`, { 
+        width: processed.width, 
+        height: processed.height, 
+        colorCount: processed.colorCount,
+        paletteLength: processed.palette?.length || 0
+      });
 
     // Convert to base64 data URL
     const base64Image = `data:image/png;base64,${processed.buffer.toString('base64')}`;
@@ -234,62 +269,66 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const totalTime = Date.now() - startTime;
     
+    const errorInfo = getErrorInfo(error);
+    console.error(`❌ [${requestId}] Generation failed after ${totalTime}ms:`, {
+      error: errorInfo.message,
+      errorName: errorInfo.name,
+      stack: errorInfo.stack
+    });
+    
     logApiRequest(request, '/ai/generate', startTime, false, {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorInfo.message,
+      errorName: errorInfo.name,
       totalTime: `${totalTime}ms`
     });
 
-    // Handle specific OpenAI API errors
-    if (error instanceof Error) {
-      if (error.message.includes('insufficient_quota')) {
-        return createErrorResponse(
-          'AI service quota exceeded',
-          'AI_QUOTA_EXCEEDED',
-          503
-        );
-      }
-      
-      if (error.message.includes('rate_limit_exceeded')) {
-        return createErrorResponse(
-          'AI service rate limit exceeded - please try again later',
-          'AI_RATE_LIMIT',
-          429
-        );
-      }
-      
-      if (error.message.includes('content_policy_violation')) {
-        return createErrorResponse(
-          'Content policy violation - please try a different prompt',
-          'CONTENT_POLICY_VIOLATION',
-          400
-        );
-      }
-      
-      if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
-        return createErrorResponse(
-          'Generation timeout - please try with a simpler prompt',
-          'TIMEOUT_ERROR',
-          408
-        );
-      }
-      
-      if (error.message.includes('OpenAI') || error.message.includes('API')) {
-        return createErrorResponse(
-          'AI service temporarily unavailable',
-          'AI_SERVICE_ERROR',
-          503
-        );
-      }
+    // Handle specific OpenAI API errors using safe error info
+    const errorMessage = errorInfo.message.toLowerCase();
+    console.log(`🔍 [${requestId}] Analyzing error message: "${errorMessage.substring(0, 100)}..."`);
+    
+    if (errorMessage.includes('insufficient_quota')) {
+      return createErrorResponse(
+        'AI service quota exceeded',
+        'AI_QUOTA_EXCEEDED',
+        503
+      );
+    }
+    
+    if (errorMessage.includes('rate_limit_exceeded')) {
+      return createErrorResponse(
+        'AI service rate limit exceeded - please try again later',
+        'AI_RATE_LIMIT',
+        429
+      );
+    }
+    
+    if (errorMessage.includes('content_policy_violation')) {
+      return createErrorResponse(
+        'Content policy violation - please try a different prompt',
+        'CONTENT_POLICY_VIOLATION',
+        400
+      );
+    }
+    
+    if (errorMessage.includes('timeout') || errorMessage.includes('etimedout')) {
+      return createErrorResponse(
+        'Generation timeout - please try with a simpler prompt',
+        'TIMEOUT_ERROR',
+        408
+      );
+    }
+    
+    if (errorMessage.includes('openai') || errorMessage.includes('api')) {
+      return createErrorResponse(
+        'AI service temporarily unavailable',
+        'AI_SERVICE_ERROR',
+        503
+      );
     }
 
     // Generic error response with security consideration (no internal details exposed)
     // But log detailed error for debugging
-    console.error('❌ Detailed error information:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause
-    });
+    console.error('❌ Detailed error information:', errorInfo);
     
     return createErrorResponse(
       'Image generation failed. Check server logs for details.',
