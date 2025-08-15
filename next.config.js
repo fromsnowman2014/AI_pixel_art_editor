@@ -53,29 +53,13 @@ const nextConfig = {
     AI_MAX_IMAGE_SIZE: process.env.AI_MAX_IMAGE_SIZE || '512',
     AI_DEFAULT_COLOR_COUNT: process.env.AI_DEFAULT_COLOR_COUNT || '24',
     // Force rebuild trigger
-    BUILD_TIMESTAMP: Date.now().toString(),
+    BUILD_TIMESTAMP: '1723753200000',
   },
 
   // Headers for CORS and security
   async headers() {
     return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'development' ? '*' : 'https://ai-pixel-art-editor.vercel.app',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization',
-          },
-        ],
-      },
+      // Remove API CORS headers - handled by api-middleware.ts instead
       {
         // Enable SharedArrayBuffer for WebAssembly
         source: '/(.*)',
