@@ -262,32 +262,43 @@ export async function processImageForPixelArt(
     console.log(`🎨 Starting image processing: ${targetWidth}x${targetHeight}, ${options.colorCount} colors`);
     console.log(`📊 Input buffer size: ${inputBuffer.length} bytes`);
 
-    // Step 1: Resize with nearest neighbor (pixel perfect)
-    const resizedBuffer = await sharp(inputBuffer)
+    // Step 1: Force RGBA conversion using PNG intermediate (Railway-compatible)
+    console.log(`🔧 Converting to RGBA using PNG intermediate for Railway compatibility...`);
+    
+    const rgbaBuffer = await sharp(inputBuffer)
       .resize(targetWidth, targetHeight, {
         kernel: sharp.kernel.nearest, // Pixel perfect scaling
         fit: 'fill' // Stretch to exact dimensions
       })
-      .raw() // Get raw pixel data
+      .png() // Convert to PNG (always RGBA)
+      .toBuffer();
+
+    // Step 2: Extract raw RGBA data from PNG
+    const rawRgbaResult = await sharp(rgbaBuffer)
+      .raw()
       .toBuffer({ resolveWithObject: true });
 
-    // Step 2: Handle RGB/RGBA conversion
-    const { data: imageData, info } = resizedBuffer;
+    const { data: imageData, info } = rawRgbaResult;
     
-    console.log(`📊 Resized image info:`, {
+    console.log(`📊 RGBA extraction info:`, {
       width: info.width,
       height: info.height,
       channels: info.channels,
       size: info.size,
       dataLength: imageData.length,
-      expectedSize: targetWidth * targetHeight * 4
+      expectedSize: targetWidth * targetHeight * 4,
+      actualChannels: info.channels || 'unknown'
     });
     
-    // Convert to RGBA format if needed
+    // Ensure we have RGBA data (should be 4 channels from PNG)
     let rgbaData: Uint8ClampedArray;
-    if (info.channels === 3) {
-      // Convert RGB to RGBA
-      console.log(`🔄 Converting RGB to RGBA...`);
+    if (info.channels === 4) {
+      // Perfect - already RGBA from PNG
+      rgbaData = imageData instanceof Uint8ClampedArray ? imageData : new Uint8ClampedArray(imageData);
+      console.log(`✅ PNG provided RGBA data correctly`);
+    } else if (info.channels === 3) {
+      // PNG somehow still RGB - manual conversion fallback
+      console.log(`⚠️ PNG unexpectedly RGB, applying manual conversion...`);
       rgbaData = new Uint8ClampedArray(targetWidth * targetHeight * 4);
       for (let i = 0, j = 0; i < imageData.length; i += 3, j += 4) {
         rgbaData[j] = imageData[i] ?? 0;     // R
@@ -295,11 +306,8 @@ export async function processImageForPixelArt(
         rgbaData[j + 2] = imageData[i + 2] ?? 0; // B
         rgbaData[j + 3] = 255;               // A (fully opaque)
       }
-    } else if (info.channels === 4) {
-      // Already RGBA
-      rgbaData = imageData instanceof Uint8ClampedArray ? imageData : new Uint8ClampedArray(imageData);
     } else {
-      throw new Error(`Unsupported channel count: ${info.channels}`);
+      throw new Error(`Unexpected channel count from PNG: ${info.channels}. Expected 4 (RGBA) or 3 (RGB).`);
     }
     
     console.log(`✅ RGBA conversion complete. Final data length: ${rgbaData.length}`);
