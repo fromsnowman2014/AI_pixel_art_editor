@@ -62,7 +62,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'development' ? '*' : 'https://aipixelarteditor-production.up.railway.app',
+            value: process.env.NODE_ENV === 'development' ? '*' : 'https://ai-pixel-art-editor.vercel.app',
           },
           {
             key: 'Access-Control-Allow-Methods',
