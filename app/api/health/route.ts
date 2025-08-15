@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { CORS_HEADERS } from '@/lib/utils/api-middleware';
 
 export interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';
@@ -114,6 +115,7 @@ export async function GET() {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
+        ...CORS_HEADERS,
       },
     });
 
@@ -140,6 +142,7 @@ export async function GET() {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
+        ...CORS_HEADERS,
       },
     });
   }
@@ -156,6 +159,18 @@ export async function HEAD() {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+// Support OPTIONS for CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      ...CORS_HEADERS,
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
     },
   });
 }

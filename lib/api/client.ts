@@ -86,10 +86,28 @@ class ApiClient {
         
         console.error(`❌ API Error: ${method} ${url}`, error);
 
-        // Handle network errors
+        // Handle network and CORS errors
         if (error.code === 'ERR_NETWORK') {
-          console.error('🚫 Network Error - check if development server is running');
-          throw new ApiError('NETWORK_ERROR', 'Unable to connect to API. Check if the server is running.', 0);
+          // Check if it's a CORS error by examining the error message
+          const errorMsg = error.message?.toLowerCase() || '';
+          if (errorMsg.includes('cors') || errorMsg.includes('access-control')) {
+            console.error('🚫 CORS Error - cross-origin request blocked:', error);
+            console.error('🔧 Debug info:', {
+              currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+              targetURL: API_BASE_URL,
+              errorMessage: error.message
+            });
+            throw new ApiError('CORS_ERROR', 'Cross-origin request blocked. Check CORS configuration.', 0);
+          } else {
+            console.error('🚫 Network Error - check if development server is running');
+            console.error('🔧 Debug info:', {
+              baseURL: API_BASE_URL,
+              requestURL: error.config?.url,
+              method: error.config?.method,
+              errorCode: error.code
+            });
+            throw new ApiError('NETWORK_ERROR', 'Unable to connect to API. Check if the server is running.', 0);
+          }
         }
         
         if (error.response?.data) {
@@ -107,8 +125,20 @@ class ApiClient {
 
   // Health Check
   async healthCheck(): Promise<HealthCheckResponse> {
-    const response = await this.client.get<HealthCheckResponse>('/health')
-    return response.data
+    console.log('🏥 Health check starting:', {
+      baseURL: API_BASE_URL,
+      fullURL: `${API_BASE_URL}/health`,
+      origin: typeof window !== 'undefined' ? window.location.origin : 'server-side'
+    });
+    
+    try {
+      const response = await this.client.get<HealthCheckResponse>('/health')
+      console.log('✅ Health check successful:', response.data);
+      return response.data
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      throw error;
+    }
   }
 
   // Projects API
