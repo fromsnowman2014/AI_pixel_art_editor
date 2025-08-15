@@ -177,15 +177,28 @@ export async function POST(request: NextRequest) {
 
     // Step 7: Generate image with DALL-E 3
     console.log(`🎨 [${requestId}] Step 7: Calling DALL-E 3 API...`);
+    console.log(`⚙️ [${requestId}] OpenAI configuration:`, { 
+      modelUsed: "dall-e-3",
+      promptLength: enhancedPrompt.length,
+      targetSize: "1024x1024",
+      timeout: "30s"
+    });
+    
     try {
-      const dalleResponse = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: enhancedPrompt,
-        n: 1,
-        size: "1024x1024", // Generate at high res, then downscale
-        quality: "standard",
-        response_format: "url",
-      });
+      // Add timeout wrapper for OpenAI API call
+      const dalleResponse = await Promise.race([
+        openai.images.generate({
+          model: "dall-e-3",
+          prompt: enhancedPrompt,
+          n: 1,
+          size: "1024x1024", // Generate at high res, then downscale
+          quality: "standard",
+          response_format: "url",
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('OpenAI API call timed out after 30 seconds')), 30000)
+        )
+      ]) as any;
 
       console.log(`🎉 [${requestId}] DALL-E 3 API call successful`);
       console.log(`📊 [${requestId}] Response data length:`, dalleResponse.data?.length || 0);
@@ -326,14 +339,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generic error response with security consideration (no internal details exposed)
-    // But log detailed error for debugging
-    console.error('❌ Detailed error information:', errorInfo);
+    // Enhanced error response with better debugging information
+    console.error(`❌ [${requestId}] Detailed error information:`, errorInfo);
+    
+    // Return more specific error message to help with debugging
+    const debugMessage = errorMessage.includes('openai') || errorMessage.includes('api') ? 
+      `OpenAI API error: ${errorInfo.message}` :
+      errorMessage.includes('fetch') || errorMessage.includes('network') ?
+      `Network error during image processing: ${errorInfo.message}` :
+      `Image generation failed: ${errorInfo.message}`;
     
     return createErrorResponse(
-      'Image generation failed. Check server logs for details.',
+      debugMessage,
       'GENERATION_ERROR',
-      500
+      500,
+      { 'X-Request-ID': requestId }
     );
   }
 }
