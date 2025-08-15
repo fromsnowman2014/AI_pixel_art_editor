@@ -1,0 +1,139 @@
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { CORS_HEADERS } from '@/lib/utils/api-middleware';
+
+/**
+ * DALL-E 2 Test API
+ * GET /api/test-dalle2
+ * 
+ * Tests DALL-E 2 image generation (faster than DALL-E 3)
+ * Used for systematic OpenAI API debugging
+ */
+export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  const requestId = crypto.randomUUID();
+  
+  console.log(`🎨 [${requestId}] DALL-E 2 test started at ${new Date().toISOString()}`);
+
+  try {
+    // Direct environment check without complex validation
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      console.log(`❌ [${requestId}] No OpenAI API key found`);
+      return NextResponse.json({
+        success: false,
+        error: {
+          message: 'OpenAI API key not found',
+          code: 'NO_API_KEY'
+        }
+      }, {
+        status: 503,
+        headers: CORS_HEADERS
+      });
+    }
+
+    if (!apiKey.startsWith('sk-')) {
+      console.log(`❌ [${requestId}] Invalid OpenAI API key format`);
+      return NextResponse.json({
+        success: false,
+        error: {
+          message: 'Invalid OpenAI API key format',
+          code: 'INVALID_API_KEY'
+        }
+      }, {
+        status: 503,
+        headers: CORS_HEADERS
+      });
+    }
+
+    console.log(`🔑 [${requestId}] OpenAI API key found (length: ${apiKey.length})`);
+
+    // Initialize OpenAI client
+    const openai = new OpenAI({ 
+      apiKey: apiKey,
+      timeout: 120000 // 2 minute timeout for image generation
+    });
+
+    console.log(`🎨 [${requestId}] OpenAI client initialized, testing DALL-E 2...`);
+
+    // Test with DALL-E 2 (faster and more stable than DALL-E 3)
+    const testPrompt = "a simple red pixel art character, 8-bit style, clean white background";
+    
+    console.log(`📝 [${requestId}] Generating image with prompt: "${testPrompt}"`);
+    
+    const imageResponse = await openai.images.generate({
+      model: "dall-e-2",
+      prompt: testPrompt,
+      n: 1,
+      size: "256x256", // Smaller size for faster generation
+      response_format: "url",
+    });
+
+    const imageUrl = imageResponse.data[0]?.url;
+    const totalTime = Date.now() - startTime;
+
+    if (!imageUrl) {
+      throw new Error('No image URL returned from DALL-E 2');
+    }
+
+    console.log(`✅ [${requestId}] DALL-E 2 test successful in ${totalTime}ms`);
+    console.log(`🔗 [${requestId}] Image URL: ${imageUrl.substring(0, 50)}...`);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        requestId,
+        model: "dall-e-2",
+        imageUrl: imageUrl,
+        prompt: testPrompt,
+        size: "256x256",
+        processingTimeMs: totalTime,
+        apiKeyLength: apiKey.length,
+        testType: "image generation"
+      }
+    }, {
+      status: 200,
+      headers: CORS_HEADERS
+    });
+
+  } catch (error) {
+    const totalTime = Date.now() - startTime;
+    console.error(`❌ [${requestId}] DALL-E 2 test failed after ${totalTime}ms:`, error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Enhanced error analysis
+    let errorCode = 'DALLE2_TEST_ERROR';
+    if (errorMessage.toLowerCase().includes('quota')) {
+      errorCode = 'QUOTA_EXCEEDED';
+    } else if (errorMessage.toLowerCase().includes('rate')) {
+      errorCode = 'RATE_LIMIT';
+    } else if (errorMessage.toLowerCase().includes('timeout')) {
+      errorCode = 'TIMEOUT';
+    } else if (errorMessage.toLowerCase().includes('content')) {
+      errorCode = 'CONTENT_POLICY';
+    }
+    
+    return NextResponse.json({
+      success: false,
+      error: {
+        message: errorMessage,
+        code: errorCode,
+        processingTimeMs: totalTime,
+        requestId
+      }
+    }, {
+      status: 500,
+      headers: CORS_HEADERS
+    });
+  }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: CORS_HEADERS
+  });
+}
