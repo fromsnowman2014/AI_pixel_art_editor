@@ -267,6 +267,7 @@ export async function processImageForPixelArt(
         kernel: sharp.kernel.nearest, // Pixel perfect scaling
         fit: 'fill' // Stretch to exact dimensions
       })
+      .ensureAlpha() // Ensure RGBA format (4 channels)
       .raw() // Get raw pixel data
       .toBuffer({ resolveWithObject: true });
 
