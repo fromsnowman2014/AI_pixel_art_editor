@@ -256,14 +256,36 @@ export const SECURITY_HEADERS = {
 } as const;
 
 /**
+ * Dynamic CORS headers for API responses
+ */
+function getCorsHeaders(): Record<string, string> {
+  // In production, allow specific origins
+  let allowedOrigin = '*';
+  
+  if (process.env.NODE_ENV === 'production') {
+    // Allow Vercel frontend domain in production
+    allowedOrigin = 'https://ai-pixel-art-editor.vercel.app';
+    
+    // Check for custom environment variable
+    if (process.env.CORS_ALLOWED_ORIGIN) {
+      allowedOrigin = process.env.CORS_ALLOWED_ORIGIN;
+    }
+  }
+  
+  console.log(`🌐 CORS Origin set to: ${allowedOrigin}`);
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-Bypass-Processing',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+/**
  * CORS headers for API responses
  */
-export const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-  'Access-Control-Max-Age': '86400',
-} as const;
+export const CORS_HEADERS = getCorsHeaders();
 
 /**
  * Check if AI services are available

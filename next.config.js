@@ -52,6 +52,8 @@ const nextConfig = {
     CANVAS_DEFAULT_SIZE: process.env.CANVAS_DEFAULT_SIZE || '32',
     AI_MAX_IMAGE_SIZE: process.env.AI_MAX_IMAGE_SIZE || '512',
     AI_DEFAULT_COLOR_COUNT: process.env.AI_DEFAULT_COLOR_COUNT || '24',
+    // Force rebuild trigger
+    BUILD_TIMESTAMP: Date.now().toString(),
   },
 
   // Headers for CORS and security
