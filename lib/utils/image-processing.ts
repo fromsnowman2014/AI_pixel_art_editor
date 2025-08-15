@@ -268,11 +268,10 @@ export async function processImageForPixelArt(
         kernel: sharp.kernel.nearest, // Pixel perfect scaling
         fit: 'fill' // Stretch to exact dimensions
       })
-      .ensureAlpha() // Ensure RGBA format (4 channels)
       .raw() // Get raw pixel data
       .toBuffer({ resolveWithObject: true });
 
-    // Step 2: Apply color quantization
+    // Step 2: Handle RGB/RGBA conversion
     const { data: imageData, info } = resizedBuffer;
     
     console.log(`📊 Resized image info:`, {
@@ -284,16 +283,34 @@ export async function processImageForPixelArt(
       expectedSize: targetWidth * targetHeight * 4
     });
     
-    // Convert Buffer to Uint8ClampedArray if needed
-    const pixelData = imageData instanceof Uint8ClampedArray ? imageData : new Uint8ClampedArray(imageData);
+    // Convert to RGBA format if needed
+    let rgbaData: Uint8ClampedArray;
+    if (info.channels === 3) {
+      // Convert RGB to RGBA
+      console.log(`🔄 Converting RGB to RGBA...`);
+      rgbaData = new Uint8ClampedArray(targetWidth * targetHeight * 4);
+      for (let i = 0, j = 0; i < imageData.length; i += 3, j += 4) {
+        rgbaData[j] = imageData[i] ?? 0;     // R
+        rgbaData[j + 1] = imageData[i + 1] ?? 0; // G
+        rgbaData[j + 2] = imageData[i + 2] ?? 0; // B
+        rgbaData[j + 3] = 255;               // A (fully opaque)
+      }
+    } else if (info.channels === 4) {
+      // Already RGBA
+      rgbaData = imageData instanceof Uint8ClampedArray ? imageData : new Uint8ClampedArray(imageData);
+    } else {
+      throw new Error(`Unsupported channel count: ${info.channels}`);
+    }
     
-    const quantizer = new MedianCutQuantizer(pixelData, info.width, info.height);
+    console.log(`✅ RGBA conversion complete. Final data length: ${rgbaData.length}`);
+    
+    const quantizer = new MedianCutQuantizer(rgbaData, targetWidth, targetHeight);
     const palette = quantizer.quantize(options.colorCount);
 
     console.log(`🎯 Generated palette with ${palette.length} colors`);
 
     // Step 3: Apply quantization to image
-    const quantizedData = applyQuantization(pixelData, info.width, info.height, palette);
+    const quantizedData = applyQuantization(rgbaData, targetWidth, targetHeight, palette);
 
     // Step 4: Convert back to PNG buffer
     console.log(`📊 Quantized data length: ${quantizedData.length}, expected: ${targetWidth * targetHeight * 4}`);
