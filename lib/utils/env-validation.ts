@@ -25,15 +25,15 @@ const envSchema = z.object({
   // Rate limiting
   RATE_LIMIT_AI_REQUESTS_PER_HOUR: z.string().optional().transform(val => parseInt(val || '60') || 60),
   
-  // AI configuration
-  AI_MAX_IMAGE_SIZE: z.string().transform(val => parseInt(val) || 512),
-  AI_DEFAULT_COLOR_COUNT: z.string().transform(val => parseInt(val) || 24),
-  AI_GENERATION_TIMEOUT: z.string().transform(val => parseInt(val) || 30000),
+  // AI configuration (optional with defaults)
+  AI_MAX_IMAGE_SIZE: z.string().optional().transform(val => parseInt(val || '512') || 512),
+  AI_DEFAULT_COLOR_COUNT: z.string().optional().transform(val => parseInt(val || '24') || 24),
+  AI_GENERATION_TIMEOUT: z.string().optional().transform(val => parseInt(val || '30000') || 30000),
   
-  // Canvas configuration
-  CANVAS_MAX_ZOOM: z.string().transform(val => parseInt(val) || 1600),
-  CANVAS_MIN_ZOOM: z.string().transform(val => parseInt(val) || 50),
-  CANVAS_DEFAULT_SIZE: z.string().transform(val => parseInt(val) || 32),
+  // Canvas configuration (optional with defaults)
+  CANVAS_MAX_ZOOM: z.string().optional().transform(val => parseInt(val || '1600') || 1600),
+  CANVAS_MIN_ZOOM: z.string().optional().transform(val => parseInt(val || '50') || 50),
+  CANVAS_DEFAULT_SIZE: z.string().optional().transform(val => parseInt(val || '32') || 32),
 });
 
 export type Env = z.infer<typeof envSchema>;
