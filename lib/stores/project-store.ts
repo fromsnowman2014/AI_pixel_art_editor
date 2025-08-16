@@ -176,7 +176,6 @@ const createDefaultProject = (options?: {
   height: options?.height || 32,
   colorLimit: options?.colorLimit || 24,
   palette: generatePalette(options?.colorLimit || 24),
-  mode: 'beginner',
   frames: [],
   activeFrameId: null,
 })
@@ -270,7 +269,7 @@ export const useProjectStore = create<ProjectStore>()(
             
             // Get current user from auth store
             const authState = useAuthStore.getState()
-            const userId = authState.user?.type === 'authenticated' ? authState.user.id : null
+            const userId = authState.user?.id || null
             
             const project: Project = {
               id: projectId,

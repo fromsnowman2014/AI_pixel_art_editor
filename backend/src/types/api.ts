@@ -41,21 +41,17 @@ export const AIGenerationResponseSchema = z.object({
 });
 
 // Project Types
-export const ProjectModeSchema = z.enum(['beginner', 'advanced']);
-
 export const CreateProjectRequestSchema = z.object({
   name: z.string().min(1).max(100),
   width: z.number().min(8).max(1024),
   height: z.number().min(8).max(1024),
   colorLimit: z.number().min(2).max(256),
   palette: z.array(z.string().regex(/^#[0-9A-Fa-f]{6}$/)).max(256),
-  mode: ProjectModeSchema.default('beginner'),
 });
 
 export const UpdateProjectRequestSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   palette: z.array(z.string().regex(/^#[0-9A-Fa-f]{6}$/)).max(256).optional(),
-  mode: ProjectModeSchema.optional(),
   activeFrameId: z.string().uuid().optional(),
 });
 
@@ -67,7 +63,6 @@ export const ProjectResponseSchema = z.object({
   height: z.number(),
   colorLimit: z.number(),
   palette: z.array(z.string()),
-  mode: ProjectModeSchema,
   frames: z.array(z.string().uuid()),
   activeFrameId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),

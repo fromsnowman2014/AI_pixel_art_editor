@@ -10,36 +10,19 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onSettingsClick }: AppHeaderProps) {
-  const { userMode, user, reset } = useAuthStore()
+  const { user } = useAuthStore()
 
-  const handleChangeMode = () => {
-    if (confirm('Changing modes will refresh the app and may lose unsaved work. Continue?')) {
-      reset()
-      window.location.reload()
-    }
+  // Simplified local mode configuration
+  const config = {
+    icon: Shield,
+    label: 'Local Mode',
+    description: 'Safe & Private - All data stays on your device',
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200'
   }
 
-  const modeConfig = {
-    anonymous: {
-      icon: Shield,
-      label: 'Local Mode',
-      description: 'Safe & Private - No data saved online',
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200'
-    },
-    parent: {
-      icon: Users,
-      label: 'Cloud Mode',
-      description: 'Parent/Teacher - Full features with cloud sync',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200'
-    }
-  }
-
-  const config = userMode ? modeConfig[userMode] : null
-  const IconComponent = config?.icon
+  const IconComponent = config.icon
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
@@ -73,15 +56,6 @@ export function AppHeader({ onSettingsClick }: AppHeaderProps) {
               </div>
             )}
 
-            {/* Change Mode Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleChangeMode}
-              className="text-xs"
-            >
-              Change Mode
-            </Button>
           </div>
         )}
 

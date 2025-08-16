@@ -8,15 +8,12 @@ import { ExportModal } from '@/components/export-modal';
 import { api } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { debugLog } from '@/lib/utils/debug';
-import type { ProjectMode } from '@/lib/types/api';
+import { generateGuidedPrompt, type GuidedPromptOptions } from '@/lib/utils/prompt-enhancer';
 import {
   Settings,
   Download,
   Upload,
   Sparkles,
-  Image,
-  Layers,
-  Grid,
   AlertTriangle,
   Save,
   Trash2,
@@ -66,8 +63,15 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  // AI Guided Prompt Options State
+  const [guidedOptions, setGuidedOptions] = useState({
+    background: 'transparent' as 'transparent' | 'included',
+    characterType: 'game' as 'game' | 'profile', 
+    artStyle: 'simple' as 'simple' | 'detailed',
+    colorTone: 'bright' as 'bright' | 'dark'
+  });
 
   const activeTab = getActiveTab();
   const project = activeTab?.project;
@@ -116,11 +120,6 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
     updateProject(activeTabId, { colorLimit: validatedColorLimit });
   }, [activeTabId, updateProject]);
 
-  const handleModeChange = useCallback((mode: ProjectMode) => {
-    if (activeTabId) {
-      updateProject(activeTabId, { mode });
-    }
-  }, [activeTabId, updateProject]);
 
   // Check if canvas has any content
   const isCanvasEmpty = useCallback(() => {
@@ -292,6 +291,55 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
     }
     setShowResizeConfirm(false);
   }, [project]);
+
+  // Toggle option handler
+  const handleGuidedOptionChange = useCallback((category: keyof typeof guidedOptions, value: any) => {
+    setGuidedOptions(prev => ({
+      ...prev,
+      [category]: value
+    }));
+  }, []);
+
+  // Toggle Switch Component
+  const ToggleSwitch = ({ label, emoji, leftOption, rightOption, value, onChange }: {
+    label: string;
+    emoji: string;
+    leftOption: { key: string; label: string };
+    rightOption: { key: string; label: string };
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <div className='space-y-2'>
+      <div className='flex items-center space-x-2 text-sm font-medium text-gray-700'>
+        <span>{emoji}</span>
+        <span>{label}</span>
+      </div>
+      <div className='flex rounded-lg border border-gray-200 bg-gray-50 p-1'>
+        <button
+          type='button'
+          onClick={() => onChange(leftOption.key)}
+          className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-all ${
+            value === leftOption.key
+              ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-200'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          {leftOption.label}
+        </button>
+        <button
+          type='button'
+          onClick={() => onChange(rightOption.key)}
+          className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-all ${
+            value === rightOption.key
+              ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-200'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          {rightOption.label}
+        </button>
+      </div>
+    </div>
+  );
 
   // Helper function to load image into canvas
   const loadImageToCanvas = useCallback(async (imageUrl: string) => {
@@ -504,14 +552,46 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
       debugLog('🎛️  ProjectPanel', 'AI_HEALTH_SUCCESS', 'Health check passed');
 
-      // Step 2: Generate AI image
+      // Step 2: Apply guided prompt enhancement
+      debugLog(
+        '🎛️  ProjectPanel',
+        'AI_GUIDED_PROMPT',
+        'Applying guided prompt options',
+        { guidedOptions }
+      );
+
+      const guidedPromptResult = generateGuidedPrompt(
+        trimmedPrompt,
+        guidedOptions,
+        {
+          mode: 'text-to-image' as const,
+          style: 'pixel-art' as const,
+          enforceTransparency: guidedOptions.background === 'transparent',
+          canvasAnalysis: undefined
+        }
+      );
+
+      debugLog(
+        '🎛️  ProjectPanel',
+        'AI_GUIDED_PROMPT_RESULT',
+        'Generated enhanced prompt',
+        {
+          originalPrompt: trimmedPrompt,
+          guidedPrompt: guidedPromptResult.guidedPrompt,
+          finalPrompt: guidedPromptResult.finalPrompt,
+          appliedOptions: guidedPromptResult.appliedGuidedOptions,
+          confidence: guidedPromptResult.confidence
+        }
+      );
+
+      // Step 3: Generate AI image with enhanced prompt
       debugLog(
         '🎛️  ProjectPanel',
         'AI_GENERATE_REQUEST',
-        'Making generation request'
+        'Making generation request with enhanced prompt'
       );
       const result = await api.ai.generate({
-        prompt: aiPrompt,
+        prompt: guidedPromptResult.finalPrompt,
         mode: 'new',
         width: project.width,
         height: project.height,
@@ -535,10 +615,14 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
       // Step 3: Load generated image into canvas
       await loadImageToCanvas(result.pngUrl);
 
-      // Step 4: Clear prompt and show success
+      // Step 4: Clear prompt and show success with guided options info
       setAiPrompt('');
+      const appliedOptionsText = guidedPromptResult.appliedGuidedOptions.join(', ');
       toast.success(
-        `AI image generated! Used ${result.colorCount} colors in ${Math.round(result.processingTimeMs / 1000)}s`
+        `✨ AI 이미지 생성 완료! 
+        🎨 적용된 옵션: ${appliedOptionsText}
+        📊 ${result.colorCount}개 색상, ${Math.round(result.processingTimeMs / 1000)}초`,
+        { duration: 4000 }
       );
     } catch (error: any) {
       debugLog(
@@ -696,29 +780,6 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
             </div>
           </div>
 
-          <div>
-            <label className='mb-2 block text-sm font-medium text-gray-700'>
-              Mode
-            </label>
-            <div className='flex space-x-2'>
-              <Button
-                variant={project.mode === 'beginner' ? 'default' : 'outline'}
-                size='sm'
-                onClick={() => handleModeChange('beginner')}
-                className='flex-1'
-              >
-                Beginner
-              </Button>
-              <Button
-                variant={project.mode === 'advanced' ? 'default' : 'outline'}
-                size='sm'
-                onClick={() => handleModeChange('advanced')}
-                className='flex-1'
-              >
-                Advanced
-              </Button>
-            </div>
-          </div>
         </div>
 
         {/* AI Generation */}
@@ -754,6 +815,51 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
               {aiPrompt.length}/{AI_PROMPT_LIMITS.MAX_LENGTH} characters
             </div>
 
+            {/* Guided Prompt Options */}
+            <div className='space-y-4 rounded-lg border border-purple-200 bg-purple-50 p-4'>
+              <div className='flex items-center space-x-2'>
+                <span className='text-sm font-semibold text-purple-800'>✨ Quick Style Options</span>
+              </div>
+              
+              <div className='grid grid-cols-1 gap-4'>
+                <ToggleSwitch
+                  label='배경'
+                  emoji='🖼️'
+                  leftOption={{ key: 'transparent', label: '투명' }}
+                  rightOption={{ key: 'included', label: '포함' }}
+                  value={guidedOptions.background}
+                  onChange={(value) => handleGuidedOptionChange('background', value)}
+                />
+                
+                <ToggleSwitch
+                  label='캐릭터 타입'
+                  emoji='👤'
+                  leftOption={{ key: 'game', label: '게임캐릭터' }}
+                  rightOption={{ key: 'profile', label: '프로필' }}
+                  value={guidedOptions.characterType}
+                  onChange={(value) => handleGuidedOptionChange('characterType', value)}
+                />
+                
+                <ToggleSwitch
+                  label='아트 스타일'
+                  emoji='🎨'
+                  leftOption={{ key: 'simple', label: '단순' }}
+                  rightOption={{ key: 'detailed', label: '상세' }}
+                  value={guidedOptions.artStyle}
+                  onChange={(value) => handleGuidedOptionChange('artStyle', value)}
+                />
+                
+                <ToggleSwitch
+                  label='색상 톤'
+                  emoji='🌈'
+                  leftOption={{ key: 'bright', label: '밝음' }}
+                  rightOption={{ key: 'dark', label: '어둠' }}
+                  value={guidedOptions.colorTone}
+                  onChange={(value) => handleGuidedOptionChange('colorTone', value)}
+                />
+              </div>
+            </div>
+
             <Button
               onClick={handleAiGenerate}
               disabled={!aiPrompt.trim() || isGenerating}
@@ -781,49 +887,16 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
           </div>
 
           <div className='mt-3 rounded-lg bg-purple-50 p-3 text-xs text-purple-700'>
-            🎨 <strong>AI Tips:</strong>
+            💡 <strong>Smart AI Tips:</strong>
             <ul className='mt-1 list-inside list-disc space-y-1'>
-              <li>Be specific about style and colors</li>
-              <li>Mention if you want simple or detailed</li>
-              <li>Add mood keywords like "happy", "dark", "cute"</li>
+              <li>프롬프트에 구체적인 설명을 추가하세요</li>
+              <li>위의 Quick Options으로 원하는 스타일을 선택하세요</li>
+              <li>"귀여운", "용감한", "마법같은" 등의 감정 키워드를 사용하세요</li>
+              <li>AI가 자동으로 픽셀 아트에 최적화된 프롬프트를 생성합니다</li>
             </ul>
           </div>
         </section>
 
-        {/* Advanced Settings */}
-        <div className='border-t border-gray-200 p-4'>
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-            className='mb-3 w-full justify-between'
-          >
-            Advanced Settings
-            <Settings className='h-4 w-4' />
-          </Button>
-
-          {showAdvancedSettings && (
-            <div className='space-y-3 text-sm'>
-              <div className='flex items-center space-x-2'>
-                <Grid className='h-4 w-4 text-gray-500' />
-                <span>Grid visible</span>
-                <input type='checkbox' className='ml-auto' defaultChecked />
-              </div>
-
-              <div className='flex items-center space-x-2'>
-                <Layers className='h-4 w-4 text-gray-500' />
-                <span>Layer mode</span>
-                <input type='checkbox' className='ml-auto' />
-              </div>
-
-              <div className='flex items-center space-x-2'>
-                <Image className='h-4 w-4 text-gray-500' />
-                <span>Auto-save</span>
-                <input type='checkbox' className='ml-auto' defaultChecked />
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Statistics */}
         <div className='border-t border-gray-200 p-4'>

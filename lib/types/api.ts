@@ -1,5 +1,4 @@
 // API Types matching backend schema
-export type ProjectMode = 'beginner' | 'advanced'
 export type AssetType = 'upload' | 'ai' | 'generated'
 
 // Project Types
@@ -11,7 +10,6 @@ export interface Project {
   height: number
   colorLimit: number
   palette: string[]
-  mode: ProjectMode
   frames: string[]
   activeFrameId: string | null
   createdAt: string
@@ -24,13 +22,11 @@ export interface CreateProjectRequest {
   height: number
   colorLimit: number
   palette: string[]
-  mode?: ProjectMode
 }
 
 export interface UpdateProjectRequest {
   name?: string
   palette?: string[]
-  mode?: ProjectMode
   activeFrameId?: string
 }
 

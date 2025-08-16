@@ -15,7 +15,6 @@ import {
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['parent', 'teacher']);
-export const projectModeEnum = pgEnum('project_mode', ['beginner', 'advanced']);
 export const assetTypeEnum = pgEnum('asset_type', ['upload', 'ai', 'generated']);
 
 // Users table (for parent/teacher accounts - COPPA compliant)
@@ -41,7 +40,6 @@ export const projects = pgTable('projects', {
   height: integer('height').notNull(),
   colorLimit: integer('color_limit').notNull(),
   palette: jsonb('palette').$type<string[]>().notNull(), // array of hex colors
-  mode: projectModeEnum('mode').notNull().default('beginner'),
   activeFrameId: uuid('active_frame_id'),
   isTemplate: boolean('is_template').notNull().default(false),
   templateCategory: varchar('template_category', { length: 50 }),

@@ -720,6 +720,147 @@ export function generateCompletePrompt(
   };
 }
 
+// Guided prompt option type definitions
+export interface GuidedPromptOptions {
+  background: 'transparent' | 'included';
+  characterType: 'game' | 'profile'; 
+  artStyle: 'simple' | 'detailed';
+  colorTone: 'bright' | 'dark';
+}
+
+/**
+ * Applies guided prompt options to enhance user input with specific style choices
+ */
+export function applyGuidedPromptOptions(
+  userPrompt: string,
+  guidedOptions: GuidedPromptOptions
+): {
+  enhancedPrompt: string;
+  appliedOptions: string[];
+  reasoning: string[];
+} {
+  const appliedOptions: string[] = [];
+  const reasoning: string[] = [];
+  let enhancedPrompt = userPrompt.trim();
+  
+  reasoning.push("🎯 Guided Prompt Enhancement:");
+  reasoning.push(`📝 User input: "${userPrompt}"`);
+  reasoning.push(`🎨 Selected options: ${JSON.stringify(guidedOptions)}`);
+  reasoning.push("");
+  
+  // Background setting
+  reasoning.push("🖼️ Background enhancement:");
+  if (guidedOptions.background === 'transparent') {
+    enhancedPrompt += ', transparent background, isolated subject, no background, sprite ready';
+    appliedOptions.push('투명 배경');
+    reasoning.push("+ Applied transparent background for sprite/character isolation");
+  } else {
+    enhancedPrompt += ', detailed background, complete scene, environmental setting';
+    appliedOptions.push('배경 포함');
+    reasoning.push("+ Applied background inclusion for complete scene");
+  }
+  
+  // Character type setting
+  reasoning.push("👤 Character type enhancement:");
+  if (guidedOptions.characterType === 'game') {
+    enhancedPrompt += ', game character sprite, video game character, RPG style character, retro game sprite';
+    appliedOptions.push('게임 캐릭터');
+    reasoning.push("+ Applied game character styling for retro gaming context");
+  } else {
+    enhancedPrompt += ', character portrait, profile view, personal avatar, character design';
+    appliedOptions.push('프로필 캐릭터');
+    reasoning.push("+ Applied profile character styling for personal representation");
+  }
+  
+  // Art style setting
+  reasoning.push("🎨 Art style enhancement:");
+  if (guidedOptions.artStyle === 'simple') {
+    enhancedPrompt += ', simple pixel art style, minimal detail, clean shapes, basic forms, easy to understand';
+    appliedOptions.push('단순한 스타일');
+    reasoning.push("+ Applied simple art style for clean, readable pixel art");
+  } else {
+    enhancedPrompt += ', detailed pixel art style, rich details, complex shading, intricate design, elaborate features';
+    appliedOptions.push('상세한 스타일');
+    reasoning.push("+ Applied detailed art style for complex, rich pixel art");
+  }
+  
+  // Color tone setting
+  reasoning.push("🌈 Color tone enhancement:");
+  if (guidedOptions.colorTone === 'bright') {
+    enhancedPrompt += ', bright vibrant colors, cheerful palette, happy colors, light and colorful, sunny atmosphere';
+    appliedOptions.push('밝은 색상');
+    reasoning.push("+ Applied bright color palette for cheerful, vibrant appearance");
+  } else {
+    enhancedPrompt += ', dark atmospheric colors, moody palette, deep colors, shadowy tones, dramatic atmosphere';
+    appliedOptions.push('어두운 색상');
+    reasoning.push("+ Applied dark color palette for moody, atmospheric appearance");
+  }
+  
+  // Add pixel art fundamentals
+  enhancedPrompt += ', pixel art style, crisp pixels, retro gaming style';
+  appliedOptions.push('픽셀 아트 기본');
+  reasoning.push("+ Added fundamental pixel art styling");
+  
+  // Cleanup
+  enhancedPrompt = enhancedPrompt
+    .replace(/,\s*,/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  reasoning.push("");
+  reasoning.push(`✨ Guided enhancement complete! Applied ${appliedOptions.length} options.`);
+  reasoning.push(`📊 Final prompt: "${enhancedPrompt}"`);
+  
+  return {
+    enhancedPrompt,
+    appliedOptions,
+    reasoning
+  };
+}
+
+/**
+ * Combined function that applies guided options and then enhances with existing logic
+ */
+export function generateGuidedPrompt(
+  userPrompt: string,
+  guidedOptions: GuidedPromptOptions,
+  enhancementOptions: PromptEnhancementOptions
+): {
+  finalPrompt: string;
+  originalPrompt: string;
+  guidedPrompt: string;
+  fullyEnhancedPrompt: string;
+  appliedGuidedOptions: string[];
+  enhancementChanges: string[];
+  confidence: number;
+  reasoning: string[];
+} {
+  // Step 1: Apply guided options
+  const guidedResult = applyGuidedPromptOptions(userPrompt, guidedOptions);
+  
+  // Step 2: Apply existing enhancement logic
+  const enhancementResult = enhancePrompt(guidedResult.enhancedPrompt, enhancementOptions);
+  
+  // Combine reasoning
+  const combinedReasoning = [
+    ...guidedResult.reasoning,
+    "",
+    "🔄 Applying additional AI enhancement...",
+    ...enhancementResult.reasoning
+  ];
+  
+  return {
+    finalPrompt: enhancementResult.enhancedPrompt,
+    originalPrompt: userPrompt,
+    guidedPrompt: guidedResult.enhancedPrompt,
+    fullyEnhancedPrompt: enhancementResult.enhancedPrompt,
+    appliedGuidedOptions: guidedResult.appliedOptions,
+    enhancementChanges: enhancementResult.changes,
+    confidence: enhancementResult.confidence,
+    reasoning: combinedReasoning
+  };
+}
+
 /**
  * Debug function to test prompt enhancement with CoT reasoning
  */
