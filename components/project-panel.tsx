@@ -619,9 +619,9 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
       setAiPrompt('');
       const appliedOptionsText = guidedPromptResult.appliedGuidedOptions.join(', ');
       toast.success(
-        `✨ AI 이미지 생성 완료! 
-        🎨 적용된 옵션: ${appliedOptionsText}
-        📊 ${result.colorCount}개 색상, ${Math.round(result.processingTimeMs / 1000)}초`,
+        `✨ AI Image Generated Successfully! 
+        🎨 Applied Options: ${appliedOptionsText}
+        📊 ${result.colorCount} colors, ${Math.round(result.processingTimeMs / 1000)}s`,
         { duration: 4000 }
       );
     } catch (error: any) {
@@ -823,37 +823,37 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
               
               <div className='grid grid-cols-1 gap-4'>
                 <ToggleSwitch
-                  label='배경'
+                  label='Background'
                   emoji='🖼️'
-                  leftOption={{ key: 'transparent', label: '투명' }}
-                  rightOption={{ key: 'included', label: '포함' }}
+                  leftOption={{ key: 'transparent', label: 'Transparent' }}
+                  rightOption={{ key: 'included', label: 'Included' }}
                   value={guidedOptions.background}
                   onChange={(value) => handleGuidedOptionChange('background', value)}
                 />
                 
                 <ToggleSwitch
-                  label='캐릭터 타입'
+                  label='Character Type'
                   emoji='👤'
-                  leftOption={{ key: 'game', label: '게임캐릭터' }}
-                  rightOption={{ key: 'profile', label: '프로필' }}
+                  leftOption={{ key: 'game', label: 'Game Character' }}
+                  rightOption={{ key: 'profile', label: 'Profile' }}
                   value={guidedOptions.characterType}
                   onChange={(value) => handleGuidedOptionChange('characterType', value)}
                 />
                 
                 <ToggleSwitch
-                  label='아트 스타일'
+                  label='Art Style'
                   emoji='🎨'
-                  leftOption={{ key: 'simple', label: '단순' }}
-                  rightOption={{ key: 'detailed', label: '상세' }}
+                  leftOption={{ key: 'simple', label: 'Simple' }}
+                  rightOption={{ key: 'detailed', label: 'Detailed' }}
                   value={guidedOptions.artStyle}
                   onChange={(value) => handleGuidedOptionChange('artStyle', value)}
                 />
                 
                 <ToggleSwitch
-                  label='색상 톤'
+                  label='Color Tone'
                   emoji='🌈'
-                  leftOption={{ key: 'bright', label: '밝음' }}
-                  rightOption={{ key: 'dark', label: '어둠' }}
+                  leftOption={{ key: 'bright', label: 'Bright' }}
+                  rightOption={{ key: 'dark', label: 'Dark' }}
                   value={guidedOptions.colorTone}
                   onChange={(value) => handleGuidedOptionChange('colorTone', value)}
                 />
@@ -889,10 +889,10 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
           <div className='mt-3 rounded-lg bg-purple-50 p-3 text-xs text-purple-700'>
             💡 <strong>Smart AI Tips:</strong>
             <ul className='mt-1 list-inside list-disc space-y-1'>
-              <li>프롬프트에 구체적인 설명을 추가하세요</li>
-              <li>위의 Quick Options으로 원하는 스타일을 선택하세요</li>
-              <li>"귀여운", "용감한", "마법같은" 등의 감정 키워드를 사용하세요</li>
-              <li>AI가 자동으로 픽셀 아트에 최적화된 프롬프트를 생성합니다</li>
+              <li>Add specific descriptions to your prompt</li>
+              <li>Use the Quick Options above to select your desired style</li>
+              <li>Include emotion keywords like "cute", "brave", "magical"</li>
+              <li>AI automatically generates optimized prompts for pixel art</li>
             </ul>
           </div>
         </section>

@@ -752,11 +752,11 @@ export function applyGuidedPromptOptions(
   reasoning.push("🖼️ Background enhancement:");
   if (guidedOptions.background === 'transparent') {
     enhancedPrompt += ', transparent background, isolated subject, no background, sprite ready';
-    appliedOptions.push('투명 배경');
+    appliedOptions.push('Transparent Background');
     reasoning.push("+ Applied transparent background for sprite/character isolation");
   } else {
     enhancedPrompt += ', detailed background, complete scene, environmental setting';
-    appliedOptions.push('배경 포함');
+    appliedOptions.push('Background Included');
     reasoning.push("+ Applied background inclusion for complete scene");
   }
   
@@ -764,11 +764,11 @@ export function applyGuidedPromptOptions(
   reasoning.push("👤 Character type enhancement:");
   if (guidedOptions.characterType === 'game') {
     enhancedPrompt += ', game character sprite, video game character, RPG style character, retro game sprite';
-    appliedOptions.push('게임 캐릭터');
+    appliedOptions.push('Game Character');
     reasoning.push("+ Applied game character styling for retro gaming context");
   } else {
     enhancedPrompt += ', character portrait, profile view, personal avatar, character design';
-    appliedOptions.push('프로필 캐릭터');
+    appliedOptions.push('Profile Character');
     reasoning.push("+ Applied profile character styling for personal representation");
   }
   
@@ -776,11 +776,11 @@ export function applyGuidedPromptOptions(
   reasoning.push("🎨 Art style enhancement:");
   if (guidedOptions.artStyle === 'simple') {
     enhancedPrompt += ', simple pixel art style, minimal detail, clean shapes, basic forms, easy to understand';
-    appliedOptions.push('단순한 스타일');
+    appliedOptions.push('Simple Style');
     reasoning.push("+ Applied simple art style for clean, readable pixel art");
   } else {
     enhancedPrompt += ', detailed pixel art style, rich details, complex shading, intricate design, elaborate features';
-    appliedOptions.push('상세한 스타일');
+    appliedOptions.push('Detailed Style');
     reasoning.push("+ Applied detailed art style for complex, rich pixel art");
   }
   
@@ -788,17 +788,17 @@ export function applyGuidedPromptOptions(
   reasoning.push("🌈 Color tone enhancement:");
   if (guidedOptions.colorTone === 'bright') {
     enhancedPrompt += ', bright vibrant colors, cheerful palette, happy colors, light and colorful, sunny atmosphere';
-    appliedOptions.push('밝은 색상');
+    appliedOptions.push('Bright Colors');
     reasoning.push("+ Applied bright color palette for cheerful, vibrant appearance");
   } else {
     enhancedPrompt += ', dark atmospheric colors, moody palette, deep colors, shadowy tones, dramatic atmosphere';
-    appliedOptions.push('어두운 색상');
+    appliedOptions.push('Dark Colors');
     reasoning.push("+ Applied dark color palette for moody, atmospheric appearance");
   }
   
   // Add pixel art fundamentals
   enhancedPrompt += ', pixel art style, crisp pixels, retro gaming style';
-  appliedOptions.push('픽셀 아트 기본');
+  appliedOptions.push('Pixel Art Style');
   reasoning.push("+ Added fundamental pixel art styling");
   
   // Cleanup
