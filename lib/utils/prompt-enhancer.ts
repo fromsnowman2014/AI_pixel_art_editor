@@ -44,13 +44,15 @@ const TRANSPARENCY_KEYWORDS = [
   'cutout style'
 ];
 
-// Quality improvement keywords
+// Quality improvement keywords with kid-friendly descriptors
 const QUALITY_KEYWORDS = [
   'high quality',
-  'clean',
-  'sharp',
-  'well defined',
-  'clear details'
+  'clean and bright',
+  'sharp colorful edges',
+  'well defined with simple details',
+  'clear cheerful details',
+  'vibrant colors',
+  'friendly appearance'
 ];
 
 // Negative prompts for pixel art
@@ -71,11 +73,11 @@ const BACKGROUND_KEYWORDS = [
   'ground', 'floor', 'wall', 'outdoor', 'indoor', 'nature', 'urban'
 ];
 
-// Character/Subject keywords detection  
+// Character/Subject keywords detection with kid-friendly focus
 const CHARACTER_KEYWORDS = [
-  'character', 'person', 'hero', 'warrior', 'mage', 'knight', 'archer',
-  'protagonist', 'avatar', 'player', 'npc', 'enemy', 'boss', 'villager',
-  'adventurer', 'explorer', 'soldier', 'guard', 'merchant', 'wizard'
+  'character', 'person', 'hero', 'friendly warrior', 'cute mage', 'brave knight', 'happy archer',
+  'protagonist', 'avatar', 'player', 'friendly npc', 'cute enemy', 'funny boss', 'cheerful villager',
+  'brave adventurer', 'curious explorer', 'kind soldier', 'helpful guard', 'friendly merchant', 'wise wizard'
 ];
 
 // Object/Item keywords detection
@@ -331,7 +333,7 @@ export function analyzePrompt(prompt: string): {
     confidence += 0.2;
     reasoning.push("+ 0.2 for no negative elements");
   }
-  if (subjectType !== 'unknown' && subjectType !== 'abstract') {
+  if (subjectType === 'character' || subjectType === 'object' || subjectType === 'scene') {
     confidence += 0.15;
     reasoning.push("+ 0.15 for clear subject identification");
   }
@@ -399,38 +401,38 @@ export function enhancePrompt(
     
     if (analysis.subjectType === 'character') {
       if (analysis.animationIntent === 'frame-sequence') {
-        // Character animation frame for GIF
-        enhancedPrompt += ', game character sprite, animation frame, pixel art style, sprite sheet ready';
-        changes.push('Added animation character style (CoT: GIF frame + character)');
-        reasoning.push("+ Applied animation character style for GIF creation");
+        // Character animation frame for GIF with enhanced descriptors
+        enhancedPrompt += ', cheerful game character sprite, colorful animation frame, detailed pixel art style, bright sprite sheet ready';
+        changes.push('Added animation character style with mood and color details (CoT: GIF frame + character)');
+        reasoning.push("+ Applied animation character style with enhanced mood and color descriptors for GIF creation");
       } else {
-        // Static character sprite
-        enhancedPrompt += ', video game character, character sprite, pixel art style, game ready';
-        changes.push('Added game character style (CoT: character for game use)');
-        reasoning.push("+ Applied character-focused game sprite style");
+        // Static character sprite with enhanced descriptors
+        enhancedPrompt += ', friendly video game character, colorful character sprite, detailed pixel art style, bright and cheerful, game ready';
+        changes.push('Added game character style with mood and color details (CoT: character for game use)');
+        reasoning.push("+ Applied character-focused game sprite style with enhanced mood and color descriptors");
       }
     } else if (analysis.subjectType === 'object') {
       if (analysis.animationIntent === 'frame-sequence') {
-        // Animated object for GIF
-        enhancedPrompt += ', animated game object, object sprite, pixel art style, animation frame';
-        changes.push('Added animated object style (CoT: GIF frame + object)');
-        reasoning.push("+ Applied animated object style for GIF creation");
+        // Animated object for GIF with enhanced descriptors
+        enhancedPrompt += ', colorful animated game object, bright object sprite, detailed pixel art style, cheerful animation frame';
+        changes.push('Added animated object style with mood and color details (CoT: GIF frame + object)');
+        reasoning.push("+ Applied animated object style with enhanced mood and color descriptors for GIF creation");
       } else {
-        // Static object sprite
-        enhancedPrompt += ', pixel art style, game item sprite, retro gaming asset, game object';
-        changes.push('Added game item style (CoT: object for game use)');
-        reasoning.push("+ Applied object-focused game asset style");
+        // Static object sprite with enhanced descriptors  
+        enhancedPrompt += ', colorful pixel art style, bright game item sprite, cheerful retro gaming asset, friendly game object';
+        changes.push('Added game item style with mood and color details (CoT: object for game use)');
+        reasoning.push("+ Applied object-focused game asset style with enhanced mood and color descriptors");
       }
     } else if (analysis.subjectType === 'scene') {
-      // Scene/background for game
-      enhancedPrompt += ', pixel art style, retro game environment, 16-bit background, game scene';
-      changes.push('Added game environment style (CoT: scene for game background)');
-      reasoning.push("+ Applied scene-focused game environment style");
+      // Scene/background for game with enhanced descriptors
+      enhancedPrompt += ', colorful pixel art style, bright retro game environment, cheerful 16-bit background, detailed friendly game scene';
+      changes.push('Added game environment style with mood and color details (CoT: scene for game background)');
+      reasoning.push("+ Applied scene-focused game environment style with enhanced mood and color descriptors");
     } else {
-      // Default with game context
-      enhancedPrompt += ', pixel art style, game asset, sprite art, retro gaming style';
-      changes.push('Added game asset style (CoT: fallback with game context)');
-      reasoning.push("+ Applied fallback game asset style");
+      // Default with game context and enhanced descriptors
+      enhancedPrompt += ', bright pixel art style, colorful game asset, cheerful sprite art, friendly retro gaming style';
+      changes.push('Added game asset style with mood and color details (CoT: fallback with game context)');
+      reasoning.push("+ Applied fallback game asset style with enhanced mood and color descriptors");
     }
   } else {
     reasoning.push("✅ Style keywords already present - no enhancement needed");
@@ -475,18 +477,18 @@ export function enhancePrompt(
   reasoning.push(`🔧 Mode-specific enhancement for: ${options.mode}`);
   switch (options.mode) {
     case 'text-to-image':
-      // For new images, add quality and game context
+      // For new images, add quality and game context with mood and color details
       if (!enhancedPrompt.includes('clean') && !enhancedPrompt.includes('sharp')) {
-        enhancedPrompt += ', clean pixels, sharp edges, crisp details';
-        changes.push('Added quality keywords for new image');
-        reasoning.push("+ Added quality enhancement for new generation");
+        enhancedPrompt += ', clean bright pixels, sharp colorful edges, crisp cheerful details';
+        changes.push('Added quality keywords with mood and color details for new image');
+        reasoning.push("+ Added quality enhancement with mood and color descriptors for new generation");
       }
       
-      // Add game context if it's a character
+      // Add game context if it's a character with enhanced descriptors
       if (analysis.subjectType === 'character' && !enhancedPrompt.toLowerCase().includes('game')) {
-        enhancedPrompt += ', suitable for video games';
-        changes.push('Added game context for character');
-        reasoning.push("+ Added game context for character use");
+        enhancedPrompt += ', suitable for cheerful video games, bright and friendly';
+        changes.push('Added game context with mood details for character');
+        reasoning.push("+ Added game context with mood descriptors for character use");
       }
       break;
       
@@ -582,24 +584,24 @@ export function getPromptSuggestions(
 ): string[] {
   const baseSuggestions = {
     'text-to-image': [
-      'cute animal character',
-      'simple house with garden',
-      'fantasy sword and shield',
-      'colorful flower bouquet',
-      'retro spaceship',
-      'magical potion bottle',
-      'cartoon food items',
-      'smiling sun and clouds'
+      'cute orange cat character with happy expression and simple details',
+      'simple cozy house with bright green garden and colorful flowers',
+      'magical fantasy sword with bright blue handle and detailed golden shield',
+      'colorful flower bouquet with pink roses and cheerful yellow daisies',
+      'friendly retro spaceship with silver details and happy pilot window',
+      'magical potion bottle with glowing purple liquid and sparkly details',
+      'happy cartoon food items with colorful simple designs and cute faces',
+      'smiling bright yellow sun with fluffy white clouds and cheerful sky'
     ],
     'image-to-image': [
-      'add more details',
-      'improve colors and shading',
-      'add background elements',
-      'enhance lighting effects',
-      'add decorative patterns',
-      'improve character expression',
-      'add environmental details',
-      'refine edges and cleanup'
+      'add more colorful details with bright cheerful colors',
+      'improve colors with happy vibrant tones and simple shading',
+      'add simple background elements with friendly atmosphere',
+      'enhance with magical glowing effects and warm lighting',
+      'add cute decorative patterns with colorful simple designs',
+      'improve character expression to look more happy and friendly',
+      'add detailed environmental elements with bright colors',
+      'refine edges and cleanup with crisp pixel art style'
     ]
   };
   

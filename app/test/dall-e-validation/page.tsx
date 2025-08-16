@@ -18,17 +18,17 @@ export default function DalleValidationPage() {
     const testCases: ValidationResult[] = [
       {
         mode: 'text-to-image',
-        expectedModel: 'DALL-E 3',
-        reasoning: 'New image generation - DALL-E 3 provides better quality',
+        expectedModel: 'DALL-E 3 (HD + Natural)',
+        reasoning: 'New image generation - DALL-E 3 with HD quality and natural style for maximum quality',
         canUseImageInput: false,
-        supports: ['text prompts', 'high quality', 'creative generation']
+        supports: ['text prompts', 'HD quality', 'natural style', 'creative generation', 'maximum detail']
       },
       {
         mode: 'image-to-image',
-        expectedModel: 'DALL-E 2',
-        reasoning: 'Image editing mode - DALL-E 3 does not support image-to-image',
+        expectedModel: 'DALL-E 2 (Maximum Resolution)',
+        reasoning: 'Image editing mode - DALL-E 2 with maximum 1024x1024 resolution for best image-to-image results',
         canUseImageInput: true,
-        supports: ['image input', 'image editing', 'style transfer', 'GIF frame continuity']
+        supports: ['image input', 'maximum resolution', 'image editing', 'style transfer', 'GIF frame continuity']
       }
     ];
 
@@ -64,7 +64,7 @@ export default function DalleValidationPage() {
           <strong>Root Cause:</strong> DALL-E 3 does not support image-to-image generation at all
         </p>
         <p className="text-gray-700">
-          <strong>Solution:</strong> Dual model approach - DALL-E 2 for image-to-image, DALL-E 3 for text-to-image
+          <strong>Solution:</strong> Top-tier dual model approach - DALL-E 2 (max resolution) for image-to-image, DALL-E 3 (HD quality) for text-to-image
         </p>
       </div>
 
@@ -121,9 +121,10 @@ export default function DalleValidationPage() {
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
             <h3 className="font-semibold text-green-800 mb-2">✅ Implementation Status</h3>
             <ul className="text-sm text-green-700 space-y-1">
-              <li>✅ Dual DALL-E model selection implemented in route.ts:334-385</li>
-              <li>✅ Image-to-image mode uses DALL-E 2 with proper image buffer handling</li>
-              <li>✅ Text-to-image mode uses DALL-E 3 for superior quality</li>
+              <li>✅ Top-tier DALL-E model selection implemented in route.ts:334-385</li>
+              <li>✅ Image-to-image mode uses DALL-E 2 with maximum 1024x1024 resolution</li>
+              <li>✅ Text-to-image mode uses DALL-E 3 with HD quality + natural style</li>
+              <li>✅ Maximum quality settings for both models activated</li>
               <li>✅ GIF animation frame prompts optimized for continuity</li>
               <li>✅ Game asset optimization with transparent backgrounds</li>
               <li>✅ Chain of Thought reasoning in prompt enhancement</li>
