@@ -62,10 +62,14 @@ export default function PromptEnhancerTestPage() {
 
   const testCases = [
     'cute cat',
-    'a beautiful landscape with mountains',
-    'photorealistic detailed 4k image of a car',
-    'pixel art character with sword',
-    'transparent background flower'
+    'walking animation',
+    'next frame continue movement', 
+    'game character sprite',
+    'animated sword spinning',
+    'magic effect explosion',
+    'transparent background flower',
+    'game item potion',
+    'character attack animation frame'
   ];
 
   return (
@@ -161,13 +165,32 @@ export default function PromptEnhancerTestPage() {
             </div>
           ) : (
             <>
-              {/* Analysis */}
+              {/* CoT Reasoning Display */}
+              <div className="bg-indigo-50 border border-indigo-200 p-4 rounded">
+                <h3 className="font-semibold text-indigo-800 mb-2">🧠 Chain of Thought Analysis:</h3>
+                <div className="bg-indigo-100 p-3 rounded font-mono text-xs max-h-64 overflow-y-auto">
+                  {results.complete.reasoning.map((line: string, i: number) => (
+                    <div key={i} className={`${line.startsWith('🧠') || line.startsWith('🚀') || line.startsWith('📊') ? 'font-bold text-indigo-800 mt-2' : ''}`}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Analysis Summary */}
               <div className="bg-blue-50 border border-blue-200 p-4 rounded">
-                <h3 className="font-semibold text-blue-800 mb-2">Prompt Analysis:</h3>
+                <h3 className="font-semibold text-blue-800 mb-2">Analysis Summary:</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>Has Style Keywords: {results.analysis.hasStyleKeywords ? '✅' : '❌'}</div>
                   <div>Has Transparency: {results.analysis.hasTransparencyKeywords ? '✅' : '❌'}</div>
+                  <div>Has Background Keywords: {results.analysis.hasBackgroundKeywords ? '✅' : '❌'}</div>
+                  <div>Has Character Keywords: {results.analysis.hasCharacterKeywords ? '✅' : '❌'}</div>
+                  <div>Has Object Keywords: {results.analysis.hasObjectKeywords ? '✅' : '❌'}</div>
+                  <div>Has Animation Keywords: {results.analysis.hasAnimationKeywords ? '✅' : '❌'}</div>
+                  <div>Has Game Asset Keywords: {results.analysis.hasGameAssetKeywords ? '✅' : '❌'}</div>
                   <div>Has Negative Elements: {results.analysis.hasNegativeElements ? '⚠️' : '✅'}</div>
+                  <div>Subject Type: <span className="font-semibold">{results.analysis.subjectType}</span></div>
+                  <div>Animation Intent: <span className="font-semibold text-purple-600">{results.analysis.animationIntent}</span></div>
                   <div>Confidence: {(results.analysis.confidence * 100).toFixed(0)}%</div>
                 </div>
                 {results.analysis.suggestedAdditions.length > 0 && (

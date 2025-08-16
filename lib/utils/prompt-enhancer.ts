@@ -64,59 +64,312 @@ const NEGATIVE_PROMPTS = [
   'soft edges'
 ];
 
+// Background-related keywords detection
+const BACKGROUND_KEYWORDS = [
+  'background', 'scene', 'environment', 'setting', 'landscape', 'backdrop',
+  'scenery', 'world', 'place', 'location', 'forest', 'city', 'room', 'sky',
+  'ground', 'floor', 'wall', 'outdoor', 'indoor', 'nature', 'urban'
+];
+
+// Character/Subject keywords detection  
+const CHARACTER_KEYWORDS = [
+  'character', 'person', 'hero', 'warrior', 'mage', 'knight', 'archer',
+  'protagonist', 'avatar', 'player', 'npc', 'enemy', 'boss', 'villager',
+  'adventurer', 'explorer', 'soldier', 'guard', 'merchant', 'wizard'
+];
+
+// Object/Item keywords detection
+const OBJECT_KEYWORDS = [
+  'sword', 'shield', 'armor', 'weapon', 'tool', 'item', 'potion', 'gem',
+  'treasure', 'coin', 'key', 'book', 'scroll', 'crystal', 'orb', 'staff',
+  'bow', 'arrow', 'helmet', 'boots', 'gloves', 'ring', 'amulet', 'chest'
+];
+
+// Game-style enhancement keywords
+const GAME_STYLE_KEYWORDS = [
+  'game character', 'RPG style', 'fantasy character', 'retro game sprite',
+  'video game character', 'pixel game art', 'indie game style', 'arcade style'
+];
+
+// Animation and GIF-specific keywords
+const ANIMATION_KEYWORDS = [
+  'animation', 'animated', 'movement', 'motion', 'frame', 'sequence',
+  'walk', 'run', 'jump', 'attack', 'idle', 'loop', 'cycle', 'step',
+  'next frame', 'continue', 'follow-up', 'progression'
+];
+
+// Game asset specific keywords
+const GAME_ASSET_KEYWORDS = [
+  'sprite', 'tile', 'asset', 'character sprite', 'game piece', 'token',
+  'game art', 'retro gaming', '2D game', 'platformer', 'side-scroller',
+  'top-down', 'isometric', 'RPG asset', 'action game', 'arcade game'
+];
+
+// Animation action keywords for prompting
+const ANIMATION_ACTIONS = {
+  character: [
+    'walking animation', 'running animation', 'jumping animation', 'idle animation',
+    'attack animation', 'death animation', 'casting spell', 'drinking potion',
+    'opening door', 'climbing ladder', 'swimming', 'flying'
+  ],
+  object: [
+    'rotating object', 'glowing effect', 'pulsing animation', 'floating animation',
+    'spinning coin', 'flickering torch', 'opening chest', 'breaking apart',
+    'materializing', 'dissolving', 'bouncing', 'swaying'
+  ],
+  effect: [
+    'magic effect', 'explosion effect', 'healing effect', 'fire animation',
+    'water ripple', 'wind effect', 'lightning strike', 'particle effect',
+    'smoke animation', 'sparkle effect', 'energy burst', 'portal opening'
+  ]
+};
+
+// Game context enhancement
+const GAME_CONTEXT_KEYWORDS = [
+  'suitable for games', 'game ready', 'tileable', 'seamless', 'game engine compatible',
+  'sprite sheet ready', 'animation friendly', 'consistent style', 'game asset quality'
+];
+
 /**
- * Analyzes a prompt and suggests improvements
+ * Advanced prompt analysis with Chain of Thought reasoning
  */
 export function analyzePrompt(prompt: string): {
   hasStyleKeywords: boolean;
   hasTransparencyKeywords: boolean;
+  hasBackgroundKeywords: boolean;
+  hasCharacterKeywords: boolean;
+  hasObjectKeywords: boolean;
+  hasAnimationKeywords: boolean;
+  hasGameAssetKeywords: boolean;
   hasNegativeElements: boolean;
+  subjectType: 'character' | 'object' | 'scene' | 'abstract' | 'unknown';
+  animationIntent: 'frame-sequence' | 'static-sprite' | 'effect' | 'none';
   suggestedAdditions: string[];
   confidence: number;
+  reasoning: string[];
 } {
   const lowerPrompt = prompt.toLowerCase();
+  const reasoning: string[] = [];
+  
+  // Step 1: Detect existing elements (CoT reasoning starts)
+  reasoning.push("🧠 Chain of Thought Analysis:");
+  reasoning.push(`📝 Input prompt: "${prompt}"`);
   
   // Check for existing style keywords
   const hasStyleKeywords = Object.values(STYLE_KEYWORDS).flat()
     .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`🎨 Style keywords present: ${hasStyleKeywords ? 'YES' : 'NO'}`);
   
   // Check for transparency keywords
   const hasTransparencyKeywords = TRANSPARENCY_KEYWORDS
     .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`🔍 Transparency keywords present: ${hasTransparencyKeywords ? 'YES' : 'NO'}`);
+  
+  // Check for background keywords
+  const hasBackgroundKeywords = BACKGROUND_KEYWORDS
+    .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`🖼️ Background keywords present: ${hasBackgroundKeywords ? 'YES' : 'NO'}`);
+  
+  // Check for character keywords
+  const hasCharacterKeywords = CHARACTER_KEYWORDS
+    .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`👤 Character keywords present: ${hasCharacterKeywords ? 'YES' : 'NO'}`);
+  
+  // Check for object keywords
+  const hasObjectKeywords = OBJECT_KEYWORDS
+    .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`⚔️ Object keywords present: ${hasObjectKeywords ? 'YES' : 'NO'}`);
+  
+  // Check for animation keywords
+  const hasAnimationKeywords = ANIMATION_KEYWORDS
+    .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`🎬 Animation keywords present: ${hasAnimationKeywords ? 'YES' : 'NO'}`);
+  
+  // Check for game asset keywords
+  const hasGameAssetKeywords = GAME_ASSET_KEYWORDS
+    .some(keyword => lowerPrompt.includes(keyword.toLowerCase()));
+  reasoning.push(`🎮 Game asset keywords present: ${hasGameAssetKeywords ? 'YES' : 'NO'}`);
   
   // Check for negative elements
   const hasNegativeElements = NEGATIVE_PROMPTS
     .some(negative => lowerPrompt.includes(negative.toLowerCase()));
+  reasoning.push(`❌ Negative elements present: ${hasNegativeElements ? 'YES' : 'NO'}`);
   
-  // Suggest additions
+  // Step 2: Subject type detection (CoT reasoning)
+  reasoning.push("🤔 Subject type analysis:");
+  let subjectType: 'character' | 'object' | 'scene' | 'abstract' | 'unknown' = 'unknown';
+  
+  // Character detection patterns
+  const characterPatterns = ['cat', 'dog', 'bird', 'animal', 'person', 'man', 'woman', 'child', 'baby'];
+  const isLikelyCharacter = characterPatterns.some(pattern => lowerPrompt.includes(pattern)) || hasCharacterKeywords;
+  
+  // Object detection patterns  
+  const objectPatterns = ['sword', 'shield', 'weapon', 'tool', 'item', 'house', 'building'];
+  const isLikelyObject = objectPatterns.some(pattern => lowerPrompt.includes(pattern)) || hasObjectKeywords;
+  
+  // Scene detection patterns
+  const scenePatterns = ['landscape', 'forest', 'castle', 'dungeon', 'world', 'map'];
+  const isLikelyScene = scenePatterns.some(pattern => lowerPrompt.includes(pattern)) || hasBackgroundKeywords;
+  
+  if (isLikelyCharacter) {
+    subjectType = 'character';
+    reasoning.push("➡️ Detected as CHARACTER (living being, person, or animal)");
+  } else if (isLikelyObject) {
+    subjectType = 'object';
+    reasoning.push("➡️ Detected as OBJECT (item, tool, or structure)");
+  } else if (isLikelyScene) {
+    subjectType = 'scene';
+    reasoning.push("➡️ Detected as SCENE (environment or landscape)");
+  } else if (prompt.trim().length < 10) {
+    subjectType = 'abstract';
+    reasoning.push("➡️ Detected as ABSTRACT (short, conceptual prompt)");
+  } else {
+    reasoning.push("➡️ Subject type UNKNOWN - treating as character for game context");
+    subjectType = 'character'; // Default to character for game context
+  }
+  
+  // Step 2.5: Animation intent detection (CoT reasoning for GIF creation)
+  reasoning.push("🎬 Animation intent analysis:");
+  let animationIntent: 'frame-sequence' | 'static-sprite' | 'effect' | 'none' = 'none';
+  
+  // Detect animation/frame sequence intent
+  const frameSequencePatterns = ['next frame', 'continue', 'sequence', 'animation', 'follow up', 'progression'];
+  const hasFrameSequenceIntent = frameSequencePatterns.some(pattern => lowerPrompt.includes(pattern));
+  
+  // Detect effect/particle intent
+  const effectPatterns = ['effect', 'magic', 'explosion', 'particle', 'glow', 'sparkle', 'burst', 'trail'];
+  const hasEffectIntent = effectPatterns.some(pattern => lowerPrompt.includes(pattern));
+  
+  if (hasFrameSequenceIntent || hasAnimationKeywords) {
+    animationIntent = 'frame-sequence';
+    reasoning.push("➡️ Animation intent: FRAME-SEQUENCE (GIF animation frame)");
+  } else if (hasEffectIntent) {
+    animationIntent = 'effect';
+    reasoning.push("➡️ Animation intent: EFFECT (visual effect or particle)");
+  } else if (hasGameAssetKeywords || subjectType === 'character' || subjectType === 'object') {
+    animationIntent = 'static-sprite';
+    reasoning.push("➡️ Animation intent: STATIC-SPRITE (game asset for potential animation)");
+  } else {
+    reasoning.push("➡️ Animation intent: NONE (static image)");
+  }
+  
+  // Step 3: Generate intelligent suggestions (CoT reasoning)
+  reasoning.push("💡 Generating optimization suggestions:");
   const suggestedAdditions: string[] = [];
   
+  // Style enhancement logic with GIF/animation context
   if (!hasStyleKeywords) {
-    suggestedAdditions.push('pixel art style');
+    if (subjectType === 'character') {
+      if (animationIntent === 'frame-sequence') {
+        suggestedAdditions.push('game character sprite', 'animation frame', 'pixel art style');
+        reasoning.push("+ Adding animation character style (GIF frame + character detected)");
+      } else {
+        suggestedAdditions.push('game character', 'sprite', 'pixel art style');
+        reasoning.push("+ Adding game character style (character detected)");
+      }
+    } else if (subjectType === 'object') {
+      if (animationIntent === 'frame-sequence') {
+        suggestedAdditions.push('animated game object', 'pixel art style');
+        reasoning.push("+ Adding animated object style (GIF frame + object detected)");
+      } else {
+        suggestedAdditions.push('pixel art style', 'game item', 'sprite');
+        reasoning.push("+ Adding game item style (object detected)");
+      }
+    } else {
+      suggestedAdditions.push('pixel art style', 'game asset');
+      reasoning.push("+ Adding basic game asset style (fallback)");
+    }
   }
   
-  if (!hasTransparencyKeywords) {
-    suggestedAdditions.push('transparent background');
+  // Background enhancement logic for GIF/game context
+  if (!hasBackgroundKeywords && !hasTransparencyKeywords) {
+    if (subjectType === 'character' || subjectType === 'object') {
+      suggestedAdditions.push('transparent background', 'isolated subject', 'game sprite');
+      reasoning.push("+ Adding transparent background (game asset - needs transparency for GIF layers)");
+    } else if (subjectType === 'scene') {
+      // Scene should have background, don't add transparency
+      reasoning.push("- Not adding transparency (scene detected - should have background)");
+    } else {
+      suggestedAdditions.push('transparent background', 'game ready');
+      reasoning.push("+ Adding transparent background (default for game/GIF use)");
+    }
   }
   
-  // Calculate confidence (higher is better)
-  let confidence = 0.5; // Base confidence
-  if (hasStyleKeywords) confidence += 0.3;
-  if (hasTransparencyKeywords) confidence += 0.2;
-  if (!hasNegativeElements) confidence += 0.2;
-  if (prompt.length > 10 && prompt.length < 200) confidence += 0.1;
+  // Game and animation context enhancement
+  if (!hasGameAssetKeywords && !lowerPrompt.includes('game')) {
+    if (animationIntent === 'frame-sequence') {
+      suggestedAdditions.push('game animation frame', 'sprite sequence');
+      reasoning.push("+ Adding animation frame context (GIF creation intent detected)");
+    } else if (subjectType === 'character') {
+      suggestedAdditions.push('video game character', 'game sprite');
+      reasoning.push("+ Adding game character context (character for game use)");
+    } else if (subjectType === 'object') {
+      suggestedAdditions.push('game object', 'game asset');
+      reasoning.push("+ Adding game object context (object for game use)");
+    }
+  }
+  
+  // Animation-specific enhancements
+  if (animationIntent === 'frame-sequence' && !hasAnimationKeywords) {
+    suggestedAdditions.push('animation ready', 'frame consistent');
+    reasoning.push("+ Adding animation consistency hints (for GIF frame sequence)");
+  }
+  
+  // Step 4: Calculate confidence (CoT reasoning)
+  reasoning.push("📊 Confidence calculation:");
+  let confidence = 0.3; // Lower base confidence for stricter standards
+  
+  if (hasStyleKeywords) {
+    confidence += 0.25;
+    reasoning.push("+ 0.25 for existing style keywords");
+  }
+  if (hasTransparencyKeywords || hasBackgroundKeywords) {
+    confidence += 0.2;
+    reasoning.push("+ 0.2 for background clarity");
+  }
+  if (!hasNegativeElements) {
+    confidence += 0.2;
+    reasoning.push("+ 0.2 for no negative elements");
+  }
+  if (subjectType !== 'unknown' && subjectType !== 'abstract') {
+    confidence += 0.15;
+    reasoning.push("+ 0.15 for clear subject identification");
+  }
+  if (animationIntent !== 'none') {
+    confidence += 0.1;
+    reasoning.push("+ 0.1 for animation context clarity");
+  }
+  if (hasGameAssetKeywords || hasAnimationKeywords) {
+    confidence += 0.1;
+    reasoning.push("+ 0.1 for game/animation keywords");
+  }
+  if (prompt.length > 5 && prompt.length < 150) {
+    confidence += 0.1;
+    reasoning.push("+ 0.1 for appropriate length");
+  }
+  
+  confidence = Math.min(confidence, 1.0);
+  reasoning.push(`📊 Final confidence: ${(confidence * 100).toFixed(0)}%`);
   
   return {
     hasStyleKeywords,
     hasTransparencyKeywords,
+    hasBackgroundKeywords,
+    hasCharacterKeywords,
+    hasObjectKeywords,
+    hasAnimationKeywords,
+    hasGameAssetKeywords,
     hasNegativeElements,
+    subjectType,
+    animationIntent,
     suggestedAdditions,
-    confidence: Math.min(confidence, 1.0)
+    confidence,
+    reasoning
   };
 }
 
 /**
- * Enhances a prompt for AI generation based on context and options
+ * Enhanced prompt optimization with intelligent CoT reasoning
  */
 export function enhancePrompt(
   originalPrompt: string, 
@@ -125,76 +378,198 @@ export function enhancePrompt(
   enhancedPrompt: string;
   changes: string[];
   confidence: number;
+  reasoning: string[];
 } {
   if (!originalPrompt.trim()) {
     throw new Error('Prompt cannot be empty');
   }
   
+  // Advanced CoT analysis
   const analysis = analyzePrompt(originalPrompt);
   const changes: string[] = [];
+  const reasoning: string[] = [...analysis.reasoning]; // Include analysis reasoning
   let enhancedPrompt = originalPrompt.trim();
   
-  // Add style keywords if missing
+  reasoning.push(""); // Add separator
+  reasoning.push("🚀 Enhancement Process:");
+  
+  // Intelligent style enhancement based on CoT analysis with GIF/animation context
   if (!analysis.hasStyleKeywords) {
-    const styleKeywords = STYLE_KEYWORDS[options.style] || STYLE_KEYWORDS['pixel-art'];
-    const primaryStyle = styleKeywords[0];
-    enhancedPrompt += `, ${primaryStyle}`;
-    changes.push(`Added style: ${primaryStyle}`);
+    reasoning.push("🎨 Style enhancement needed...");
+    
+    if (analysis.subjectType === 'character') {
+      if (analysis.animationIntent === 'frame-sequence') {
+        // Character animation frame for GIF
+        enhancedPrompt += ', game character sprite, animation frame, pixel art style, sprite sheet ready';
+        changes.push('Added animation character style (CoT: GIF frame + character)');
+        reasoning.push("+ Applied animation character style for GIF creation");
+      } else {
+        // Static character sprite
+        enhancedPrompt += ', video game character, character sprite, pixel art style, game ready';
+        changes.push('Added game character style (CoT: character for game use)');
+        reasoning.push("+ Applied character-focused game sprite style");
+      }
+    } else if (analysis.subjectType === 'object') {
+      if (analysis.animationIntent === 'frame-sequence') {
+        // Animated object for GIF
+        enhancedPrompt += ', animated game object, object sprite, pixel art style, animation frame';
+        changes.push('Added animated object style (CoT: GIF frame + object)');
+        reasoning.push("+ Applied animated object style for GIF creation");
+      } else {
+        // Static object sprite
+        enhancedPrompt += ', pixel art style, game item sprite, retro gaming asset, game object';
+        changes.push('Added game item style (CoT: object for game use)');
+        reasoning.push("+ Applied object-focused game asset style");
+      }
+    } else if (analysis.subjectType === 'scene') {
+      // Scene/background for game
+      enhancedPrompt += ', pixel art style, retro game environment, 16-bit background, game scene';
+      changes.push('Added game environment style (CoT: scene for game background)');
+      reasoning.push("+ Applied scene-focused game environment style");
+    } else {
+      // Default with game context
+      enhancedPrompt += ', pixel art style, game asset, sprite art, retro gaming style';
+      changes.push('Added game asset style (CoT: fallback with game context)');
+      reasoning.push("+ Applied fallback game asset style");
+    }
+  } else {
+    reasoning.push("✅ Style keywords already present - no enhancement needed");
   }
   
-  // Handle transparency based on mode and options
-  if (options.enforceTransparency && !analysis.hasTransparencyKeywords) {
-    enhancedPrompt += ', transparent background, no background, isolated subject';
-    changes.push('Added transparency requirements');
+  // Intelligent background handling for GIF/game asset creation
+  if (!analysis.hasBackgroundKeywords && !analysis.hasTransparencyKeywords) {
+    reasoning.push("🖼️ Background enhancement needed for GIF/game use...");
+    
+    if (analysis.subjectType === 'character' || analysis.subjectType === 'object') {
+      if (analysis.animationIntent === 'frame-sequence') {
+        // Animation frames MUST have transparent backgrounds for GIF layering
+        enhancedPrompt += ', transparent background, isolated subject, no background, animation frame ready, GIF compatible';
+        changes.push('Added animation transparency (CoT: GIF frame needs transparent background)');
+        reasoning.push("+ Applied transparent background for GIF frame layering");
+      } else {
+        // Game sprites need transparency for compositing
+        enhancedPrompt += ', transparent background, isolated subject, no background, sprite ready, game compatible';
+        changes.push('Added sprite transparency (CoT: game sprite needs transparent background)');
+        reasoning.push("+ Applied transparent background for game sprite compositing");
+      }
+    } else if (analysis.subjectType === 'scene') {
+      // Scenes should have backgrounds but be game-ready
+      enhancedPrompt += ', detailed background, complete scene, game environment, tileable edges';
+      changes.push('Added game scene background (CoT: scene needs environment for game world)');
+      reasoning.push("+ Applied game environment background (scenes for game worlds)");
+    } else {
+      // Default to transparent for any GIF/game use
+      enhancedPrompt += ', transparent background, isolated subject, game ready, GIF ready';
+      changes.push('Added universal transparency (CoT: default for GIF/game compatibility)');
+      reasoning.push("+ Applied universal transparent background for GIF/game use");
+    }
+  } else if (options.enforceTransparency && !analysis.hasTransparencyKeywords) {
+    enhancedPrompt += ', transparent background, no background, isolated subject, GIF compatible';
+    changes.push('Added enforced transparency with GIF compatibility');
+    reasoning.push("+ Applied enforced transparency with GIF/game optimization");
+  } else {
+    reasoning.push("✅ Background context already clear - no enhancement needed");
   }
   
-  // Mode-specific enhancements
+  // Mode-specific intelligent enhancements
+  reasoning.push(`🔧 Mode-specific enhancement for: ${options.mode}`);
   switch (options.mode) {
     case 'text-to-image':
-      // For new images, add quality keywords
+      // For new images, add quality and game context
       if (!enhancedPrompt.includes('clean') && !enhancedPrompt.includes('sharp')) {
-        enhancedPrompt += ', clean, sharp pixels';
+        enhancedPrompt += ', clean pixels, sharp edges, crisp details';
         changes.push('Added quality keywords for new image');
+        reasoning.push("+ Added quality enhancement for new generation");
+      }
+      
+      // Add game context if it's a character
+      if (analysis.subjectType === 'character' && !enhancedPrompt.toLowerCase().includes('game')) {
+        enhancedPrompt += ', suitable for video games';
+        changes.push('Added game context for character');
+        reasoning.push("+ Added game context for character use");
       }
       break;
       
     case 'image-to-image':
-      // For improvements, add enhancement keywords
-      enhancedPrompt = `improve this pixel art: ${enhancedPrompt}`;
-      enhancedPrompt += ', maintain pixel art style, enhance details';
-      changes.push('Added image-to-image enhancement keywords');
+      // For GIF frame creation: enhance based on subject and animation intent
+      if (analysis.animationIntent === 'frame-sequence') {
+        // This is for creating the next frame in a GIF sequence
+        if (analysis.subjectType === 'character') {
+          enhancedPrompt = `create next animation frame of this pixel art character: ${enhancedPrompt}`;
+          enhancedPrompt += ', continue animation sequence, maintain character consistency, next movement frame, smooth animation transition';
+        } else if (analysis.subjectType === 'object') {
+          enhancedPrompt = `create next animation frame of this pixel art object: ${enhancedPrompt}`;
+          enhancedPrompt += ', continue object animation, maintain object consistency, next animation state, smooth transition';
+        } else {
+          enhancedPrompt = `create next frame in animation sequence: ${enhancedPrompt}`;
+          enhancedPrompt += ', continue animation, maintain consistency, next frame, smooth progression';
+        }
+        changes.push('Added GIF frame sequence instructions (CoT: animation frame creation)');
+        reasoning.push("+ Applied GIF frame sequence optimization for animation continuity");
+      } else {
+        // Standard improvement for static sprites
+        if (analysis.subjectType === 'character') {
+          enhancedPrompt = `improve this game character sprite: ${enhancedPrompt}`;
+          enhancedPrompt += ', enhance character details, maintain sprite consistency, improve game readiness';
+        } else if (analysis.subjectType === 'object') {
+          enhancedPrompt = `improve this game object sprite: ${enhancedPrompt}`;
+          enhancedPrompt += ', enhance object details, maintain sprite consistency, improve game asset quality';
+        } else {
+          enhancedPrompt = `improve this game sprite: ${enhancedPrompt}`;
+          enhancedPrompt += ', maintain pixel art style, enhance game asset quality';
+        }
+        changes.push('Added game sprite improvement instructions (CoT: game asset enhancement)');
+        reasoning.push("+ Applied game sprite enhancement for better game asset quality");
+      }
       
-      // Use canvas analysis for context
+      // Use canvas analysis for GIF/game context
       if (options.canvasAnalysis) {
         if (options.canvasAnalysis.dominantColors.length > 0 && options.preserveExistingColors) {
-          enhancedPrompt += ', preserve existing color palette';
-          changes.push('Added color preservation hint');
+          enhancedPrompt += ', preserve existing color palette, maintain color consistency';
+          changes.push('Added color preservation for animation consistency');
+          reasoning.push("+ Added color preservation for GIF/animation consistency");
         }
         
         if (options.canvasAnalysis.hasTransparency) {
-          enhancedPrompt += ', maintain transparency';
-          changes.push('Added transparency preservation');
+          enhancedPrompt += ', maintain transparency, preserve transparent background';
+          changes.push('Added transparency preservation for GIF layering');
+          reasoning.push("+ Added transparency preservation for GIF frame compatibility");
         }
       }
       break;
   }
   
-  // Add negative prompts to avoid unwanted effects
+  // Add enhanced negative prompts for game/GIF optimization
   if (options.style === 'pixel-art') {
-    enhancedPrompt += '. Avoid: blurry, antialiased, smooth gradients, photorealistic';
-    changes.push('Added negative prompts');
+    if (analysis.animationIntent === 'frame-sequence') {
+      enhancedPrompt += '. Avoid: blurry, antialiased, smooth gradients, photorealistic, inconsistent style, frame jumping, motion blur, different art style';
+      changes.push('Added animation-specific negative prompts');
+      reasoning.push("+ Added negative prompts for GIF animation consistency");
+    } else {
+      enhancedPrompt += '. Avoid: blurry, antialiased, smooth gradients, photorealistic, high detail textures, non-game style, realistic lighting, complex shadows';
+      changes.push('Added game-optimized negative prompts');
+      reasoning.push("+ Added negative prompts for game sprite quality");
+    }
   }
   
-  // Final cleanup
+  // Final cleanup and optimization
+  reasoning.push("🧹 Final cleanup and optimization:");
   enhancedPrompt = enhancedPrompt
     .replace(/,\s*,/g, ',') // Remove double commas
     .replace(/\s+/g, ' ')   // Normalize spaces
+    .replace(/,\s*\./g, '.') // Fix comma before period
     .trim();
+  reasoning.push("+ Cleaned up formatting and spacing");
+  
+  reasoning.push(""); // Add separator
+  reasoning.push(`✨ Enhancement complete! Applied ${changes.length} optimizations.`);
+  reasoning.push(`📊 Final confidence: ${(analysis.confidence * 100).toFixed(0)}%`);
   
   return {
     enhancedPrompt,
     changes,
-    confidence: analysis.confidence
+    confidence: analysis.confidence,
+    reasoning
   };
 }
 
@@ -228,7 +603,7 @@ export function getPromptSuggestions(
     ]
   };
   
-  let suggestions = baseSuggestions[mode] || baseSuggestions['text-to-image'];
+  let suggestions = baseSuggestions[mode as 'text-to-image' | 'image-to-image'] || baseSuggestions['text-to-image'];
   
   // Customize based on canvas analysis
   if (canvasAnalysis && mode === 'image-to-image') {
@@ -308,7 +683,7 @@ export function validatePrompt(prompt: string): {
 }
 
 /**
- * Generates a complete enhanced prompt with all options applied
+ * Generates a complete enhanced prompt with all options applied and CoT reasoning
  */
 export function generateCompletePrompt(
   userPrompt: string,
@@ -320,6 +695,7 @@ export function generateCompletePrompt(
   appliedChanges: string[];
   validationResults: ReturnType<typeof validatePrompt>;
   confidence: number;
+  reasoning: string[];
 } {
   // Validate first
   const validation = validatePrompt(userPrompt);
@@ -328,7 +704,7 @@ export function generateCompletePrompt(
     throw new Error(`Prompt validation failed: ${validation.issues.join(', ')}`);
   }
   
-  // Enhance the prompt
+  // Enhance the prompt with CoT reasoning
   const enhancement = enhancePrompt(userPrompt, options);
   
   return {
@@ -337,27 +713,43 @@ export function generateCompletePrompt(
     enhancedPrompt: enhancement.enhancedPrompt,
     appliedChanges: enhancement.changes,
     validationResults: validation,
-    confidence: enhancement.confidence
+    confidence: enhancement.confidence,
+    reasoning: enhancement.reasoning
   };
 }
 
 /**
- * Debug function to test prompt enhancement
+ * Debug function to test prompt enhancement with CoT reasoning
  */
 export function debugPromptEnhancement(
   prompt: string, 
   options: PromptEnhancementOptions
 ): void {
-  console.log('🎭 Prompt Enhancement Debug:');
+  console.log('🎭 Enhanced Prompt Analysis Debug:');
   console.log('Original:', prompt);
+  console.log('Options:', options);
+  console.log('');
   
   try {
     const result = generateCompletePrompt(prompt, options);
+    
+    // Display CoT reasoning step by step
+    console.log('🧠 Chain of Thought Reasoning:');
+    result.reasoning.forEach(line => console.log(line));
+    console.log('');
+    
+    console.log('📊 Final Results:');
+    console.log('Original:', result.originalPrompt);
     console.log('Enhanced:', result.finalPrompt);
-    console.log('Changes:', result.appliedChanges);
-    console.log('Confidence:', result.confidence.toFixed(2));
-    console.log('Validation:', result.validationResults);
+    console.log('Applied Changes:', result.appliedChanges);
+    console.log('Confidence:', (result.confidence * 100).toFixed(0) + '%');
+    console.log('Validation:', result.validationResults.isValid ? 'PASSED' : 'FAILED');
+    
+    if (!result.validationResults.isValid) {
+      console.log('Validation Issues:', result.validationResults.issues);
+    }
+    
   } catch (error) {
-    console.error('Enhancement failed:', error);
+    console.error('❌ Enhancement failed:', error);
   }
 }
