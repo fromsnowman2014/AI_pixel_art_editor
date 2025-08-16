@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import axios, { AxiosInstance } from 'axios'
 import type {
   Project,
   CreateProjectRequest,
@@ -60,7 +60,7 @@ class ApiClient {
       },
     })
 
-    // Request interceptor for auth
+    // Request interceptor for auth and debugging
     this.client.interceptors.request.use((config) => {
       // Add auth token if available; guard against non-browser environments
       const token = typeof window !== 'undefined'
@@ -71,6 +71,19 @@ class ApiClient {
         config.headers = config.headers || {}
         config.headers.Authorization = `Bearer ${token}`
       }
+      
+      // Debug logging for AI generation requests
+      if (config.url?.includes('/ai/generate')) {
+        console.log('🔧 Request Interceptor: AI generation request details:', {
+          url: config.url,
+          method: config.method,
+          headers: config.headers,
+          data: config.data,
+          timeout: config.timeout,
+          baseURL: config.baseURL
+        });
+      }
+      
       return config
     })
 
@@ -215,12 +228,45 @@ class ApiClient {
 
   // AI Generation API
   async generateAI(data: AIGenerateRequest): Promise<AIGenerationResponse> {
-    console.log('🔧 API Client: Sending AI generation request:', data);
+    console.log('🔧 API Client: Original request data:', data);
     
-    const response = await this.client.post<{success: boolean, data: AIGenerationResponse}>('/ai/generate', data, {
-      timeout: 600000, // 10 minutes for AI generation to match backend processing time
-    })
+    // Transform request data to match backend schema
+    const backendRequest = {
+      prompt: data.prompt,
+      width: data.width,
+      height: data.height,
+      colorCount: data.colorLimit, // colorLimit → colorCount
+      style: 'pixel-art' as const,  // Always use pixel-art style
+      // Skip: mode, enableDithering, quantizationMethod (not used by backend)
+    };
     
+    console.log('🔧 API Client: Transformed request data:', backendRequest);
+    console.log('🔧 API Client: Request details:', {
+      url: `${API_BASE_URL}/ai/generate`,
+      method: 'POST',
+      timeout: 600000,
+      headers: this.client.defaults.headers
+    });
+    
+    try {
+      const response = await this.client.post<{success: boolean, data: AIGenerationResponse}>('/ai/generate', backendRequest, {
+        timeout: 600000, // 10 minutes for AI generation to match backend processing time
+      })
+      
+      console.log('✅ API Client: Request successful');
+      return this.handleResponse(response);
+    } catch (error: any) {
+      console.error('❌ API Client: Request failed:', {
+        error: error,
+        config: error?.config,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      throw error;
+    }
+  }
+
+  private handleResponse(response: any): AIGenerationResponse {
     console.log('📥 API Client: Raw response received:', {
       status: response.status,
       success: response.data?.success,
