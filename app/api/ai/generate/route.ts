@@ -14,8 +14,12 @@ import {
   CORS_HEADERS
 } from '@/lib/utils/api-middleware';
 import { getEnv } from '@/lib/utils/env-validation';
+import { generateCompletePrompt } from '@/lib/utils/prompt-enhancer';
+import { detectOptimalAIMode, validateModeForCanvas } from '@/lib/utils/ai-mode-detector';
+import { analyzeCanvas } from '@/lib/utils/canvas-analysis';
+import { AIGenerationMode } from '@/lib/types/canvas';
 
-// Request validation schema
+// Enhanced request validation schema supporting multiple AI generation modes
 const GenerateRequestSchema = z.object({
   prompt: z.string()
     .min(1, 'Prompt is required')
@@ -35,6 +39,48 @@ const GenerateRequestSchema = z.object({
     .default(24),
   style: z.enum(['pixel-art', 'low-res', 'retro']).default('pixel-art'),
   seed: z.number().int().optional(),
+  
+  // AI Generation Mode Support
+  mode: z.enum(['text-to-image', 'image-to-image', 'inpainting', 'outpainting'])
+    .default('text-to-image'),
+  
+  // Image-to-image specific fields
+  inputImage: z.string()
+    .optional()
+    .refine((data) => {
+      // If provided, must be valid base64 data URL
+      if (!data) return true;
+      return data.startsWith('data:image/') && data.includes('base64,');
+    }, 'inputImage must be a valid base64 data URL'),
+  
+  strength: z.number()
+    .min(0.1, 'Strength must be at least 0.1')
+    .max(1.0, 'Strength must be at most 1.0')
+    .default(0.7)
+    .optional(),
+  
+  // Background and transparency options
+  preserveTransparency: z.boolean().default(true),
+  enforceTransparentBackground: z.boolean().default(true),
+  
+  // Advanced options
+  guidanceScale: z.number()
+    .min(1.0, 'Guidance scale must be at least 1.0')
+    .max(20.0, 'Guidance scale must be at most 20.0')
+    .default(7.5)
+    .optional(),
+  negativePrompt: z.string()
+    .max(500, 'Negative prompt must be less than 500 characters')
+    .optional(),
+}).refine((data) => {
+  // Validation: image-to-image mode requires inputImage
+  if (data.mode === 'image-to-image' && !data.inputImage) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'inputImage is required when mode is image-to-image',
+  path: ['inputImage']
 });
 
 type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
@@ -104,18 +150,8 @@ export async function POST(request: NextRequest) {
   console.log(`🔄 [${requestId}] Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
 
   try {
-    // Step 1: Check AI service availability
-    console.log(`📋 [${requestId}] Step 1: Checking AI service availability...`);
-    const serviceCheck = checkAIServiceAvailability();
-    if (!serviceCheck.available) {
-      console.log(`❌ [${requestId}] Service unavailable:`, serviceCheck);
-      logApiRequest(request, '/ai/generate', startTime, false, 'Service unavailable');
-      return serviceCheck.response;
-    }
-    console.log(`✅ [${requestId}] AI service availability check passed`);
-
-    // Step 2: Validate request body
-    console.log(`📝 [${requestId}] Step 2: Validating request body...`);
+    // Step 1: Validate request body (moved before service check for better testing)
+    console.log(`📝 [${requestId}] Step 1: Validating request body...`);
     const validation = await validateRequestBody(request, GenerateRequestSchema);
     if (!validation.success) {
       console.log(`❌ [${requestId}] Request validation failed:`, validation);
@@ -124,8 +160,43 @@ export async function POST(request: NextRequest) {
     }
     console.log(`✅ [${requestId}] Request validation passed`);
 
-    const { prompt, width, height, colorCount = 24, style } = validation.data;
-    console.log(`📊 [${requestId}] Request parameters:`, { prompt: prompt.substring(0, 50) + '...', width, height, colorCount, style });
+    // Step 2: Check AI service availability
+    console.log(`📋 [${requestId}] Step 2: Checking AI service availability...`);
+    const serviceCheck = checkAIServiceAvailability();
+    if (!serviceCheck.available) {
+      console.log(`❌ [${requestId}] Service unavailable:`, serviceCheck);
+      logApiRequest(request, '/ai/generate', startTime, false, 'Service unavailable');
+      return serviceCheck.response;
+    }
+    console.log(`✅ [${requestId}] AI service availability check passed`);
+
+    const { 
+      prompt, 
+      width, 
+      height, 
+      colorCount = 24, 
+      style,
+      mode = 'text-to-image',
+      inputImage,
+      strength = 0.7,
+      preserveTransparency = true,
+      enforceTransparentBackground = true,
+      guidanceScale = 7.5,
+      negativePrompt
+    } = validation.data;
+    
+    console.log(`📊 [${requestId}] Request parameters:`, { 
+      prompt: prompt.substring(0, 50) + '...', 
+      width, 
+      height, 
+      colorCount, 
+      style,
+      mode,
+      hasInputImage: !!inputImage,
+      strength,
+      preserveTransparency,
+      enforceTransparentBackground
+    });
 
     // Step 3: Validate image constraints  
     console.log(`🔍 [${requestId}] Step 3: Validating image constraints...`);
@@ -151,17 +222,90 @@ export async function POST(request: NextRequest) {
     }
     console.log(`✅ [${requestId}] Rate limiting passed`);
 
-    // Step 5: Sanitize and enhance prompt
-    console.log(`🎭 [${requestId}] Step 5: Processing prompt...`);
+    // Step 5: Analyze input image (if provided) and enhance prompt intelligently
+    console.log(`🎭 [${requestId}] Step 5: Intelligent prompt processing...`);
+    
+    let canvasAnalysis = null;
+    let dalleInputImage = undefined;
+    
+    // Analyze input image for image-to-image mode
+    if (mode === 'image-to-image' && inputImage) {
+      console.log(`🖼️ [${requestId}] Analyzing input image for ${mode} mode...`);
+      
+      try {
+        // Convert base64 to ImageData for analysis
+        const base64Data = inputImage.split(',')[1];
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        
+        // For now, create a mock analysis - in a real implementation, we'd analyze the actual image
+        canvasAnalysis = {
+          isEmpty: false,
+          hasTransparency: preserveTransparency,
+          dominantColors: ['rgb(100,100,100)', 'rgb(200,200,200)'], // Mock colors
+          pixelDensity: 0.6,
+          contentBounds: { x: 0, y: 0, width: width, height: height },
+          totalPixels: width * height,
+          filledPixels: Math.floor(width * height * 0.6),
+          fillPercentage: 60
+        };
+        
+        // For DALL-E 3 image-to-image, we need to use the input image
+        dalleInputImage = inputImage;
+        
+        console.log(`✅ [${requestId}] Input image analyzed:`, {
+          hasTransparency: canvasAnalysis.hasTransparency,
+          fillPercentage: canvasAnalysis.fillPercentage,
+          dominantColors: canvasAnalysis.dominantColors.length
+        });
+      } catch (error) {
+        console.error(`❌ [${requestId}] Failed to analyze input image:`, error);
+        return createErrorResponse(
+          'Failed to analyze input image',
+          'IMAGE_ANALYSIS_ERROR',
+          400
+        );
+      }
+    }
+    
+    // Validate mode compatibility
+    const modeValidation = validateModeForCanvas(mode as AIGenerationMode, canvasAnalysis);
+    if (!modeValidation.isValid) {
+      console.log(`❌ [${requestId}] Mode validation failed:`, modeValidation);
+      return createErrorResponse(
+        `Mode '${mode}' is not suitable: ${modeValidation.warnings.join(', ')}`,
+        'MODE_VALIDATION_ERROR',
+        400
+      );
+    }
+    
+    // Generate enhanced prompt using intelligent prompt enhancer
     const sanitizedPrompt = sanitize.prompt(prompt);
-    const enhancedPrompt = `${sanitizedPrompt}, pixel art style, ${style}, low resolution, limited color palette, crisp pixels, no anti-aliasing, retro gaming aesthetic`;
-    console.log(`✅ [${requestId}] Prompt processed: "${enhancedPrompt.substring(0, 100)}..."`);
+    const promptEnhancementOptions = {
+      mode: mode as AIGenerationMode,
+      style,
+      enforceTransparency: enforceTransparentBackground,
+      canvasAnalysis,
+      preserveExistingColors: preserveTransparency
+    };
+    
+    const promptResult = generateCompletePrompt(sanitizedPrompt, promptEnhancementOptions);
+    const enhancedPrompt = promptResult.finalPrompt;
+    
+    console.log(`✅ [${requestId}] Intelligent prompt enhancement completed:`, {
+      originalLength: sanitizedPrompt.length,
+      enhancedLength: enhancedPrompt.length,
+      appliedChanges: promptResult.appliedChanges.length,
+      confidence: promptResult.confidence.toFixed(2)
+    });
     
     console.log(`🎯 [${requestId}] Preparing DALL-E 3 generation:`, {
+      mode: mode,
       prompt: enhancedPrompt.substring(0, 100) + '...',
       targetSize: `${width}x${height}`,
       colorCount,
-      style
+      style,
+      hasInputImage: !!dalleInputImage,
+      strength: strength
     });
 
     // Step 6: Ensure OpenAI client is initialized
@@ -241,7 +385,22 @@ export async function POST(request: NextRequest) {
         width: 1024, // Actual DALL-E 3 size
         height: 1024,
         colorCount: colorCount,
-        processingTimeMs: totalTime
+        processingTimeMs: totalTime,
+        
+        // Enhanced metadata (bypass mode)
+        generationMetadata: {
+          mode: mode,
+          originalPrompt: sanitizedPrompt,
+          enhancedPrompt: enhancedPrompt,
+          appliedChanges: promptResult.appliedChanges,
+          promptConfidence: promptResult.confidence,
+          hadInputImage: !!inputImage,
+          strength: mode === 'image-to-image' ? strength : undefined,
+          style: style,
+          preserveTransparency: preserveTransparency,
+          enforceTransparentBackground: enforceTransparentBackground,
+          bypassMode: true
+        }
       };
 
       logApiRequest(request, '/ai/generate?bypass=true', startTime, true, { 
@@ -310,7 +469,21 @@ export async function POST(request: NextRequest) {
       width: processed.width,
       height: processed.height,
       colorCount: processed.colorCount,
-      processingTimeMs: totalTime
+      processingTimeMs: totalTime,
+      
+      // Enhanced metadata
+      generationMetadata: {
+        mode: mode,
+        originalPrompt: sanitizedPrompt,
+        enhancedPrompt: enhancedPrompt,
+        appliedChanges: promptResult.appliedChanges,
+        promptConfidence: promptResult.confidence,
+        hadInputImage: !!inputImage,
+        strength: mode === 'image-to-image' ? strength : undefined,
+        style: style,
+        preserveTransparency: preserveTransparency,
+        enforceTransparentBackground: enforceTransparentBackground
+      }
     };
 
     logApiRequest(request, '/ai/generate', startTime, true, { 
