@@ -96,7 +96,7 @@ interface FrameCanvasData {
   thumbnail: string | null // Base64 encoded thumbnail image
 }
 
-interface ProjectTab {
+export interface ProjectTab {
   id: string
   project: Project
   currentFrame: Frame | null

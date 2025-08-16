@@ -1,10 +1,12 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { X, Plus, Copy, Save } from 'lucide-react'
+import { ProjectDeletionModal, SimpleConfirmationModal } from './project-deletion-modal'
+import { analyzeProjectFrames, needsSaveConfirmation } from '@/lib/utils/project-helpers'
 
 export function ProjectTabs() {
   const {
@@ -15,7 +17,102 @@ export function ProjectTabs() {
     createNewProject,
     duplicateTab,
     saveProject,
+    getTab,
   } = useProjectStore()
+  
+  // Modal state management
+  const [deletionModal, setDeletionModal] = useState<{
+    open: boolean
+    tabId: string | null
+    projectName: string
+    framesWithContent: number
+    totalFrames: number
+  }>({
+    open: false,
+    tabId: null,
+    projectName: '',
+    framesWithContent: 0,
+    totalFrames: 0
+  })
+  
+  const [simpleModal, setSimpleModal] = useState<{
+    open: boolean
+    tabId: string | null
+    projectName: string
+  }>({
+    open: false,
+    tabId: null,
+    projectName: ''
+  })
+  
+  const [isLoading, setIsLoading] = useState(false)
+
+  /**
+   * Handle project close with smart confirmation
+   */
+  const handleProjectClose = (tabId: string) => {
+    const tab = getTab(tabId)
+    if (!tab) return
+
+    const analysis = analyzeProjectFrames(tab)
+    
+    if (analysis.hasUnsavedWork) {
+      // Show confirmation modal for projects with content
+      setDeletionModal({
+        open: true,
+        tabId,
+        projectName: tab.project.name,
+        framesWithContent: analysis.framesWithContent,
+        totalFrames: analysis.totalFrames
+      })
+    } else {
+      // Show simple confirmation for empty projects
+      setSimpleModal({
+        open: true,
+        tabId,
+        projectName: tab.project.name
+      })
+    }
+  }
+
+  /**
+   * Save project and close
+   */
+  const handleSaveAndClose = async () => {
+    if (!deletionModal.tabId) return
+
+    setIsLoading(true)
+    try {
+      await saveProject(deletionModal.tabId)
+      closeTab(deletionModal.tabId)
+      setDeletionModal(prev => ({ ...prev, open: false }))
+    } catch (error) {
+      console.error('Failed to save project:', error)
+      // Keep modal open on error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  /**
+   * Discard changes and close
+   */
+  const handleDiscardAndClose = () => {
+    if (!deletionModal.tabId) return
+
+    closeTab(deletionModal.tabId)
+    setDeletionModal(prev => ({ ...prev, open: false }))
+  }
+
+  /**
+   * Simple close for empty projects
+   */
+  const handleSimpleClose = () => {
+    if (!simpleModal.tabId) return
+
+    closeTab(simpleModal.tabId)
+    setSimpleModal(prev => ({ ...prev, open: false }))
+  }
 
   return (
     <div className="flex h-12 items-center bg-white">
@@ -86,7 +183,7 @@ export function ProjectTabs() {
                 className="h-6 w-6 p-0 hover:bg-red-100"
                 onClick={(e) => {
                   e.stopPropagation()
-                  closeTab(tab.id)
+                  handleProjectClose(tab.id)
                 }}
                 title="Close project"
               >
@@ -126,6 +223,26 @@ export function ProjectTabs() {
           }
         </div>
       </div>
+
+      {/* Confirmation Modals */}
+      <ProjectDeletionModal
+        open={deletionModal.open}
+        onOpenChange={(open) => setDeletionModal(prev => ({ ...prev, open }))}
+        projectName={deletionModal.projectName}
+        framesWithContent={deletionModal.framesWithContent}
+        totalFrames={deletionModal.totalFrames}
+        onSaveAndClose={handleSaveAndClose}
+        onDiscardAndClose={handleDiscardAndClose}
+        isLoading={isLoading}
+      />
+
+      <SimpleConfirmationModal
+        open={simpleModal.open}
+        onOpenChange={(open) => setSimpleModal(prev => ({ ...prev, open }))}
+        projectName={simpleModal.projectName}
+        onConfirm={handleSimpleClose}
+        isLoading={isLoading}
+      />
     </div>
   )
 }
