@@ -18,6 +18,7 @@ import { generateCompletePrompt } from '@/lib/utils/prompt-enhancer';
 import { detectOptimalAIMode, validateModeForCanvas } from '@/lib/utils/ai-mode-detector';
 import { analyzeCanvas } from '@/lib/utils/canvas-analysis';
 import { AIGenerationMode } from '@/lib/types/canvas';
+import { createApiLogger } from '@/lib/utils/smart-logger';
 
 // Enhanced request validation schema supporting multiple AI generation modes
 const GenerateRequestSchema = z.object({
@@ -139,96 +140,62 @@ openai = initializeOpenAI();
  * 3. Return base64 encoded image with metadata
  */
 export async function POST(request: NextRequest) {
-  // CRITICAL: First log to verify function execution
-  console.log('🚀 API ROUTE ENTRY: POST /api/ai/generate function started');
-  console.log('🚀 Timestamp:', new Date().toISOString());
-  console.log('🚀 Request URL:', request.url);
-  console.log('🚀 Request method:', request.method);
-  
   let requestId: string;
   let startTime: number;
   let bypassProcessing: boolean = false;
+  let apiLogger: ReturnType<typeof createApiLogger>;
   
   try {
     startTime = Date.now();
     requestId = crypto.randomUUID();
-    console.log(`🆔 Generated requestId: ${requestId}`);
+    apiLogger = createApiLogger('/api/ai/generate', requestId);
+    
+    apiLogger.info('AI image generation request started');
+    
+    // Check for bypass parameter (query param or header)
+    const { searchParams } = new URL(request.url);
+    const bypassFromParam = searchParams.get('bypass') === 'true';
+    const bypassFromHeader = request.headers.get('x-bypass-processing') === 'true';
+    bypassProcessing = bypassFromParam || bypassFromHeader;
+    
+    apiLogger.debug(() => `Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
+    
   } catch (error) {
-    console.error('❌ Failed to initialize basic variables:', error);
     return new Response(JSON.stringify({
       success: false,
       error: { message: 'Failed to initialize request', code: 'INIT_ERROR' }
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-  
-  try {
-    // Check for bypass parameter (query param or header)
-    console.log(`🔧 [${requestId}] Parsing URL and headers...`);
-    const { searchParams } = new URL(request.url);
-    const bypassFromParam = searchParams.get('bypass') === 'true';
-    const bypassFromHeader = request.headers.get('x-bypass-processing') === 'true';
-    bypassProcessing = bypassFromParam || bypassFromHeader;
-    console.log(`🔧 [${requestId}] URL parsing successful`);
-    
-    console.log(`🎨 [${requestId}] AI image generation requested at ${new Date().toISOString()}`);
-    console.log(`🔧 [${requestId}] Environment check: NODE_ENV=${process.env.NODE_ENV}`);
-    console.log(`🔄 [${requestId}] Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
-    console.log(`🔧 [${requestId}] About to start main try block...`);
-  } catch (prelimError) {
-    console.error(`❌ [${requestId}] Failed in preliminary setup:`, prelimError);
-    return new Response(JSON.stringify({
-      success: false,
-      error: { message: 'Failed in preliminary setup', code: 'PRELIM_ERROR', details: String(prelimError) }
-    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-  }
 
   try {
-    // Step 1: Validate request body (moved before service check for better testing)
-    console.log(`📝 [${requestId}] Step 1: Starting request body validation...`);
+    const timer = apiLogger.time('Full AI generation process');
     
-    let validation: any;
-    try {
-      console.log(`📝 [${requestId}] Calling validateRequestBody function...`);
-      validation = await validateRequestBody(request, GenerateRequestSchema);
-      console.log(`📝 [${requestId}] validateRequestBody completed, success:`, validation?.success);
-    } catch (validationError) {
-      console.error(`❌ [${requestId}] validateRequestBody threw exception:`, validationError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: { message: 'Validation function failed', code: 'VALIDATION_EXCEPTION', details: String(validationError) }
-      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    }
+    // Step 1: Validate request body
+    apiLogger.debug('Starting request body validation');
+    const validation = await validateRequestBody(request, GenerateRequestSchema);
     
     if (!validation.success) {
-      console.log(`❌ [${requestId}] Request validation failed:`, validation);
+      apiLogger.warn('Request validation failed');
       logApiRequest(request, '/ai/generate', startTime, false, 'Validation failed');
       return validation.response;
     }
-    console.log(`✅ [${requestId}] Request validation passed`);
-    console.log(`🔍 [${requestId}] Received request data:`, JSON.stringify(validation.data, null, 2));
+    
+    apiLogger.debug(() => 'Request validation passed', undefined, () => ({
+      prompt: validation.data.prompt.substring(0, 50) + '...',
+      dimensions: `${validation.data.width}x${validation.data.height}`,
+      mode: validation.data.mode,
+      colorCount: validation.data.colorCount
+    }));
 
     // Step 2: Check AI service availability
-    console.log(`📋 [${requestId}] Step 2: Starting AI service availability check...`);
-    
-    let serviceCheck: any;
-    try {
-      console.log(`📋 [${requestId}] Calling checkAIServiceAvailability function...`);
-      serviceCheck = checkAIServiceAvailability();
-      console.log(`📋 [${requestId}] checkAIServiceAvailability completed, available:`, serviceCheck?.available);
-    } catch (serviceError) {
-      console.error(`❌ [${requestId}] checkAIServiceAvailability threw exception:`, serviceError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: { message: 'Service check failed', code: 'SERVICE_CHECK_EXCEPTION', details: String(serviceError) }
-      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    }
+    apiLogger.debug('Checking AI service availability');
+    const serviceCheck = checkAIServiceAvailability();
     
     if (!serviceCheck.available) {
-      console.log(`❌ [${requestId}] Service unavailable:`, serviceCheck);
+      apiLogger.error('AI service unavailable');
       logApiRequest(request, '/ai/generate', startTime, false, 'Service unavailable');
       return serviceCheck.response;
     }
-    console.log(`✅ [${requestId}] AI service availability check passed`);
 
     const { 
       prompt, 
@@ -245,24 +212,18 @@ export async function POST(request: NextRequest) {
       negativePrompt
     } = validation.data;
     
-    console.log(`📊 [${requestId}] Request parameters:`, { 
-      prompt: prompt.substring(0, 50) + '...', 
-      width, 
-      height, 
-      colorCount, 
-      style,
+    apiLogger.info('Processing AI generation request', { 
+      dimensions: `${width}x${height}`,
+      colorCount,
       mode,
-      hasInputImage: !!inputImage,
-      strength,
-      preserveTransparency,
-      enforceTransparentBackground
+      style,
+      hasInputImage: !!inputImage
     });
 
     // Step 3: Validate image constraints  
-    console.log(`🔍 [${requestId}] Step 3: Validating image constraints...`);
     const constraintValidation = validateImageConstraints(width, height, colorCount);
     if (!constraintValidation.valid) {
-      console.log(`❌ [${requestId}] Constraint validation failed:`, constraintValidation);
+      apiLogger.warn('Image constraint validation failed', undefined, constraintValidation);
       logApiRequest(request, '/ai/generate', startTime, false, 'Constraint validation failed');
       return createErrorResponse(
         constraintValidation.error || 'Invalid image constraints',
@@ -270,27 +231,22 @@ export async function POST(request: NextRequest) {
         400
       );
     }
-    console.log(`✅ [${requestId}] Image constraints validation passed`);
 
     // Step 4: Apply rate limiting
-    console.log(`⏱️ [${requestId}] Step 4: Applying rate limiting...`);
     const rateLimitResult = applyRateLimit(request);
     if (!rateLimitResult.success) {
-      console.log(`❌ [${requestId}] Rate limit exceeded:`, rateLimitResult);
+      apiLogger.warn('Rate limit exceeded');
       logApiRequest(request, '/ai/generate', startTime, false, 'Rate limit exceeded');
       return rateLimitResult.response;
     }
-    console.log(`✅ [${requestId}] Rate limiting passed`);
 
     // Step 5: Analyze input image (if provided) and enhance prompt intelligently
-    console.log(`🎭 [${requestId}] Step 5: Intelligent prompt processing...`);
-    
     let canvasAnalysis = null;
     let dalleInputImage = undefined;
     
     // Analyze input image for image-to-image mode
     if (mode === 'image-to-image' && inputImage) {
-      console.log(`🖼️ [${requestId}] Analyzing input image for ${mode} mode...`);
+      apiLogger.debug('Analyzing input image for image-to-image mode');
       
       try {
         // Convert base64 to ImageData for analysis
@@ -315,13 +271,12 @@ export async function POST(request: NextRequest) {
         // For DALL-E 3 image-to-image, we need to use the input image
         dalleInputImage = inputImage;
         
-        console.log(`✅ [${requestId}] Input image analyzed:`, {
-          hasTransparency: canvasAnalysis.hasTransparency,
+        apiLogger.debug('Input image analysis completed', undefined, {
           fillPercentage: canvasAnalysis.fillPercentage,
-          dominantColors: canvasAnalysis.dominantColors.length
+          hasTransparency: canvasAnalysis.hasTransparency
         });
       } catch (error) {
-        console.error(`❌ [${requestId}] Failed to analyze input image:`, error);
+        apiLogger.error('Failed to analyze input image', undefined, error);
         return createErrorResponse(
           'Failed to analyze input image',
           'IMAGE_ANALYSIS_ERROR',
@@ -333,7 +288,7 @@ export async function POST(request: NextRequest) {
     // Validate mode compatibility
     const modeValidation = validateModeForCanvas(mode as AIGenerationMode, canvasAnalysis);
     if (!modeValidation.isValid) {
-      console.log(`❌ [${requestId}] Mode validation failed:`, modeValidation);
+      apiLogger.warn('Mode validation failed', undefined, modeValidation);
       return createErrorResponse(
         `Mode '${mode}' is not suitable: ${modeValidation.warnings.join(', ')}`,
         'MODE_VALIDATION_ERROR',
@@ -354,46 +309,20 @@ export async function POST(request: NextRequest) {
     const promptResult = generateCompletePrompt(sanitizedPrompt, promptEnhancementOptions);
     const enhancedPrompt = promptResult.finalPrompt;
     
-    console.log(`✅ [${requestId}] Intelligent prompt enhancement completed:`, {
+    apiLogger.debug(() => `Prompt enhancement completed`, undefined, () => ({
       originalLength: sanitizedPrompt.length,
       enhancedLength: enhancedPrompt.length,
       appliedChanges: promptResult.appliedChanges.length,
       confidence: promptResult.confidence.toFixed(2)
-    });
-    
-    console.log(`🎯 [${requestId}] Preparing GPT-Image-1 generation:`, {
-      mode: mode,
-      prompt: enhancedPrompt.substring(0, 100) + '...',
-      targetSize: `${width}x${height}`,
-      colorCount,
-      style,
-      hasInputImage: !!dalleInputImage,
-      strength: strength
-    });
+    }));
 
     // Step 6: Ensure OpenAI client is initialized
-    console.log(`🤖 [${requestId}] Step 6: Checking OpenAI client...`);
-    console.log(`🤖 [${requestId}] Current openai client status:`, { 
-      exists: !!openai, 
-      type: typeof openai,
-      hasApiKey: !!process.env.OPENAI_API_KEY 
-    });
-    
     if (!openai) {
-      console.log(`🔄 [${requestId}] OpenAI client not initialized, attempting to re-initialize...`);
-      try {
-        openai = initializeOpenAI();
-        console.log(`🔄 [${requestId}] initializeOpenAI completed, result:`, !!openai);
-      } catch (initError) {
-        console.error(`❌ [${requestId}] initializeOpenAI threw exception:`, initError);
-        return new Response(JSON.stringify({
-          success: false,
-          error: { message: 'OpenAI initialization failed', code: 'OPENAI_INIT_EXCEPTION', details: String(initError) }
-        }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-      }
+      apiLogger.debug('Initializing OpenAI client');
+      openai = initializeOpenAI();
       
       if (!openai) {
-        console.log(`❌ [${requestId}] OpenAI client initialization failed`);
+        apiLogger.error('OpenAI client initialization failed - check API key configuration');
         logApiRequest(request, '/ai/generate', startTime, false, 'OpenAI client not initialized');
         return createErrorResponse(
           'AI service initialization failed - check OpenAI API key configuration',
@@ -402,30 +331,12 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    console.log(`✅ [${requestId}] OpenAI client ready`);
 
-    // Step 7: Generate image using DALL-E 3 model (Verified OpenAI Model)
-    console.log(`🎨 [${requestId}] Step 7: Calling DALL-E 3 API...`);
-    console.log(`🔍 [${requestId}] OpenAI client status:`, { 
-      clientExists: !!openai,
-      clientType: typeof openai
-    });
+    // Step 7: Generate image using DALL-E 3 model
+    const aiTimer = apiLogger.time('OpenAI API call');
+    apiLogger.info(`Calling DALL-E API for ${mode} generation`);
     
     let dalleResponse: any;
-    
-    // Use DALL-E 3 - Verified and supported OpenAI model
-    console.log(`⚙️ [${requestId}] Using DALL-E 3 for ${mode} (VERIFIED MODEL):`, { 
-      modelUsed: "dall-e-3",
-      mode: mode,
-      quality: "hd",
-      style: "natural",
-      promptLength: enhancedPrompt.length,
-      targetSize: "1024x1024",
-      hasInputImage: !!dalleInputImage,
-      timeout: "10min"
-    });
-    
-    console.log(`🚀 [${requestId}] About to call OpenAI API with model: dall-e-3`);
     
     if (mode === 'image-to-image' && dalleInputImage) {
       // Convert base64 to buffer for image-to-image
@@ -435,7 +346,7 @@ export async function POST(request: NextRequest) {
       }
       const imageBuffer = Buffer.from(base64Data, 'base64');
       
-      console.log(`🖼️ [${requestId}] Calling OpenAI images.edit for image-to-image mode`);
+      apiLogger.debug('Using DALL-E 2 for image editing (image-to-image mode)');
       dalleResponse = await Promise.race([
         openai.images.edit({
           model: "dall-e-2", // Note: DALL-E 3 doesn't support image editing, use DALL-E 2
@@ -449,9 +360,8 @@ export async function POST(request: NextRequest) {
           setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)
         )
       ]) as any;
-      console.log(`✅ [${requestId}] OpenAI images.edit call completed successfully`);
     } else {
-      console.log(`🎨 [${requestId}] Calling OpenAI images.generate for text-to-image mode`);
+      apiLogger.debug('Using DALL-E 3 for text-to-image generation');
       dalleResponse = await Promise.race([
         openai.images.generate({
           model: "dall-e-3",
@@ -466,37 +376,28 @@ export async function POST(request: NextRequest) {
           setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)
         )
       ]) as any;
-      console.log(`✅ [${requestId}] OpenAI images.generate call completed successfully`);
     }
 
-    const usedModel = 'DALL-E 3';
-    console.log(`🎉 [${requestId}] ${usedModel} API call successful`);
-    console.log(`📊 [${requestId}] Response data length:`, dalleResponse.data?.length || 0);
-
+    aiTimer(); // Log API call duration
+    
     if (!dalleResponse.data || dalleResponse.data.length === 0) {
-      throw new Error(`No image generated by ${usedModel}`);
+      throw new Error('No image generated by DALL-E');
     }
     
     const imageUrl = dalleResponse.data[0]?.url;
     if (!imageUrl) {
-      throw new Error(`No image URL returned from ${usedModel}`);
+      throw new Error('No image URL returned from DALL-E');
     }
 
-    console.log(`✅ [${requestId}] ${usedModel} generation successful, image URL received`);
-    console.log(`🔗 [${requestId}] Image URL: ${imageUrl.substring(0, 50)}...`);
-    console.log(`🎯 [${requestId}] Used model: ${usedModel} (mode: ${mode}, hadInput: ${!!dalleInputImage})`);
+    apiLogger.info('DALL-E image generation successful');
 
     // CRITICAL: Bypass processing BEFORE any Sharp/VIPS operations to avoid RGB/RGBA issues
     if (bypassProcessing) {
       const totalTime = Date.now() - startTime;
       
-      console.log(`🚀 [${requestId}] Bypass mode: Returning raw DALL-E 3 output without processing`);
-      console.log(`🎉 Bypass AI image generation complete:`, {
-        dimensions: `${width}x${height} (requested)`,
-        actualSize: "1024x1024 (DALL-E 3)",
-        colors: colorCount,
+      apiLogger.info('Bypass mode: Returning raw DALL-E output without processing', {
         totalTime: `${totalTime}ms`,
-        note: "Raw DALL-E 3 output without pixel art processing"
+        outputSize: '1024x1024'
       });
 
       const responseData = {
@@ -538,50 +439,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 8: Download generated image
-    console.log(`📥 [${requestId}] Step 8: Downloading generated image...`);
+    const downloadTimer = apiLogger.time('Image download');
     const imageResponse = await fetch(imageUrl, {
       signal: AbortSignal.timeout(600000) // 10 minute timeout
     });
     
     if (!imageResponse.ok) {
-      console.error(`❌ [${requestId}] Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
       throw new Error(`Failed to download generated image: ${imageResponse.statusText}`);
     }
 
-    console.log(`✅ [${requestId}] Image downloaded, converting to buffer...`);
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    console.log(`📊 [${requestId}] Image buffer size: ${imageBuffer.length} bytes`);
+    downloadTimer();
+    
+    apiLogger.debug(() => `Downloaded image buffer: ${imageBuffer.length} bytes`);
 
     // Step 9: Process image for pixel art conversion using Sharp
-    console.log(`🎨 [${requestId}] Step 9: Processing image for pixel art...`);
-    console.log(`⚙️ [${requestId}] Processing parameters:`, { targetWidth: width, targetHeight: height, colorCount, method: 'median-cut', dithering: false });
-    
-    console.log(`🔧 [${requestId}] Using Sharp processing with RGBA conversion...`);
+    const processTimer = apiLogger.time('Pixel art processing');
     const processed = await processImageForPixelArt(imageBuffer, width, height, {
       colorCount,
       method: 'median-cut',
       enableDithering: false
     });
-    console.log(`✅ [${requestId}] Sharp processing successful`);
-    console.log(`✅ [${requestId}] Image processing completed successfully`);
-    console.log(`📊 [${requestId}] Processed result:`, { 
-      width: processed.width, 
-      height: processed.height, 
+    processTimer();
+    
+    apiLogger.debug(() => 'Image processing completed', undefined, () => ({ 
+      dimensions: `${processed.width}x${processed.height}`, 
       colorCount: processed.colorCount,
       paletteLength: processed.palette?.length || 0
-    });
+    }));
 
     // Convert to base64 data URL
     const base64Image = `data:image/png;base64,${processed.buffer.toString('base64')}`;
 
     const totalTime = Date.now() - startTime;
-
-    console.log(`🎉 AI image generation complete:`, {
-      dimensions: `${processed.width}x${processed.height}`,
-      colors: processed.colorCount,
-      processingTime: `${processed.processingTimeMs}ms`,
-      totalTime: `${totalTime}ms`
-    });
 
     const responseData = {
       assetId: requestId, // Use request ID as asset ID
@@ -607,6 +497,12 @@ export async function POST(request: NextRequest) {
       }
     };
 
+    apiLogger.info('AI image generation completed successfully', {
+      dimensions: `${processed.width}x${processed.height}`,
+      colorCount: processed.colorCount,
+      totalTime: `${totalTime}ms`
+    });
+
     logApiRequest(request, '/ai/generate', startTime, true, { 
       dimensions: `${processed.width}x${processed.height}`,
       colors: processed.colorCount 
@@ -619,55 +515,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     const totalTime = Date.now() - startTime;
-    
-    console.error(`💥 [${requestId}] CRITICAL: Exception caught in main try block:`, error);
-    console.error(`🔍 [${requestId}] Error type:`, typeof error);
-    console.error(`🔍 [${requestId}] Error constructor:`, error?.constructor?.name);
-    console.error(`🔍 [${requestId}] Error prototype:`, Object.getPrototypeOf(error));
-    
-    // Extract all possible error information
-    if (error && typeof error === 'object') {
-      console.error(`🔍 [${requestId}] Error object keys:`, Object.keys(error));
-      
-      // Check if this is an OpenAI API error
-      if ('error' in error) {
-        console.error(`🔍 [${requestId}] OpenAI API Error Details:`, error.error);
-      }
-      
-      // Check for response data (with type safety)
-      if ('response' in error && error.response && typeof error.response === 'object') {
-        const response = error.response as any;
-        console.error(`🔍 [${requestId}] HTTP Response Error:`, {
-          status: response.status || 'unknown',
-          statusText: response.statusText || 'unknown',
-          data: response.data || 'no data'
-        });
-      }
-      
-      // Check for request config (with type safety)
-      if ('config' in error && error.config && typeof error.config === 'object') {
-        const config = error.config as any;
-        console.error(`🔍 [${requestId}] Request Config:`, {
-          url: config.url || 'unknown',
-          method: config.method || 'unknown',
-          headers: config.headers || 'no headers'
-        });
-      }
-    }
-    
-    // Try to extract the stack trace
-    if (error instanceof Error) {
-      console.error(`🔍 [${requestId}] Error message:`, error.message);
-      console.error(`🔍 [${requestId}] Error stack:`, error.stack);
-    }
-    
     const errorInfo = getErrorInfo(error);
-    console.error(`❌ [${requestId}] Generation failed after ${totalTime}ms:`, {
-      error: errorInfo.message,
-      errorName: errorInfo.name,
-      stack: errorInfo.stack,
-      originalError: String(error)
-    });
+    
+    // Log error with appropriate level based on logger availability
+    if (apiLogger) {
+      apiLogger.error('AI generation failed', { 
+        totalTime: `${totalTime}ms`,
+        errorType: error?.constructor?.name 
+      }, errorInfo);
+    } else {
+      console.error(`❌ AI generation failed after ${totalTime}ms:`, errorInfo.message);
+    }
     
     logApiRequest(request, '/ai/generate', startTime, false, {
       error: errorInfo.message,
@@ -677,7 +535,6 @@ export async function POST(request: NextRequest) {
 
     // Handle specific OpenAI API errors using safe error info
     const errorMessage = errorInfo.message.toLowerCase();
-    console.log(`🔍 [${requestId}] Analyzing error message: "${errorMessage.substring(0, 100)}..."`);
     
     if (errorMessage.includes('insufficient_quota')) {
       return createErrorResponse(
@@ -719,39 +576,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enhanced error response with better debugging information
-    console.error(`❌ [${requestId}] Detailed error information:`, errorInfo);
-    
-    // Return more specific error message to help with debugging
+    // Return concise error response with essential debug info for development
     const debugMessage = errorMessage.includes('openai') || errorMessage.includes('api') ? 
       `OpenAI API error: ${errorInfo.message}` :
       errorMessage.includes('fetch') || errorMessage.includes('network') ?
       `Network error during image processing: ${errorInfo.message}` :
       `Image generation failed: ${errorInfo.message}`;
     
-    // Include comprehensive debug information in the response
-    const debugInfo = {
+    const debugInfo = process.env.NODE_ENV === 'development' ? {
       requestId,
-      timestamp: new Date().toISOString(),
       totalTime: `${totalTime}ms`,
-      errorType: typeof error,
-      errorConstructor: error?.constructor?.name,
+      errorType: error?.constructor?.name,
       errorMessage: errorInfo.message,
-      errorName: errorInfo.name,
-      hasStack: !!errorInfo.stack,
-      originalError: String(error).substring(0, 500), // Truncate to avoid huge responses
-      nodeEnv: process.env.NODE_ENV,
       hasOpenAIKey: !!process.env.OPENAI_API_KEY
-    };
-    
-    console.error(`❌ [${requestId}] Sending error response with debug info:`, debugInfo);
+    } : undefined;
     
     return new Response(JSON.stringify({
       success: false,
       error: {
         message: debugMessage,
         code: 'GENERATION_ERROR',
-        debug: debugInfo
+        ...(debugInfo && { debug: debugInfo })
       }
     }), { 
       status: 500, 

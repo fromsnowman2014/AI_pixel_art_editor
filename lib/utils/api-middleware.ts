@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getEnv, isAIEnabled } from './env-validation';
+import { logger } from './smart-logger';
 
 /**
  * API Middleware utilities for request validation, security, and error handling
@@ -407,7 +408,7 @@ export function getErrorInfo(error: unknown): {
 }
 
 /**
- * Logging utility for API requests
+ * Enhanced logging utility for API requests with performance metrics
  */
 export function logApiRequest(
   request: NextRequest,
@@ -421,21 +422,44 @@ export function logApiRequest(
   const userAgent = request.headers.get('user-agent')?.substring(0, 100);
   const clientId = rateLimiter.getClientId(request);
 
-  const logData = {
+  // Enhanced performance metrics
+  const performanceMetrics = {
     endpoint,
     method,
-    duration: `${duration}ms`,
+    duration_ms: duration,
     success,
-    clientId: clientId.substring(0, 20), // Truncate for privacy
-    userAgent,
     timestamp: new Date().toISOString(),
-    ...(details && { details })
+    // Performance classification
+    performance_tier: duration < 100 ? 'fast' : duration < 500 ? 'normal' : duration < 2000 ? 'slow' : 'critical',
+    // Request metadata
+    client_type: userAgent?.includes('curl') ? 'cli' : 
+                 userAgent?.includes('Mozilla') ? 'browser' : 'api',
+    client_id_hash: clientId.substring(0, 8), // Truncated for privacy
+    // Additional context
+    ...(details && { context: details })
   };
 
+  // Log with appropriate level based on performance and success
   if (success) {
-    console.log(`✅ API Request completed:`, logData);
+    if (duration > 2000) {
+      logger.warn('API request completed but slow', performanceMetrics);
+    } else {
+      logger.info('API request completed', performanceMetrics);
+    }
   } else {
-    console.error(`❌ API Request failed:`, logData);
+    logger.error('API request failed', performanceMetrics);
+  }
+
+  // Additional monitoring metrics for Railway (structured logs when enabled)
+  if (process.env.STRUCTURED_LOGS === 'true') {
+    logger.info('api_metrics', {
+      metric_type: 'api_request',
+      endpoint_hash: Buffer.from(endpoint).toString('base64').substring(0, 12),
+      response_time_ms: duration,
+      status: success ? 'success' : 'error',
+      performance_score: Math.max(0, 100 - Math.floor(duration / 10)), // 0-100 score
+      timestamp_unix: Math.floor(Date.now() / 1000)
+    });
   }
 }
 

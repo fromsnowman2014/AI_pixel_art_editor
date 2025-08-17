@@ -18,17 +18,19 @@ import type {
 
 // API Configuration - Using Local Next.js API with Proxy to Backend
 const getApiBaseUrl = () => {
-  // ALWAYS use local Next.js API routes to avoid CORS issues
-  // The Next.js API routes will proxy to Railway backend when needed
-  
-  if (typeof window !== 'undefined') {
-    // Client-side: Always use local API routes (no CORS issues)
-    console.log('🔧 API Client using local Next.js API routes (CORS-free)');
-    return '/api';
-  } else {
-    // Server-side: Also use local API routes for consistency
-    return '/api';
+  // Development mode: Use production API directly if OPENAI_API_KEY is missing
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    const hasLocalApiKey = !!process.env.NEXT_PUBLIC_HAS_OPENAI_KEY;
+    
+    if (!hasLocalApiKey) {
+      console.log('🔧 API Client using production Railway API (no local OpenAI key)');
+      return 'https://aipixelarteditor-production.up.railway.app/api';
+    }
   }
+  
+  // Default: use local Next.js API routes (CORS-free)
+  console.log('🔧 API Client using local Next.js API routes (CORS-free)');
+  return '/api';
 }
 
 const API_BASE_URL = getApiBaseUrl()

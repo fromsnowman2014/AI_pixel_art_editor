@@ -5,6 +5,7 @@ import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Download, FileImage, Film, Image, Play, X } from 'lucide-react'
+import { createComponentLogger } from '@/lib/utils/smart-logger'
 
 interface ExportModalProps {
   open: boolean
@@ -30,6 +31,8 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
   const activeTab = getActiveTab()
   const project = activeTab?.project
   const frames = activeTab?.frames || []
+  
+  const logger = createComponentLogger('ExportModal')
 
   // Calculate scaled dimensions and validate maximum size
   const scaledWidth = project ? Math.round(project.width * scale) : 0
@@ -44,15 +47,6 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
     const testHeight = Math.round(project.height * s)
     return testWidth <= maxDimension && testHeight <= maxDimension
   })
-
-  // Debug logging utility
-  const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
-  const debugLog = (category: string, message: string, data?: any) => {
-    if (DEBUG_MODE) {
-      const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-      console.log(`[${timestamp}] 💾 ExportModal [${category}]:`, message, data || '')
-    }
-  }
 
   // Initialize filename when modal opens
   useEffect(() => {
@@ -86,19 +80,16 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
     if (!activeTabId || !project) return
 
     setIsExporting(true)
-    debugLog('EXPORT_START', 'Starting export process', {
+    
+    const exportTimer = logger.time('Export process')
+    logger.info('Starting export process', {
       exportType,
-      imageFormat: exportType === 'image' ? imageFormat : undefined,
-      fileName,
-      scale,
-      scaledWidth,
-      scaledHeight,
-      quality: exportType === 'image' ? quality : undefined,
-      gifDuration: exportType === 'gif' ? gifDuration : undefined
+      format: exportType === 'image' ? imageFormat : 'gif',
+      dimensions: `${scaledWidth}x${scaledHeight}`,
+      scale
     })
 
-    // CRITICAL: Save all frame canvas data before export
-    debugLog('EXPORT_SAVE_FRAMES', 'Saving all frame data before export')
+    // Save all frame canvas data before export
     saveAllFrameCanvasData(activeTabId)
 
     try {
@@ -110,34 +101,23 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
         })
       } else {
         if (frames.length <= 1) {
-          debugLog('EXPORT_GIF_ERROR', 'Insufficient frames for GIF creation', {
-            totalFrames: frames.length,
-            availableFrames: frames.map(f => f.id)
-          })
+          logger.warn('Insufficient frames for GIF creation', { totalFrames: frames.length })
           return
         }
         
         const includedFrames = frames.filter(f => f.included)
-        debugLog('EXPORT_GIF_PREPARATION', 'Preparing GIF export', {
-          totalFrames: frames.length,
-          includedFrames: includedFrames.length,
-          frameDetails: frames.map(f => ({
-            id: f.id,
-            included: f.included,
-            delayMs: f.delayMs
-          })),
-          gifDuration,
-          gifLoop,
-          fileName
-        })
         
         if (includedFrames.length === 0) {
-          debugLog('EXPORT_GIF_ERROR', 'No frames included in animation', {
-            totalFrames: frames.length,
-            includedCount: 0
-          })
+          logger.warn('No frames included in animation', { totalFrames: frames.length })
           throw new Error('No frames are included in the animation')
         }
+        
+        logger.debug(() => 'Exporting GIF', undefined, () => ({
+          totalFrames: frames.length,
+          includedFrames: includedFrames.length,
+          gifDuration,
+          gifLoop
+        }))
         
         await exportProject(activeTabId, 'gif', {
           fileName,
@@ -149,10 +129,11 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
         })
       }
 
-      debugLog('EXPORT_SUCCESS', 'Export completed successfully')
+      exportTimer()
+      logger.info('Export completed successfully')
       onOpenChange(false)
     } catch (error) {
-      debugLog('EXPORT_ERROR', 'Export failed', { error })
+      logger.error('Export failed', undefined, error)
     } finally {
       setIsExporting(false)
     }

@@ -16,6 +16,7 @@ import {
   SkipBack,
   SkipForward
 } from 'lucide-react'
+import { createComponentLogger } from '@/lib/utils/smart-logger'
 
 interface FrameManagerProps {
   frames: Frame[]
@@ -37,6 +38,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackFrame, setPlaybackFrame] = useState(0)
+  
+  const logger = createComponentLogger('FrameManager')
 
   // Animation playback (simplified) - moved before early return
   React.useEffect(() => {
@@ -67,28 +70,9 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   const handleDuplicateFrame = (frameId: string) => {
-    // Enhanced debug logging for frame duplication
-    const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
-    const debugLog = (category: string, message: string, data?: any) => {
-      if (DEBUG_MODE) {
-        const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-        console.log(`[${timestamp}] 🎞️  FrameManager [${category}]:`, message, data || '')
-      }
-    }
-
-    debugLog('DUPLICATE_FRAME_START', `Initiating frame duplication`, {
-      frameId,
-      activeTabId,
-      activeFrameId,
-      totalFrames: frames.length
-    })
-
+    logger.debug(() => 'Frame duplication initiated', { frameId, totalFrames: frames.length })
     duplicateFrame(activeTabId, frameId)
-    
-    debugLog('DUPLICATE_FRAME_COMPLETE', `Frame duplication completed`, {
-      frameId,
-      newTotalFrames: frames.length + 1
-    })
+    logger.debug(() => 'Frame duplication completed', { frameId })
   }
 
   const handleDeleteFrame = (frameId: string) => {
@@ -98,94 +82,43 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   const handleFrameSelect = (frameId: string) => {
-    // Enhanced debug logging for frame switching
-    const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
-    const debugLog = (category: string, message: string, data?: any) => {
-      if (DEBUG_MODE) {
-        const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-        console.log(`[${timestamp}] 🎞️  FrameManager [${category}]:`, message, data || '')
-      }
-    }
-
-    // EDGE CASE: Validate inputs
-    if (!frameId || typeof frameId !== 'string') {
-      debugLog('FRAME_SELECT_ERROR', 'Invalid frameId provided', { frameId, type: typeof frameId })
+    // Input validation
+    if (!frameId || !activeTabId || !frames?.length) {
+      logger.warn('Invalid frame selection parameters', { frameId, activeTabId, framesLength: frames?.length })
       return
     }
 
-    if (!activeTabId || typeof activeTabId !== 'string') {
-      debugLog('FRAME_SELECT_ERROR', 'Invalid activeTabId', { activeTabId, type: typeof activeTabId })
-      return
-    }
-
-    if (!frames || frames.length === 0) {
-      debugLog('FRAME_SELECT_ERROR', 'No frames available', { framesLength: frames?.length || 0 })
-      return
-    }
-
-    // EDGE CASE: Verify frame exists
+    // Verify frame exists
     const targetFrame = frames.find(f => f.id === frameId)
     if (!targetFrame) {
-      debugLog('FRAME_SELECT_ERROR', 'Target frame not found', { 
-        frameId, 
-        availableFrames: frames.map(f => f.id),
-        totalFrames: frames.length
-      })
+      logger.warn('Target frame not found', { frameId, availableFrames: frames.length })
       return
     }
 
-    const currentActiveFrameId = frames.find(f => f.id === activeFrameId)?.id
-    debugLog('FRAME_SELECT_START', `User clicked frame ${frameId}`, {
-      currentActiveFrameId,
-      targetFrameId: frameId,
-      totalFrames: frames.length,
-      isPlaying,
-      activeTabId
-    })
-
-    // Check if we're actually switching frames
-    if (currentActiveFrameId === frameId) {
-      debugLog('FRAME_SELECT_SAME', 'Selected same frame, no action needed', { frameId })
+    // Prevent selection of same frame or during playback
+    if (activeFrameId === frameId) {
+      logger.debug(() => 'Same frame already selected', { frameId })
       return
     }
 
-    // EDGE CASE: Prevent rapid clicking
     if (isPlaying) {
-      debugLog('FRAME_SELECT_BLOCKED', 'Frame switching blocked during playback', { frameId })
+      logger.debug(() => 'Frame switching blocked during playback', { frameId })
       return
     }
-
-    debugLog('FRAME_SELECT_EXECUTE', 'Calling setActiveFrame', {
-      from: currentActiveFrameId,
-      to: frameId
-    })
 
     try {
+      logger.debug(() => 'Switching to frame', { from: activeFrameId, to: frameId })
+      
       setActiveFrame(activeTabId, frameId)
       
       const frameIndex = frames.findIndex(f => f.id === frameId)
       if (frameIndex >= 0) {
         setPlaybackFrame(frameIndex)
-        debugLog('FRAME_SELECT_PLAYBACK_UPDATE', 'Updated playback frame index', {
-          frameIndex,
-          frameId
-        })
       } else {
-        debugLog('FRAME_SELECT_WARNING', 'Could not find frame index for playback update', {
-          frameId,
-          availableFrames: frames.map((f, i) => ({ id: f.id, index: i }))
-        })
+        logger.warn('Could not find frame index for playback', { frameId })
       }
-
-      debugLog('FRAME_SELECT_COMPLETE', 'Frame selection process completed successfully', {
-        targetFrameId: frameId
-      })
     } catch (error) {
-      debugLog('FRAME_SELECT_ERROR', 'Error during frame selection', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        frameId,
-        activeTabId
-      })
+      logger.error('Frame selection failed', { frameId, activeTabId }, error)
     }
   }
 
