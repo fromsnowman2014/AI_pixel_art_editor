@@ -126,7 +126,7 @@ class OpenAIService {
         }
     }
     /**
-     * Edit an image using DALL-E 2 (for image-to-image workflows)
+     * Edit an image using GPT-Image-1 (for image-to-image workflows)
      */
     async editImage(params) {
         const startTime = Date.now();

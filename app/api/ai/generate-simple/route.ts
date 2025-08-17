@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
     
     const imageUrl = dalleResponse.data[0]?.url;
     if (!imageUrl) {
-      throw new Error('No image URL returned from DALL-E 3');
+      throw new Error('No image URL returned from GPT-Image-1');
     }
 
     console.log(`✅ [${requestId}] GPT-Image-1 generation successful, image URL received`);
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
     const responseData = {
       imageUrl: imageUrl, // Return raw OpenAI image URL
       originalImageUrl: imageUrl,
-      width: 1024, // Actual DALL-E 3 size
+      width: 1024, // Actual GPT-Image-1 size
       height: 1024,
       requestedWidth: width,
       requestedHeight: height,
