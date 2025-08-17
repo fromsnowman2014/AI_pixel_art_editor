@@ -217,18 +217,19 @@ class ApiClient {
   async generateAI(data: AIGenerateRequest): Promise<AIGenerationResponse> {
     console.log('🔧 API Client: Original request data:', data);
     
-    // Send request data exactly as backend expects (no transformation needed)
+    // Transform request data to match backend schema exactly
     const backendRequest = {
       prompt: data.prompt,
-      mode: data.mode,
+      mode: data.mode === 'new' ? 'text-to-image' : data.mode, // Convert 'new' mode to 'text-to-image'
       width: data.width,
       height: data.height,
-      colorLimit: data.colorLimit,  // Keep original field name
-      enableDithering: data.enableDithering ?? false,
-      quantizationMethod: data.quantizationMethod ?? 'median-cut',
+      colorCount: data.colorLimit,  // Backend expects 'colorCount', not 'colorLimit'
+      style: 'pixel-art', // Add required style field
       // Optional fields
+      ...(data.enableDithering !== undefined && { enableDithering: data.enableDithering }),
+      ...(data.quantizationMethod && { quantizationMethod: data.quantizationMethod }),
       ...(data.referenceImageId && { referenceImageId: data.referenceImageId }),
-      ...(data.referenceImageData && { referenceImageData: data.referenceImageData }),
+      ...(data.referenceImageData && { inputImage: data.referenceImageData }), // Backend expects 'inputImage'
       ...(data.seed && { seed: data.seed })
     };
     
