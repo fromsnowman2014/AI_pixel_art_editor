@@ -130,10 +130,11 @@ openai = initializeOpenAI();
  * AI Image Generation API
  * POST /api/ai/generate
  * 
- * Generates pixel art using OpenAI's latest GPT-Image-1 model:
- * - GPT-Image-1 (latest image model) for both text-to-image and image-to-image generation
+ * Generates pixel art using OpenAI's verified DALL-E 3 model:
+ * - DALL-E 3 (verified model) for text-to-image generation with superior quality
+ * - DALL-E 2 for image-to-image editing operations
  * - HD quality + natural style optimized for pixel art creation
- * 1. Generate high-resolution image using GPT-Image-1 model
+ * 1. Generate high-resolution image using DALL-E 3/2 model
  * 2. Process for pixel art conversion (quantization + resize)
  * 3. Return base64 encoded image with metadata
  */
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest) {
       return validation.response;
     }
     console.log(`✅ [${requestId}] Request validation passed`);
+    console.log(`🔍 [${requestId}] Received request data:`, JSON.stringify(validation.data, null, 2));
 
     // Step 2: Check AI service availability
     console.log(`📋 [${requestId}] Step 2: Checking AI service availability...`);
@@ -331,14 +333,18 @@ export async function POST(request: NextRequest) {
     }
     console.log(`✅ [${requestId}] OpenAI client ready`);
 
-    // Step 7: Generate image using GPT-Image-1 model (Latest OpenAI Model)
-    console.log(`🎨 [${requestId}] Step 7: Calling GPT-Image-1 API...`);
+    // Step 7: Generate image using DALL-E 3 model (Verified OpenAI Model)
+    console.log(`🎨 [${requestId}] Step 7: Calling DALL-E 3 API...`);
+    console.log(`🔍 [${requestId}] OpenAI client status:`, { 
+      clientExists: !!openai,
+      clientType: typeof openai
+    });
     
     let dalleResponse: any;
     
-    // Use GPT-Image-1 as per OpenAI documentation (Latest Image Model)
-    console.log(`⚙️ [${requestId}] Using GPT-Image-1 for ${mode} (LATEST MODEL):`, { 
-      modelUsed: "gpt-image-1",
+    // Use DALL-E 3 - Verified and supported OpenAI model
+    console.log(`⚙️ [${requestId}] Using DALL-E 3 for ${mode} (VERIFIED MODEL):`, { 
+      modelUsed: "dall-e-3",
       mode: mode,
       quality: "hd",
       style: "natural",
@@ -348,6 +354,8 @@ export async function POST(request: NextRequest) {
       timeout: "10min"
     });
     
+    console.log(`🚀 [${requestId}] About to call OpenAI API with model: dall-e-3`);
+    
     if (mode === 'image-to-image' && dalleInputImage) {
       // Convert base64 to buffer for image-to-image
       const base64Data = dalleInputImage.split(',')[1];
@@ -356,9 +364,10 @@ export async function POST(request: NextRequest) {
       }
       const imageBuffer = Buffer.from(base64Data, 'base64');
       
+      console.log(`🖼️ [${requestId}] Calling OpenAI images.edit for image-to-image mode`);
       dalleResponse = await Promise.race([
         openai.images.edit({
-          model: "gpt-image-1",
+          model: "dall-e-2", // Note: DALL-E 3 doesn't support image editing, use DALL-E 2
           image: imageBuffer as any, // Type assertion for Buffer to Uploadable
           prompt: enhancedPrompt,
           n: 1,
@@ -369,10 +378,12 @@ export async function POST(request: NextRequest) {
           setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)
         )
       ]) as any;
+      console.log(`✅ [${requestId}] OpenAI images.edit call completed successfully`);
     } else {
+      console.log(`🎨 [${requestId}] Calling OpenAI images.generate for text-to-image mode`);
       dalleResponse = await Promise.race([
         openai.images.generate({
-          model: "gpt-image-1",
+          model: "dall-e-3",
           prompt: enhancedPrompt,
           n: 1,
           size: "1024x1024",
@@ -384,9 +395,10 @@ export async function POST(request: NextRequest) {
           setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)
         )
       ]) as any;
+      console.log(`✅ [${requestId}] OpenAI images.generate call completed successfully`);
     }
 
-    const usedModel = 'GPT-Image-1';
+    const usedModel = 'DALL-E 3';
     console.log(`🎉 [${requestId}] ${usedModel} API call successful`);
     console.log(`📊 [${requestId}] Response data length:`, dalleResponse.data?.length || 0);
 
@@ -407,13 +419,13 @@ export async function POST(request: NextRequest) {
     if (bypassProcessing) {
       const totalTime = Date.now() - startTime;
       
-      console.log(`🚀 [${requestId}] Bypass mode: Returning raw GPT-Image-1 output without processing`);
+      console.log(`🚀 [${requestId}] Bypass mode: Returning raw DALL-E 3 output without processing`);
       console.log(`🎉 Bypass AI image generation complete:`, {
         dimensions: `${width}x${height} (requested)`,
-        actualSize: "1024x1024 (GPT-Image-1)",
+        actualSize: "1024x1024 (DALL-E 3)",
         colors: colorCount,
         totalTime: `${totalTime}ms`,
-        note: "Raw GPT-Image-1 output without pixel art processing"
+        note: "Raw DALL-E 3 output without pixel art processing"
       });
 
       const responseData = {
@@ -536,6 +548,15 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     const totalTime = Date.now() - startTime;
+    
+    console.error(`💥 [${requestId}] Exception caught in AI generation:`, error);
+    console.error(`🔍 [${requestId}] Error type:`, typeof error);
+    console.error(`🔍 [${requestId}] Error constructor:`, error?.constructor?.name);
+    
+    // Check if this is an OpenAI API error
+    if (error && typeof error === 'object' && 'error' in error) {
+      console.error(`🔍 [${requestId}] OpenAI API Error Details:`, error.error);
+    }
     
     const errorInfo = getErrorInfo(error);
     console.error(`❌ [${requestId}] Generation failed after ${totalTime}ms:`, {
