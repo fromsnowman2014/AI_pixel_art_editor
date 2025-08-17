@@ -216,14 +216,21 @@ class ApiClient {
   // AI Generation API
   async generateAI(data: AIGenerateRequest): Promise<AIGenerationResponse> {
     console.log('🔧 API Client: Original request data:', data);
+    console.log('🔧 API Client: Original mode:', data.mode, 'colorLimit:', data.colorLimit);
     
     // Transform request data to match backend schema exactly
+    const transformedMode = data.mode === 'new' ? 'text-to-image' : data.mode;
+    const transformedColorCount = data.colorLimit;
+    
+    console.log('🔧 API Client: Mode transformation:', data.mode, '->', transformedMode);
+    console.log('🔧 API Client: Color field transformation: colorLimit ->', 'colorCount:', transformedColorCount);
+    
     const backendRequest = {
       prompt: data.prompt,
-      mode: data.mode === 'new' ? 'text-to-image' : data.mode, // Convert 'new' mode to 'text-to-image'
+      mode: transformedMode, // Convert 'new' mode to 'text-to-image'
       width: data.width,
       height: data.height,
-      colorCount: data.colorLimit,  // Backend expects 'colorCount', not 'colorLimit'
+      colorCount: transformedColorCount,  // Backend expects 'colorCount', not 'colorLimit'
       style: 'pixel-art', // Add required style field
       // Optional fields
       ...(data.enableDithering !== undefined && { enableDithering: data.enableDithering }),
@@ -233,7 +240,8 @@ class ApiClient {
       ...(data.seed && { seed: data.seed })
     };
     
-    console.log('🔧 API Client: Backend request data:', backendRequest);
+    console.log('🔧 API Client: Final backend request data:', backendRequest);
+    console.log('🔧 API Client: Final backend request keys:', Object.keys(backendRequest));
     console.log('🔧 API Client: Request details:', {
       url: `${API_BASE_URL}/ai/generate`,
       method: 'POST',
