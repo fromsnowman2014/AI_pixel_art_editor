@@ -140,23 +140,35 @@ openai = initializeOpenAI();
  * 3. Return base64 encoded image with metadata
  */
 export async function POST(request: NextRequest) {
+  // CRITICAL: First log to verify function execution
+  console.log('🚀 API ROUTE ENTRY: POST /api/ai/generate function started');
+  console.log('🚀 Timestamp:', new Date().toISOString());
+  console.log('🚀 Request URL:', request.url);
+  console.log('🚀 Request method:', request.method);
+  
   let requestId: string;
   let startTime: number;
   let bypassProcessing: boolean = false;
   let apiLogger: ReturnType<typeof createApiLogger>;
   
   try {
+    console.log('🚀 STEP 0: Starting initialization');
     startTime = Date.now();
     requestId = crypto.randomUUID();
+    console.log('🚀 STEP 0.1: Generated requestId:', requestId);
+    
     apiLogger = createApiLogger('/api/ai/generate', requestId);
+    console.log('🚀 STEP 0.2: API logger created successfully');
     
     apiLogger.info('AI image generation request started');
+    console.log('🚀 STEP 0.3: API logger info call successful');
     
     // Check for bypass parameter (query param or header)
     const { searchParams } = new URL(request.url);
     const bypassFromParam = searchParams.get('bypass') === 'true';
     const bypassFromHeader = request.headers.get('x-bypass-processing') === 'true';
     bypassProcessing = bypassFromParam || bypassFromHeader;
+    console.log('🚀 STEP 0.4: Bypass processing check completed:', bypassProcessing);
     
     apiLogger.debug(() => `Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
     
@@ -168,11 +180,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    console.log('🚀 STEP 1: Main try block started');
     const timer = apiLogger.time('Full AI generation process');
+    console.log('🚀 STEP 1.1: Timer created successfully');
     
     // Step 1: Validate request body
+    console.log('🚀 STEP 2: Starting request body validation');
     apiLogger.debug('Starting request body validation');
     const validation = await validateRequestBody(request, GenerateRequestSchema);
+    console.log('🚀 STEP 2.1: Request body validation completed:', validation.success);
     
     if (!validation.success) {
       apiLogger.warn('Request validation failed');
@@ -188,8 +204,10 @@ export async function POST(request: NextRequest) {
     }));
 
     // Step 2: Check AI service availability
+    console.log('🚀 STEP 3: Checking AI service availability');
     apiLogger.debug('Checking AI service availability');
     const serviceCheck = checkAIServiceAvailability();
+    console.log('🚀 STEP 3.1: AI service availability check completed:', serviceCheck.available);
     
     if (!serviceCheck.available) {
       apiLogger.error('AI service unavailable');
@@ -317,11 +335,17 @@ export async function POST(request: NextRequest) {
     }));
 
     // Step 6: Ensure OpenAI client is initialized
+    console.log('🚀 STEP 6: Checking OpenAI client initialization');
+    console.log('🚀 STEP 6.1: Current openai client state:', !!openai);
+    
     if (!openai) {
+      console.log('🚀 STEP 6.2: OpenAI client not initialized, initializing now...');
       apiLogger.debug('Initializing OpenAI client');
       openai = initializeOpenAI();
+      console.log('🚀 STEP 6.3: OpenAI initialization result:', !!openai);
       
       if (!openai) {
+        console.error('🚀 STEP 6.4: OpenAI client initialization FAILED');
         apiLogger.error('OpenAI client initialization failed - check API key configuration');
         logApiRequest(request, '/ai/generate', startTime, false, 'OpenAI client not initialized');
         return createErrorResponse(
@@ -331,12 +355,16 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+    console.log('🚀 STEP 6.5: OpenAI client ready for API call');
 
     // Step 7: Generate image using DALL-E 3 model
+    console.log('🚀 STEP 7: Starting DALL-E API call');
     const aiTimer = apiLogger.time('OpenAI API call');
     apiLogger.info(`Calling DALL-E API for ${mode} generation`);
+    console.log('🚀 STEP 7.1: API timer and logger setup completed');
     
     let dalleResponse: any;
+    console.log('🚀 STEP 7.2: About to call DALL-E with mode:', mode);
     
     if (mode === 'image-to-image' && dalleInputImage) {
       // Convert base64 to buffer for image-to-image
@@ -517,14 +545,21 @@ export async function POST(request: NextRequest) {
     const totalTime = Date.now() - startTime;
     const errorInfo = getErrorInfo(error);
     
+    // Enhanced error logging for debugging
+    console.error(`❌ [${requestId}] CRITICAL ERROR in AI generation:`, {
+      errorType: error?.constructor?.name,
+      errorMessage: errorInfo.message,
+      errorStack: errorInfo.stack,
+      totalTime: `${totalTime}ms`,
+      timestamp: new Date().toISOString()
+    });
+    
     // Log error with appropriate level based on logger availability
     if (apiLogger) {
       apiLogger.error('AI generation failed', { 
         totalTime: `${totalTime}ms`,
         errorType: error?.constructor?.name 
       }, errorInfo);
-    } else {
-      console.error(`❌ AI generation failed after ${totalTime}ms:`, errorInfo.message);
     }
     
     logApiRequest(request, '/ai/generate', startTime, false, {
@@ -533,70 +568,139 @@ export async function POST(request: NextRequest) {
       totalTime: `${totalTime}ms`
     });
 
+    // Extract detailed error information for client debugging
+    let detailedError = {
+      originalMessage: errorInfo.message,
+      errorType: error?.constructor?.name,
+      requestId,
+      timestamp: new Date().toISOString(),
+      totalTime: `${totalTime}ms`
+    };
+
+    // Check for OpenAI API specific errors
+    if (error && typeof error === 'object') {
+      // OpenAI API error with response
+      if ('response' in error && error.response) {
+        const response = error.response as any;
+        detailedError = {
+          ...detailedError,
+          openaiError: {
+            status: response.status,
+            statusText: response.statusText,
+            data: response.data,
+            headers: response.headers
+          }
+        };
+        console.error(`❌ [${requestId}] OpenAI API Response Error:`, response.data);
+      }
+      
+      // OpenAI SDK error
+      if ('error' in error && error.error) {
+        detailedError = {
+          ...detailedError,
+          openaiSdkError: error.error
+        };
+        console.error(`❌ [${requestId}] OpenAI SDK Error:`, error.error);
+      }
+      
+      // Network/Fetch errors
+      if ('code' in error) {
+        detailedError = {
+          ...detailedError,
+          networkError: {
+            code: (error as any).code,
+            errno: (error as any).errno,
+            syscall: (error as any).syscall
+          }
+        };
+        console.error(`❌ [${requestId}] Network Error:`, (error as any).code);
+      }
+    }
+
     // Handle specific OpenAI API errors using safe error info
     const errorMessage = errorInfo.message.toLowerCase();
     
     if (errorMessage.includes('insufficient_quota')) {
-      return createErrorResponse(
-        'AI service quota exceeded',
-        'AI_QUOTA_EXCEEDED',
-        503
-      );
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          message: 'AI service quota exceeded',
+          code: 'AI_QUOTA_EXCEEDED',
+          details: detailedError
+        }
+      }), { 
+        status: 503, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId 
+        } 
+      });
     }
     
     if (errorMessage.includes('rate_limit_exceeded')) {
-      return createErrorResponse(
-        'AI service rate limit exceeded - please try again later',
-        'AI_RATE_LIMIT',
-        429
-      );
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          message: 'AI service rate limit exceeded - please try again later',
+          code: 'AI_RATE_LIMIT',
+          details: detailedError
+        }
+      }), { 
+        status: 429, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId 
+        } 
+      });
     }
     
     if (errorMessage.includes('content_policy_violation')) {
-      return createErrorResponse(
-        'Content policy violation - please try a different prompt',
-        'CONTENT_POLICY_VIOLATION',
-        400
-      );
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          message: 'Content policy violation - please try a different prompt',
+          code: 'CONTENT_POLICY_VIOLATION',
+          details: detailedError
+        }
+      }), { 
+        status: 400, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId 
+        } 
+      });
     }
     
     if (errorMessage.includes('timeout') || errorMessage.includes('etimedout')) {
-      return createErrorResponse(
-        'Generation timeout after 10 minutes - please try with a simpler prompt or check OpenAI service status',
-        'TIMEOUT_ERROR',
-        408
-      );
-    }
-    
-    if (errorMessage.includes('openai') || errorMessage.includes('api')) {
-      return createErrorResponse(
-        'AI service temporarily unavailable',
-        'AI_SERVICE_ERROR',
-        503
-      );
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          message: 'Generation timeout after 10 minutes - please try with a simpler prompt or check OpenAI service status',
+          code: 'TIMEOUT_ERROR',
+          details: detailedError
+        }
+      }), { 
+        status: 408, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId 
+        } 
+      });
     }
 
-    // Return concise error response with essential debug info for development
-    const debugMessage = errorMessage.includes('openai') || errorMessage.includes('api') ? 
-      `OpenAI API error: ${errorInfo.message}` :
-      errorMessage.includes('fetch') || errorMessage.includes('network') ?
-      `Network error during image processing: ${errorInfo.message}` :
-      `Image generation failed: ${errorInfo.message}`;
-    
-    const debugInfo = process.env.NODE_ENV === 'development' ? {
-      requestId,
-      totalTime: `${totalTime}ms`,
-      errorType: error?.constructor?.name,
-      errorMessage: errorInfo.message,
-      hasOpenAIKey: !!process.env.OPENAI_API_KEY
-    } : undefined;
-    
+    // Return comprehensive error response with all debugging information
     return new Response(JSON.stringify({
       success: false,
       error: {
-        message: debugMessage,
+        message: `AI generation failed: ${errorInfo.message}`,
         code: 'GENERATION_ERROR',
-        ...(debugInfo && { debug: debugInfo })
+        details: detailedError,
+        // Include raw error for debugging
+        rawError: process.env.NODE_ENV === 'development' ? {
+          name: errorInfo.name,
+          message: errorInfo.message,
+          stack: errorInfo.stack?.substring(0, 1000) // Limit stack trace size
+        } : undefined
       }
     }), { 
       status: 500, 

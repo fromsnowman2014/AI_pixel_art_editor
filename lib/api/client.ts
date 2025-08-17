@@ -20,7 +20,7 @@ import type {
 const getApiBaseUrl = () => {
   // Development mode: Use production API directly if OPENAI_API_KEY is missing
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    const hasLocalApiKey = !!process.env.NEXT_PUBLIC_HAS_OPENAI_KEY;
+    const hasLocalApiKey = process.env.NEXT_PUBLIC_HAS_OPENAI_KEY === 'true';
     
     if (!hasLocalApiKey) {
       console.log('🔧 API Client using production Railway API (no local OpenAI key)');
