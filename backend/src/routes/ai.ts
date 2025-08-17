@@ -68,8 +68,8 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
         const result = await openaiService.generateImage({
           prompt,
           size: '1024x1024', // Always generate at high res for better quantization
-          quality: 'standard',
-          style: 'vivid',
+          quality: 'high',
+          background: 'transparent',
           responseFormat: 'url',
           userId,
         });
@@ -197,7 +197,7 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
           colorLimit,
           quantizationMethod: quantizationMethod || 'median-cut',
           processingTimeMs: processedImage.processingTimeMs,
-          aiModel: 'dall-e-3',
+          aiModel: 'gpt-image-1',
         },
       }).returning();
 
@@ -374,7 +374,7 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
               colorLimit,
               quantizationMethod: 'median-cut',
               processingTimeMs: processed.processingTimeMs,
-              aiModel: 'dall-e-2',
+              aiModel: 'gpt-image-1',
             },
           }).returning();
 

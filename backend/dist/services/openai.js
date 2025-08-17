@@ -19,14 +19,14 @@ class OpenAIService {
         });
     }
     /**
-     * Generate image using DALL-E 3 with pixel art optimized prompts
+     * Generate image using GPT-Image-1 with pixel art optimized prompts
      */
     async generateImage(params) {
         const startTime = Date.now();
         try {
             // Optimize prompt for pixel art generation
             const optimizedPrompt = this.optimizePromptForPixelArt(params.prompt);
-            logger.info('Generating image with OpenAI DALL-E 3', {
+            logger.info('Generating image with OpenAI GPT-Image-1', {
                 originalPrompt: params.prompt,
                 optimizedPrompt,
                 size: params.size || '1024x1024',
@@ -37,8 +37,8 @@ class OpenAIService {
                 prompt: optimizedPrompt,
                 n: 1,
                 size: params.size || '1024x1024',
-                quality: params.quality || 'standard',
-                style: params.style || 'vivid',
+                quality: params.quality || 'high',
+                background: params.background || 'transparent',
                 response_format: params.responseFormat || 'url',
                 user: params.userId, // for abuse monitoring
             });

@@ -1,5 +1,4 @@
 export declare const userRoleEnum: import("drizzle-orm/pg-core").PgEnum<["parent", "teacher"]>;
-export declare const projectModeEnum: import("drizzle-orm/pg-core").PgEnum<["beginner", "advanced"]>;
 export declare const assetTypeEnum: import("drizzle-orm/pg-core").PgEnum<["upload", "ai", "generated"]>;
 export declare const users: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "users";
@@ -214,18 +213,6 @@ export declare const projects: import("drizzle-orm/pg-core").PgTableWithColumns<
             notNull: true;
             hasDefault: false;
             enumValues: undefined;
-            baseColumn: never;
-        }, {}, {}>;
-        mode: import("drizzle-orm/pg-core").PgColumn<{
-            name: "mode";
-            tableName: "projects";
-            dataType: "string";
-            columnType: "PgEnumColumn";
-            data: "beginner" | "advanced";
-            driverParam: string;
-            notNull: true;
-            hasDefault: true;
-            enumValues: ["beginner", "advanced"];
             baseColumn: never;
         }, {}, {}>;
         activeFrameId: import("drizzle-orm/pg-core").PgColumn<{

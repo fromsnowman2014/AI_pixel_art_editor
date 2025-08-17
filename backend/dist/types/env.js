@@ -16,7 +16,7 @@ exports.envSchema = zod_1.z.object({
     HOST: zod_1.z.string().default('0.0.0.0'),
     // OpenAI API Configuration
     OPENAI_API_KEY: zod_1.z.string().min(1).optional(), // Optional for development
-    OPENAI_MODEL: zod_1.z.string().default('dall-e-3'),
+    OPENAI_MODEL: zod_1.z.string().default('gpt-image-1'),
     OPENAI_MAX_RETRIES: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1).max(10)).default('3'),
     OPENAI_TIMEOUT: zod_1.z.string().transform(Number).pipe(zod_1.z.number().min(1000)).default('30000'),
     // Database Configuration

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HealthCheckResponseSchema = exports.ApiErrorSchema = exports.AuthResponseSchema = exports.VerifyTokenRequestSchema = exports.LoginRequestSchema = exports.UserResponseSchema = exports.CreateUserRequestSchema = exports.FileUploadResponseSchema = exports.GifExportResponseSchema = exports.GifExportRequestSchema = exports.FrameResponseSchema = exports.UpdateFrameRequestSchema = exports.CreateFrameRequestSchema = exports.ProjectResponseSchema = exports.UpdateProjectRequestSchema = exports.CreateProjectRequestSchema = exports.ProjectModeSchema = exports.AIGenerationResponseSchema = exports.AIVariationsRequestSchema = exports.AIGenerateRequestSchema = exports.ColorQuantizationMethodSchema = exports.AIGenerationModeSchema = exports.TimestampSchema = exports.IdSchema = void 0;
+exports.HealthCheckResponseSchema = exports.ApiErrorSchema = exports.AuthResponseSchema = exports.VerifyTokenRequestSchema = exports.LoginRequestSchema = exports.UserResponseSchema = exports.CreateUserRequestSchema = exports.FileUploadResponseSchema = exports.GifExportResponseSchema = exports.GifExportRequestSchema = exports.FrameResponseSchema = exports.UpdateFrameRequestSchema = exports.CreateFrameRequestSchema = exports.ProjectResponseSchema = exports.UpdateProjectRequestSchema = exports.CreateProjectRequestSchema = exports.AIGenerationResponseSchema = exports.AIVariationsRequestSchema = exports.AIGenerateRequestSchema = exports.ColorQuantizationMethodSchema = exports.AIGenerationModeSchema = exports.TimestampSchema = exports.IdSchema = void 0;
 const zod_1 = require("zod");
 // Common types
 exports.IdSchema = zod_1.z.string().uuid();
@@ -38,19 +38,16 @@ exports.AIGenerationResponseSchema = zod_1.z.object({
     processingTimeMs: zod_1.z.number(),
 });
 // Project Types
-exports.ProjectModeSchema = zod_1.z.enum(['beginner', 'advanced']);
 exports.CreateProjectRequestSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(100),
     width: zod_1.z.number().min(8).max(1024),
     height: zod_1.z.number().min(8).max(1024),
     colorLimit: zod_1.z.number().min(2).max(256),
     palette: zod_1.z.array(zod_1.z.string().regex(/^#[0-9A-Fa-f]{6}$/)).max(256),
-    mode: exports.ProjectModeSchema.default('beginner'),
 });
 exports.UpdateProjectRequestSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(100).optional(),
     palette: zod_1.z.array(zod_1.z.string().regex(/^#[0-9A-Fa-f]{6}$/)).max(256).optional(),
-    mode: exports.ProjectModeSchema.optional(),
     activeFrameId: zod_1.z.string().uuid().optional(),
 });
 exports.ProjectResponseSchema = zod_1.z.object({
@@ -61,7 +58,6 @@ exports.ProjectResponseSchema = zod_1.z.object({
     height: zod_1.z.number(),
     colorLimit: zod_1.z.number(),
     palette: zod_1.z.array(zod_1.z.string()),
-    mode: exports.ProjectModeSchema,
     frames: zod_1.z.array(zod_1.z.string().uuid()),
     activeFrameId: zod_1.z.string().uuid().nullable(),
     createdAt: zod_1.z.string().datetime(),

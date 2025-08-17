@@ -17,13 +17,13 @@ export class OpenAIService {
   }
 
   /**
-   * Generate image using DALL-E 3 with pixel art optimized prompts
+   * Generate image using GPT-Image-1 with pixel art optimized prompts
    */
   async generateImage(params: {
     prompt: string;
     size?: '1024x1024' | '1792x1024' | '1024x1792';
-    quality?: 'standard' | 'hd';
-    style?: 'vivid' | 'natural';
+    quality?: 'low' | 'medium' | 'high';
+    background?: 'transparent' | 'opaque';
     responseFormat?: 'url' | 'b64_json';
     userId?: string;
   }): Promise<{
@@ -37,7 +37,7 @@ export class OpenAIService {
       // Optimize prompt for pixel art generation
       const optimizedPrompt = this.optimizePromptForPixelArt(params.prompt);
       
-      logger.info('Generating image with OpenAI DALL-E 3', {
+      logger.info('Generating image with OpenAI GPT-Image-1', {
         originalPrompt: params.prompt,
         optimizedPrompt,
         size: params.size || '1024x1024',
@@ -45,12 +45,12 @@ export class OpenAIService {
       });
 
       const response = await this.client.images.generate({
-        model: env.OPENAI_MODEL as 'dall-e-3',
+        model: env.OPENAI_MODEL as 'gpt-image-1',
         prompt: optimizedPrompt,
         n: 1,
         size: params.size || '1024x1024',
-        quality: params.quality || 'standard',
-        style: params.style || 'vivid',
+        quality: params.quality || 'high',
+        background: params.background || 'transparent',
         response_format: params.responseFormat || 'url',
         user: params.userId, // for abuse monitoring
       });

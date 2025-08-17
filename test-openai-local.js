@@ -39,13 +39,13 @@ async function testOpenAI() {
     console.log('\n📋 Test 1: Checking available models...');
     const models = await openai.models.list();
     const hasGPT35 = models.data.some(m => m.id === 'gpt-3.5-turbo');
+    const hasGptImage1 = models.data.some(m => m.id === 'gpt-image-1');
     const hasDalle3 = models.data.some(m => m.id === 'dall-e-3');
-    const hasDalle2 = models.data.some(m => m.id === 'dall-e-2');
     
     console.log(`✅ Models accessible: ${models.data.length} total`);
     console.log(`   - GPT-3.5-turbo: ${hasGPT35 ? '✅' : '❌'}`);
+    console.log(`   - GPT-Image-1: ${hasGptImage1 ? '✅' : '❌'}`);
     console.log(`   - DALL-E 3: ${hasDalle3 ? '✅' : '❌'}`);
-    console.log(`   - DALL-E 2: ${hasDalle2 ? '✅' : '❌'}`);
 
     // Test 2: Simple chat completion
     console.log('\n🤖 Test 2: Testing GPT-3.5-turbo...');
@@ -58,22 +58,24 @@ async function testOpenAI() {
     const chatTime = Date.now() - start;
     console.log(`✅ GPT-3.5-turbo response (${chatTime}ms): ${completion.choices[0]?.message?.content}`);
 
-    // Test 3: DALL-E 2 (faster than DALL-E 3)
-    console.log('\n🎨 Test 3: Testing DALL-E 2 image generation...');
+    // Test 3: GPT-Image-1 (latest image model)
+    console.log('\n🎨 Test 3: Testing GPT-Image-1 image generation...');
     const imageStart = Date.now();
     const imageResponse = await openai.images.generate({
-      model: "dall-e-2",
-      prompt: "a simple red pixel",
+      model: "gpt-image-1",
+      prompt: "a simple red pixel art character",
       n: 1,
-      size: "256x256"
+      size: "1024x1024",
+      quality: "medium",
+      background: "transparent"
     });
     const imageTime = Date.now() - imageStart;
     
     if (imageResponse.data[0]?.url) {
-      console.log(`✅ DALL-E 2 generation successful (${imageTime}ms)`);
+      console.log(`✅ GPT-Image-1 generation successful (${imageTime}ms)`);
       console.log(`🔗 Image URL: ${imageResponse.data[0].url.substring(0, 50)}...`);
     } else {
-      console.log('❌ DALL-E 2 generation failed - no image URL returned');
+      console.log('❌ GPT-Image-1 generation failed - no image URL returned');
     }
 
     console.log('\n🎉 All OpenAI API tests completed successfully!');
@@ -81,7 +83,7 @@ async function testOpenAI() {
     console.log(`   - API Key: Valid (${apiKey.length} chars)`);
     console.log(`   - Models: ${models.data.length} accessible`);
     console.log(`   - GPT-3.5: ${chatTime}ms response time`);
-    console.log(`   - DALL-E 2: ${imageTime}ms generation time`);
+    console.log(`   - GPT-Image-1: ${imageTime}ms generation time`);
     
   } catch (error) {
     console.error('\n❌ OpenAI API test failed:', error.message);

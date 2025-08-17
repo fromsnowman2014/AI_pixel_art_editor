@@ -84,17 +84,14 @@ export declare const AIGenerationResponseSchema: z.ZodObject<{
     pngUrl: string;
     colorCount: number;
 }>;
-export declare const ProjectModeSchema: z.ZodEnum<["beginner", "advanced"]>;
 export declare const CreateProjectRequestSchema: z.ZodObject<{
     name: z.ZodString;
     width: z.ZodNumber;
     height: z.ZodNumber;
     colorLimit: z.ZodNumber;
     palette: z.ZodArray<z.ZodString, "many">;
-    mode: z.ZodDefault<z.ZodEnum<["beginner", "advanced"]>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
-    mode: "beginner" | "advanced";
     width: number;
     height: number;
     colorLimit: number;
@@ -105,21 +102,17 @@ export declare const CreateProjectRequestSchema: z.ZodObject<{
     height: number;
     colorLimit: number;
     palette: string[];
-    mode?: "beginner" | "advanced" | undefined;
 }>;
 export declare const UpdateProjectRequestSchema: z.ZodObject<{
     name: z.ZodOptional<z.ZodString>;
     palette: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
-    mode: z.ZodOptional<z.ZodEnum<["beginner", "advanced"]>>;
     activeFrameId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     name?: string | undefined;
-    mode?: "beginner" | "advanced" | undefined;
     palette?: string[] | undefined;
     activeFrameId?: string | undefined;
 }, {
     name?: string | undefined;
-    mode?: "beginner" | "advanced" | undefined;
     palette?: string[] | undefined;
     activeFrameId?: string | undefined;
 }>;
@@ -131,7 +124,6 @@ export declare const ProjectResponseSchema: z.ZodObject<{
     height: z.ZodNumber;
     colorLimit: z.ZodNumber;
     palette: z.ZodArray<z.ZodString, "many">;
-    mode: z.ZodEnum<["beginner", "advanced"]>;
     frames: z.ZodArray<z.ZodString, "many">;
     activeFrameId: z.ZodNullable<z.ZodString>;
     createdAt: z.ZodString;
@@ -139,7 +131,6 @@ export declare const ProjectResponseSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     id: string;
     name: string;
-    mode: "beginner" | "advanced";
     createdAt: string;
     updatedAt: string;
     userId: string | null;
@@ -152,7 +143,6 @@ export declare const ProjectResponseSchema: z.ZodObject<{
 }, {
     id: string;
     name: string;
-    mode: "beginner" | "advanced";
     createdAt: string;
     updatedAt: string;
     userId: string | null;

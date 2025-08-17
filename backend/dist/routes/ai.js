@@ -46,8 +46,8 @@ const aiRoutes = (fastify, options, done) => {
                 const result = await openai_1.openaiService.generateImage({
                     prompt,
                     size: '1024x1024', // Always generate at high res for better quantization
-                    quality: 'standard',
-                    style: 'vivid',
+                    quality: 'high',
+                    background: 'transparent',
                     responseFormat: 'url',
                     userId,
                 });
@@ -153,7 +153,7 @@ const aiRoutes = (fastify, options, done) => {
                     colorLimit,
                     quantizationMethod: quantizationMethod || 'median-cut',
                     processingTimeMs: processedImage.processingTimeMs,
-                    aiModel: 'dall-e-3',
+                    aiModel: 'gpt-image-1',
                 },
             }).returning();
             const totalProcessingTime = Date.now() - startTime;
@@ -302,7 +302,7 @@ const aiRoutes = (fastify, options, done) => {
                         colorLimit,
                         quantizationMethod: 'median-cut',
                         processingTimeMs: processed.processingTimeMs,
-                        aiModel: 'dall-e-2',
+                        aiModel: 'gpt-image-1',
                     },
                 }).returning();
                 return {

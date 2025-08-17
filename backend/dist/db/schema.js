@@ -1,11 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.analyticsRelations = exports.assetsRelations = exports.layersRelations = exports.framesRelations = exports.projectsRelations = exports.usersRelations = exports.systemLogs = exports.analytics = exports.rateLimits = exports.assets = exports.layers = exports.frames = exports.projects = exports.users = exports.assetTypeEnum = exports.projectModeEnum = exports.userRoleEnum = void 0;
+exports.analyticsRelations = exports.assetsRelations = exports.layersRelations = exports.framesRelations = exports.projectsRelations = exports.usersRelations = exports.systemLogs = exports.analytics = exports.rateLimits = exports.assets = exports.layers = exports.frames = exports.projects = exports.users = exports.assetTypeEnum = exports.userRoleEnum = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 // Enums
 exports.userRoleEnum = (0, pg_core_1.pgEnum)('user_role', ['parent', 'teacher']);
-exports.projectModeEnum = (0, pg_core_1.pgEnum)('project_mode', ['beginner', 'advanced']);
 exports.assetTypeEnum = (0, pg_core_1.pgEnum)('asset_type', ['upload', 'ai', 'generated']);
 // Users table (for parent/teacher accounts - COPPA compliant)
 exports.users = (0, pg_core_1.pgTable)('users', {
@@ -29,7 +28,6 @@ exports.projects = (0, pg_core_1.pgTable)('projects', {
     height: (0, pg_core_1.integer)('height').notNull(),
     colorLimit: (0, pg_core_1.integer)('color_limit').notNull(),
     palette: (0, pg_core_1.jsonb)('palette').$type().notNull(), // array of hex colors
-    mode: (0, exports.projectModeEnum)('mode').notNull().default('beginner'),
     activeFrameId: (0, pg_core_1.uuid)('active_frame_id'),
     isTemplate: (0, pg_core_1.boolean)('is_template').notNull().default(false),
     templateCategory: (0, pg_core_1.varchar)('template_category', { length: 50 }),

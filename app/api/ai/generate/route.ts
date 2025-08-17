@@ -131,11 +131,11 @@ openai = initializeOpenAI();
  * AI Image Generation API
  * POST /api/ai/generate
  * 
- * Generates pixel art using OpenAI's verified DALL-E 3 model:
- * - DALL-E 3 (verified model) for text-to-image generation with superior quality
- * - DALL-E 2 for image-to-image editing operations
+ * Generates pixel art using OpenAI's GPT-Image-1 model:
+ * - GPT-Image-1 for both text-to-image and image-to-image operations with superior quality
+ * - Unified model for all image generation tasks
  * - HD quality + natural style optimized for pixel art creation
- * 1. Generate high-resolution image using DALL-E 3/2 model
+ * 1. Generate high-resolution image using GPT-Image-1 model
  * 2. Process for pixel art conversion (quantization + resize)
  * 3. Return base64 encoded image with metadata
  */
@@ -374,14 +374,16 @@ export async function POST(request: NextRequest) {
       }
       const imageBuffer = Buffer.from(base64Data, 'base64');
       
-      apiLogger.debug('Using DALL-E 2 for image editing (image-to-image mode)');
+      apiLogger.debug('Using GPT-Image-1 for image editing (image-to-image mode)');
       dalleResponse = await Promise.race([
         openai.images.edit({
-          model: "dall-e-2", // Note: DALL-E 3 doesn't support image editing, use DALL-E 2
+          model: "gpt-image-1", // Note: GPT-Image-1 supports both text-to-image and image editing
           image: imageBuffer as any, // Type assertion for Buffer to Uploadable
           prompt: enhancedPrompt,
           n: 1,
           size: "1024x1024",
+          quality: "high",
+          background: "transparent",
           response_format: "url",
         }),
         new Promise((_, reject) => 
@@ -389,15 +391,15 @@ export async function POST(request: NextRequest) {
         )
       ]) as any;
     } else {
-      apiLogger.debug('Using DALL-E 3 for text-to-image generation');
+      apiLogger.debug('Using GPT-Image-1 for text-to-image generation');
       dalleResponse = await Promise.race([
         openai.images.generate({
-          model: "dall-e-3",
+          model: "gpt-image-1",
           prompt: enhancedPrompt,
           n: 1,
           size: "1024x1024",
-          quality: "hd",
-          style: "natural",
+          quality: "high",
+          background: "transparent",
           response_format: "url",
         }),
         new Promise((_, reject) => 
@@ -569,7 +571,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Extract detailed error information for client debugging
-    let detailedError = {
+    let detailedError: any = {
       originalMessage: errorInfo.message,
       errorType: error?.constructor?.name,
       requestId,

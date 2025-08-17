@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
         status: 'success',
         modelsFound: hasModels,
         modelCount: modelsResponse.data?.length || 0,
-        hasDallE3: modelsResponse.data?.some(model => model.id === 'dall-e-3') || false
+        hasGptImage1: modelsResponse.data?.some(model => model.id === 'gpt-image-1') || false
       };
       console.log('✅ OpenAI API connectivity test passed');
     } catch (error) {
@@ -127,11 +127,12 @@ export async function GET(request: NextRequest) {
       }
 
       const testResponse = await openaiClient.images.generate({
-        model: "dall-e-3",
+        model: "gpt-image-1",
         prompt: "a simple red pixel",
         n: 1,
         size: "1024x1024",
-        quality: "standard",
+        quality: "medium",
+        background: "transparent",
         response_format: "url",
       });
 

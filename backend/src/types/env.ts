@@ -12,7 +12,7 @@ export const envSchema = z.object({
 
   // OpenAI API Configuration
   OPENAI_API_KEY: z.string().min(1).optional(), // Optional for development
-  OPENAI_MODEL: z.string().default('dall-e-3'),
+  OPENAI_MODEL: z.string().default('gpt-image-1'),
   OPENAI_MAX_RETRIES: z.string().transform(Number).pipe(z.number().min(1).max(10)).default('3'),
   OPENAI_TIMEOUT: z.string().transform(Number).pipe(z.number().min(1000)).default('30000'),
 

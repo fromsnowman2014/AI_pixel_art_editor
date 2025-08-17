@@ -3,13 +3,13 @@ export declare class OpenAIService {
     private rateLimitCounter;
     constructor();
     /**
-     * Generate image using DALL-E 3 with pixel art optimized prompts
+     * Generate image using GPT-Image-1 with pixel art optimized prompts
      */
     generateImage(params: {
         prompt: string;
         size?: '1024x1024' | '1792x1024' | '1024x1792';
-        quality?: 'standard' | 'hd';
-        style?: 'vivid' | 'natural';
+        quality?: 'low' | 'medium' | 'high';
+        background?: 'transparent' | 'opaque';
         responseFormat?: 'url' | 'b64_json';
         userId?: string;
     }): Promise<{
