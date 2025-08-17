@@ -16,31 +16,18 @@ import type {
   HealthCheckResponse,
 } from '@/lib/types/api'
 
-// API Configuration - Using Railway Backend in Production
+// API Configuration - Using Local Next.js API with Proxy to Backend
 const getApiBaseUrl = () => {
-  // Use Railway backend URL if configured, otherwise fallback to local API
-  const railwayUrl = process.env.NEXT_PUBLIC_API_URL;
+  // ALWAYS use local Next.js API routes to avoid CORS issues
+  // The Next.js API routes will proxy to Railway backend when needed
   
-  // Force Railway backend in production environments
   if (typeof window !== 'undefined') {
-    // Client-side: Check if we're in a production environment
-    const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    const isVercelDeployment = window.location.hostname.includes('.vercel.app');
-    
-    if (isProduction && (railwayUrl || isVercelDeployment)) {
-      // Production: Always use Railway backend
-      const backendUrl = railwayUrl || 'https://aipixelarteditor-production.up.railway.app';
-      console.log(`🚀 Production API Client using Railway backend: ${backendUrl}`);
-      return backendUrl + '/api';
-    }
-    
-    // Development: use relative URLs
-    console.log('🔧 Development API Client using local API');
+    // Client-side: Always use local API routes (no CORS issues)
+    console.log('🔧 API Client using local Next.js API routes (CORS-free)');
     return '/api';
   } else {
-    // Server-side: use configured URL or fallback
-    const backendUrl = railwayUrl || 'https://aipixelarteditor-production.up.railway.app';
-    return backendUrl + '/api';
+    // Server-side: Also use local API routes for consistency
+    return '/api';
   }
 }
 
