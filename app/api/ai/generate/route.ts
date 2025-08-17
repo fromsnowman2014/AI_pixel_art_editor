@@ -139,23 +139,66 @@ openai = initializeOpenAI();
  * 3. Return base64 encoded image with metadata
  */
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  const requestId = crypto.randomUUID();
+  // CRITICAL: First log to verify function execution
+  console.log('🚀 API ROUTE ENTRY: POST /api/ai/generate function started');
+  console.log('🚀 Timestamp:', new Date().toISOString());
+  console.log('🚀 Request URL:', request.url);
+  console.log('🚀 Request method:', request.method);
   
-  // Check for bypass parameter (query param or header)
-  const { searchParams } = new URL(request.url);
-  const bypassFromParam = searchParams.get('bypass') === 'true';
-  const bypassFromHeader = request.headers.get('x-bypass-processing') === 'true';
-  const bypassProcessing = bypassFromParam || bypassFromHeader;
+  let requestId: string;
+  let startTime: number;
+  let bypassProcessing: boolean = false;
   
-  console.log(`🎨 [${requestId}] AI image generation requested at ${new Date().toISOString()}`);
-  console.log(`🔧 [${requestId}] Environment check: NODE_ENV=${process.env.NODE_ENV}`);
-  console.log(`🔄 [${requestId}] Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
+  try {
+    startTime = Date.now();
+    requestId = crypto.randomUUID();
+    console.log(`🆔 Generated requestId: ${requestId}`);
+  } catch (error) {
+    console.error('❌ Failed to initialize basic variables:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: { message: 'Failed to initialize request', code: 'INIT_ERROR' }
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+  
+  try {
+    // Check for bypass parameter (query param or header)
+    console.log(`🔧 [${requestId}] Parsing URL and headers...`);
+    const { searchParams } = new URL(request.url);
+    const bypassFromParam = searchParams.get('bypass') === 'true';
+    const bypassFromHeader = request.headers.get('x-bypass-processing') === 'true';
+    bypassProcessing = bypassFromParam || bypassFromHeader;
+    console.log(`🔧 [${requestId}] URL parsing successful`);
+    
+    console.log(`🎨 [${requestId}] AI image generation requested at ${new Date().toISOString()}`);
+    console.log(`🔧 [${requestId}] Environment check: NODE_ENV=${process.env.NODE_ENV}`);
+    console.log(`🔄 [${requestId}] Processing mode: ${bypassProcessing ? 'BYPASS (Raw DALL-E)' : 'FULL (With Processing)'}`);
+    console.log(`🔧 [${requestId}] About to start main try block...`);
+  } catch (prelimError) {
+    console.error(`❌ [${requestId}] Failed in preliminary setup:`, prelimError);
+    return new Response(JSON.stringify({
+      success: false,
+      error: { message: 'Failed in preliminary setup', code: 'PRELIM_ERROR', details: String(prelimError) }
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
 
   try {
     // Step 1: Validate request body (moved before service check for better testing)
-    console.log(`📝 [${requestId}] Step 1: Validating request body...`);
-    const validation = await validateRequestBody(request, GenerateRequestSchema);
+    console.log(`📝 [${requestId}] Step 1: Starting request body validation...`);
+    
+    let validation: any;
+    try {
+      console.log(`📝 [${requestId}] Calling validateRequestBody function...`);
+      validation = await validateRequestBody(request, GenerateRequestSchema);
+      console.log(`📝 [${requestId}] validateRequestBody completed, success:`, validation?.success);
+    } catch (validationError) {
+      console.error(`❌ [${requestId}] validateRequestBody threw exception:`, validationError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: { message: 'Validation function failed', code: 'VALIDATION_EXCEPTION', details: String(validationError) }
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+    
     if (!validation.success) {
       console.log(`❌ [${requestId}] Request validation failed:`, validation);
       logApiRequest(request, '/ai/generate', startTime, false, 'Validation failed');
@@ -165,8 +208,21 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 [${requestId}] Received request data:`, JSON.stringify(validation.data, null, 2));
 
     // Step 2: Check AI service availability
-    console.log(`📋 [${requestId}] Step 2: Checking AI service availability...`);
-    const serviceCheck = checkAIServiceAvailability();
+    console.log(`📋 [${requestId}] Step 2: Starting AI service availability check...`);
+    
+    let serviceCheck: any;
+    try {
+      console.log(`📋 [${requestId}] Calling checkAIServiceAvailability function...`);
+      serviceCheck = checkAIServiceAvailability();
+      console.log(`📋 [${requestId}] checkAIServiceAvailability completed, available:`, serviceCheck?.available);
+    } catch (serviceError) {
+      console.error(`❌ [${requestId}] checkAIServiceAvailability threw exception:`, serviceError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: { message: 'Service check failed', code: 'SERVICE_CHECK_EXCEPTION', details: String(serviceError) }
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+    
     if (!serviceCheck.available) {
       console.log(`❌ [${requestId}] Service unavailable:`, serviceCheck);
       logApiRequest(request, '/ai/generate', startTime, false, 'Service unavailable');
@@ -317,9 +373,24 @@ export async function POST(request: NextRequest) {
 
     // Step 6: Ensure OpenAI client is initialized
     console.log(`🤖 [${requestId}] Step 6: Checking OpenAI client...`);
+    console.log(`🤖 [${requestId}] Current openai client status:`, { 
+      exists: !!openai, 
+      type: typeof openai,
+      hasApiKey: !!process.env.OPENAI_API_KEY 
+    });
+    
     if (!openai) {
       console.log(`🔄 [${requestId}] OpenAI client not initialized, attempting to re-initialize...`);
-      openai = initializeOpenAI();
+      try {
+        openai = initializeOpenAI();
+        console.log(`🔄 [${requestId}] initializeOpenAI completed, result:`, !!openai);
+      } catch (initError) {
+        console.error(`❌ [${requestId}] initializeOpenAI threw exception:`, initError);
+        return new Response(JSON.stringify({
+          success: false,
+          error: { message: 'OpenAI initialization failed', code: 'OPENAI_INIT_EXCEPTION', details: String(initError) }
+        }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
       
       if (!openai) {
         console.log(`❌ [${requestId}] OpenAI client initialization failed`);
@@ -549,20 +620,53 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const totalTime = Date.now() - startTime;
     
-    console.error(`💥 [${requestId}] Exception caught in AI generation:`, error);
+    console.error(`💥 [${requestId}] CRITICAL: Exception caught in main try block:`, error);
     console.error(`🔍 [${requestId}] Error type:`, typeof error);
     console.error(`🔍 [${requestId}] Error constructor:`, error?.constructor?.name);
+    console.error(`🔍 [${requestId}] Error prototype:`, Object.getPrototypeOf(error));
     
-    // Check if this is an OpenAI API error
-    if (error && typeof error === 'object' && 'error' in error) {
-      console.error(`🔍 [${requestId}] OpenAI API Error Details:`, error.error);
+    // Extract all possible error information
+    if (error && typeof error === 'object') {
+      console.error(`🔍 [${requestId}] Error object keys:`, Object.keys(error));
+      
+      // Check if this is an OpenAI API error
+      if ('error' in error) {
+        console.error(`🔍 [${requestId}] OpenAI API Error Details:`, error.error);
+      }
+      
+      // Check for response data (with type safety)
+      if ('response' in error && error.response && typeof error.response === 'object') {
+        const response = error.response as any;
+        console.error(`🔍 [${requestId}] HTTP Response Error:`, {
+          status: response.status || 'unknown',
+          statusText: response.statusText || 'unknown',
+          data: response.data || 'no data'
+        });
+      }
+      
+      // Check for request config (with type safety)
+      if ('config' in error && error.config && typeof error.config === 'object') {
+        const config = error.config as any;
+        console.error(`🔍 [${requestId}] Request Config:`, {
+          url: config.url || 'unknown',
+          method: config.method || 'unknown',
+          headers: config.headers || 'no headers'
+        });
+      }
+    }
+    
+    // Try to extract the stack trace
+    if (error instanceof Error) {
+      console.error(`🔍 [${requestId}] Error message:`, error.message);
+      console.error(`🔍 [${requestId}] Error stack:`, error.stack);
     }
     
     const errorInfo = getErrorInfo(error);
     console.error(`❌ [${requestId}] Generation failed after ${totalTime}ms:`, {
       error: errorInfo.message,
       errorName: errorInfo.name,
-      stack: errorInfo.stack
+      stack: errorInfo.stack,
+      originalError: String(error)
     });
     
     logApiRequest(request, '/ai/generate', startTime, false, {
@@ -625,12 +729,37 @@ export async function POST(request: NextRequest) {
       `Network error during image processing: ${errorInfo.message}` :
       `Image generation failed: ${errorInfo.message}`;
     
-    return createErrorResponse(
-      debugMessage,
-      'GENERATION_ERROR',
-      500,
-      { 'X-Request-ID': requestId }
-    );
+    // Include comprehensive debug information in the response
+    const debugInfo = {
+      requestId,
+      timestamp: new Date().toISOString(),
+      totalTime: `${totalTime}ms`,
+      errorType: typeof error,
+      errorConstructor: error?.constructor?.name,
+      errorMessage: errorInfo.message,
+      errorName: errorInfo.name,
+      hasStack: !!errorInfo.stack,
+      originalError: String(error).substring(0, 500), // Truncate to avoid huge responses
+      nodeEnv: process.env.NODE_ENV,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY
+    };
+    
+    console.error(`❌ [${requestId}] Sending error response with debug info:`, debugInfo);
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        message: debugMessage,
+        code: 'GENERATION_ERROR',
+        debug: debugInfo
+      }
+    }), { 
+      status: 500, 
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Request-ID': requestId 
+      } 
+    });
   }
 }
 
