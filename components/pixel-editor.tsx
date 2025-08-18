@@ -5,6 +5,7 @@ import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { PixelCanvas } from './pixel-canvas'
 import { Toolbar } from './toolbar'
+import { TopToolbar } from './top-toolbar'
 import { ProjectTabs } from './project-tabs'
 import { ColorPalette } from './color-palette'
 import { FrameManager } from './frame-manager'
@@ -74,6 +75,9 @@ export function PixelEditor({ className }: PixelEditorProps) {
       <div className="flex-shrink-0 border-b border-gray-200 bg-white">
         <ProjectTabs />
       </div>
+
+      {/* Top Toolbar - Primary Actions */}
+      <TopToolbar />
 
       {/* Main editor area */}
       <div className="flex flex-1 overflow-hidden">

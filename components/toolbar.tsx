@@ -10,11 +10,7 @@ import {
   Eraser,
   Paintbrush,
   Pipette,
-  Move,
-  RotateCcw,
-  RotateCw,
-  ZoomIn,
-  ZoomOut
+  Move
 } from 'lucide-react'
 
 interface ToolbarProps {
@@ -71,43 +67,6 @@ export function Toolbar({ className }: ToolbarProps) {
     updateCanvasState(activeTabId, { tool })
   }
 
-  const handleZoomIn = () => {
-    const newZoom = Math.min(32, canvasState.zoom * 1.5)
-    debugLog('ZOOM_IN', `Zoom changed from ${canvasState.zoom}x to ${newZoom}x`, {
-      previousZoom: canvasState.zoom,
-      newZoom: newZoom,
-      maxReached: newZoom === 32
-    })
-    updateCanvasState(activeTabId, { zoom: newZoom })
-  }
-
-  const handleZoomOut = () => {
-    const newZoom = Math.max(1, canvasState.zoom / 1.5)
-    debugLog('ZOOM_OUT', `Zoom changed from ${canvasState.zoom}x to ${newZoom}x`, {
-      previousZoom: canvasState.zoom,
-      newZoom: newZoom,
-      minReached: newZoom === 1
-    })
-    updateCanvasState(activeTabId, { zoom: newZoom })
-  }
-
-  const handleUndo = () => {
-    debugLog('UNDO', 'Undo action triggered', {
-      currentHistoryIndex: activeTab?.historyIndex,
-      historyLength: activeTab?.history.length,
-      canUndo: activeTab?.historyIndex && activeTab.historyIndex > 0
-    })
-    undo(activeTabId)
-  }
-  
-  const handleRedo = () => {
-    debugLog('REDO', 'Redo action triggered', {
-      currentHistoryIndex: activeTab?.historyIndex,
-      historyLength: activeTab?.history.length,
-      canRedo: activeTab?.history && activeTab.historyIndex < activeTab.history.length - 1
-    })
-    redo(activeTabId)
-  }
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -143,102 +102,6 @@ export function Toolbar({ className }: ToolbarProps) {
         })}
       </div>
 
-      <div className="border-t border-gray-200 pt-4">
-        <div className="mb-2 text-xs font-medium text-gray-600">ACTIONS</div>
-        <div className="space-y-2">
-          <Tooltip
-            content="Undo last action (Ctrl+Z)"
-            side="right"
-            disabled={!activeTab?.historyIndex || activeTab.historyIndex <= 0}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-              onClick={handleUndo}
-              disabled={!activeTab?.historyIndex || activeTab.historyIndex <= 0}
-              aria-label="Undo last action (Ctrl+Z)"
-              role="button"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
-              Undo
-              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Ctrl+Z">⌘Z</span>
-            </Button>
-          </Tooltip>
-          
-          <Tooltip
-            content="Redo last undone action (Ctrl+Shift+Z)"
-            side="right"
-            disabled={!activeTab?.history || activeTab.historyIndex >= activeTab.history.length - 1}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-              onClick={handleRedo}
-              disabled={
-                !activeTab?.history || 
-                activeTab.historyIndex >= activeTab.history.length - 1
-              }
-              aria-label="Redo last undone action (Ctrl+Shift+Z)"
-              role="button"
-            >
-              <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
-              Redo
-              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Ctrl+Shift+Z">⌘⇧Z</span>
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
-
-      <div className="border-t border-gray-200 pt-4">
-        <div className="mb-2 text-xs font-medium text-gray-600">ZOOM</div>
-        <div className="space-y-2">
-          <Tooltip
-            content={`Zoom in (Press +) - Current: ${canvasState.zoom.toFixed(1)}x`}
-            side="right"
-            disabled={canvasState.zoom >= 32}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-              onClick={handleZoomIn}
-              disabled={canvasState.zoom >= 32}
-              aria-label={`Zoom in (Plus key) - Current zoom: ${canvasState.zoom.toFixed(1)}x`}
-              role="button"
-            >
-              <ZoomIn className="mr-2 h-4 w-4" aria-hidden="true" />
-              Zoom In
-              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Plus key">+</span>
-            </Button>
-          </Tooltip>
-          
-          <Tooltip
-            content={`Zoom out (Press -) - Current: ${canvasState.zoom.toFixed(1)}x`}
-            side="right"
-            disabled={canvasState.zoom <= 1}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-              onClick={handleZoomOut}
-              disabled={canvasState.zoom <= 1}
-              aria-label={`Zoom out (Minus key) - Current zoom: ${canvasState.zoom.toFixed(1)}x`}
-              role="button"
-            >
-              <ZoomOut className="mr-2 h-4 w-4" aria-hidden="true" />
-              Zoom Out
-              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Minus key">-</span>
-            </Button>
-          </Tooltip>
-        </div>
-        
-        <div className="mt-2 text-center text-xs text-gray-500">
-          Current: {canvasState.zoom.toFixed(1)}x
-        </div>
-      </div>
       {/* Brush Size Control */}
       <div className="border-t border-gray-200 pt-4">
         <div className="mb-2 text-xs font-medium text-gray-600">BRUSH SIZE</div>
