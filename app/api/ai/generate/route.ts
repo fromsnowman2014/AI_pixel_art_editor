@@ -316,6 +316,11 @@ export async function POST(request: NextRequest) {
     
     // Generate enhanced prompt using intelligent prompt enhancer
     const sanitizedPrompt = sanitize.prompt(prompt);
+    console.log('🔍 PROMPT DEBUG - Original prompt:', {
+      text: sanitizedPrompt,
+      length: sanitizedPrompt.length
+    });
+    
     const promptEnhancementOptions = {
       mode: mode as AIGenerationMode,
       style: style || 'pixel-art',
@@ -325,13 +330,45 @@ export async function POST(request: NextRequest) {
     };
     
     const promptResult = generateCompletePrompt(sanitizedPrompt, promptEnhancementOptions);
-    const enhancedPrompt = promptResult.finalPrompt;
+    let enhancedPrompt = promptResult.finalPrompt;
+    
+    console.log('🔍 PROMPT DEBUG - Enhanced prompt:', {
+      text: enhancedPrompt,
+      length: enhancedPrompt.length,
+      appliedChanges: promptResult.appliedChanges.length,
+      confidence: promptResult.confidence
+    });
+    
+    // CRITICAL: Check if enhanced prompt exceeds GPT-Image-1 limits
+    const MAX_PROMPT_LENGTH = 4000; // Conservative limit for GPT-Image-1
+    if (enhancedPrompt.length > MAX_PROMPT_LENGTH) {
+      console.log('⚠️ PROMPT TOO LONG - Truncating enhanced prompt:', {
+        originalLength: enhancedPrompt.length,
+        maxLength: MAX_PROMPT_LENGTH
+      });
+      
+      // Intelligently truncate: keep original prompt + essential enhancements
+      const truncatedPrompt = enhancedPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...';
+      enhancedPrompt = truncatedPrompt;
+      
+      apiLogger.warn('Enhanced prompt truncated due to length limits', {
+        originalLength: promptResult.finalPrompt.length,
+        truncatedLength: enhancedPrompt.length,
+        maxAllowed: MAX_PROMPT_LENGTH
+      });
+      
+      console.log('🔧 PROMPT FIXED - Truncated prompt:', {
+        text: enhancedPrompt,
+        length: enhancedPrompt.length
+      });
+    }
     
     apiLogger.debug(() => `Prompt enhancement completed`, undefined, () => ({
       originalLength: sanitizedPrompt.length,
       enhancedLength: enhancedPrompt.length,
       appliedChanges: promptResult.appliedChanges.length,
-      confidence: promptResult.confidence.toFixed(2)
+      confidence: promptResult.confidence.toFixed(2),
+      wasTruncated: promptResult.finalPrompt.length > MAX_PROMPT_LENGTH
     }));
 
     // Step 6: Ensure OpenAI client is initialized

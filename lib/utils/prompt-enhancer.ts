@@ -642,14 +642,22 @@ export function validatePrompt(prompt: string): {
   const issues: string[] = [];
   const suggestions: string[] = [];
   
-  // Length checks
+  // Length checks - aligned with API route validation (1000 chars)
   if (prompt.length < 3) {
     issues.push('Prompt is too short');
     suggestions.push('Add more descriptive words');
-  } else if (prompt.length > 500) {
+  } else if (prompt.length > 1000) {
     issues.push('Prompt is too long');
     suggestions.push('Simplify and focus on key elements');
   }
+  
+  // Add debug logging for prompt validation
+  console.log('🔍 VALIDATION DEBUG - Prompt length check:', {
+    promptLength: prompt.length,
+    maxAllowed: 1000,
+    isValid: prompt.length <= 1000,
+    prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : '')
+  });
   
   // Content checks
   const lowerPrompt = prompt.toLowerCase();
