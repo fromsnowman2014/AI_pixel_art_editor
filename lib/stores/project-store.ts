@@ -107,6 +107,12 @@ export interface ProjectTab {
   historyIndex: number
   isDirty: boolean
   frameCanvasData: FrameCanvasData[] // Store canvas data for each frame
+  
+  // Playback state
+  isPlaying: boolean
+  playbackFrameIndex: number
+  playbackFrameId: string | null
+  playbackIntervalId: number | null
 }
 
 interface ProjectStore {
@@ -148,6 +154,12 @@ interface ProjectStore {
   getFrameThumbnail: (tabId: string, frameId: string) => string | null
   regenerateAllThumbnails: () => void
   regenerateFrameThumbnail: (tabId: string, frameId: string) => void
+
+  // Playback operations
+  startPlayback: (tabId: string) => void
+  stopPlayback: (tabId: string) => void
+  togglePlayback: (tabId: string) => void
+  setPlaybackFrame: (tabId: string, frameIndex: number) => void
 
   // Utility functions
   getActiveTab: () => ProjectTab | null
@@ -254,6 +266,20 @@ export const useProjectStore = create<ProjectStore>()(
                     })
                   }
                 }
+                
+                // Initialize playback state for tabs loaded from persistence
+                if (tab.isPlaying === undefined) {
+                  tab.isPlaying = false
+                }
+                if (tab.playbackFrameIndex === undefined) {
+                  tab.playbackFrameIndex = 0
+                }
+                if (tab.playbackFrameId === undefined) {
+                  tab.playbackFrameId = null
+                }
+                if (tab.playbackIntervalId === undefined) {
+                  tab.playbackIntervalId = null
+                }
 
               })
             })
@@ -310,7 +336,13 @@ export const useProjectStore = create<ProjectStore>()(
                 frameId,
                 canvasData: { ...canvasData, data: new Uint8ClampedArray(canvasData.data) },
                 thumbnail: null // Will be generated when first drawn
-              }]
+              }],
+              
+              // Playback state
+              isPlaying: false,
+              playbackFrameIndex: 0,
+              playbackFrameId: null,
+              playbackIntervalId: null
             }
 
             state.tabs.push(newTab)
@@ -348,6 +380,12 @@ export const useProjectStore = create<ProjectStore>()(
               historyIndex: 0,
               isDirty: false,
               frameCanvasData: [], // Will be populated when frames are loaded
+              
+              // Playback state
+              isPlaying: false,
+              playbackFrameIndex: 0,
+              playbackFrameId: null,
+              playbackIntervalId: null
             }
 
             state.tabs.push(newTab)
@@ -1677,6 +1715,147 @@ export const useProjectStore = create<ProjectStore>()(
                 frameId,
                 dataLength: frameData.canvasData?.data.length || 0
               })
+            }
+          })
+        },
+
+        // Playback operations
+        startPlayback: (tabId) => {
+          const state = get()
+          const tab = state.tabs.find(t => t.id === tabId)
+          if (!tab || tab.frames.length <= 1) return
+
+          // Stop any existing playback
+          get().stopPlayback(tabId)
+
+          // Start playback
+          set((draft) => {
+            const currentTab = draft.tabs.find(t => t.id === tabId)
+            if (!currentTab) return
+
+            currentTab.isPlaying = true
+            currentTab.playbackFrameIndex = 0
+            currentTab.playbackFrameId = currentTab.frames[0]?.id || null
+          })
+
+          // Create a recursive function for frame advancement
+          const advanceFrame = () => {
+            const currentState = get()
+            const currentTab = currentState.tabs.find(t => t.id === tabId)
+            
+            if (!currentTab || !currentTab.isPlaying || currentTab.frames.length <= 1) {
+              return
+            }
+
+            const nextFrameIndex = (currentTab.playbackFrameIndex + 1) % currentTab.frames.length
+            const nextFrame = currentTab.frames[nextFrameIndex]
+            
+            if (nextFrame) {
+              // Update playback state
+              set((draft) => {
+                const tab = draft.tabs.find(t => t.id === tabId)
+                if (!tab) return
+                
+                tab.playbackFrameIndex = nextFrameIndex
+                tab.playbackFrameId = nextFrame.id
+
+                // Load frame canvas data and update canvas
+                const frameData = tab.frameCanvasData.find(f => f.frameId === nextFrame.id)
+                if (frameData && frameData.canvasData) {
+                  tab.canvasData = { 
+                    ...frameData.canvasData, 
+                    data: new Uint8ClampedArray(frameData.canvasData.data) 
+                  }
+                }
+              })
+
+              // Schedule next frame
+              const delay = nextFrame.delayMs || 500
+              const timeoutId = setTimeout(advanceFrame, delay)
+              
+              // Store timeout ID
+              set((draft) => {
+                const tab = draft.tabs.find(t => t.id === tabId)
+                if (tab) {
+                  tab.playbackIntervalId = timeoutId as unknown as number
+                }
+              })
+            }
+          }
+
+          // Start the first frame advancement
+          const initialDelay = tab.frames[0]?.delayMs || 500
+          const timeoutId = setTimeout(advanceFrame, initialDelay)
+          
+          set((draft) => {
+            const currentTab = draft.tabs.find(t => t.id === tabId)
+            if (currentTab) {
+              currentTab.playbackIntervalId = timeoutId as unknown as number
+            }
+          })
+        },
+
+        stopPlayback: (tabId) => {
+          set((draft) => {
+            const tab = draft.tabs.find(t => t.id === tabId)
+            if (!tab) return
+
+            tab.isPlaying = false
+            tab.playbackFrameId = null
+            
+            if (tab.playbackIntervalId) {
+              clearTimeout(tab.playbackIntervalId) // Changed from clearInterval to clearTimeout
+              tab.playbackIntervalId = null
+            }
+
+            // Restore the active frame
+            if (tab.project.activeFrameId) {
+              const activeFrame = tab.frames.find(f => f.id === tab.project.activeFrameId)
+              if (activeFrame) {
+                const frameData = tab.frameCanvasData.find(f => f.frameId === activeFrame.id)
+                if (frameData && frameData.canvasData) {
+                  tab.canvasData = { 
+                    ...frameData.canvasData, 
+                    data: new Uint8ClampedArray(frameData.canvasData.data) 
+                  }
+                }
+              }
+            }
+          })
+        },
+
+        togglePlayback: (tabId) => {
+          const state = get()
+          const tab = state.tabs.find(t => t.id === tabId)
+          if (!tab) return
+
+          if (tab.isPlaying) {
+            state.stopPlayback(tabId)
+          } else {
+            state.startPlayback(tabId)
+          }
+        },
+
+        setPlaybackFrame: (tabId, frameIndex) => {
+          set((draft) => {
+            const tab = draft.tabs.find(t => t.id === tabId)
+            if (!tab || frameIndex < 0 || frameIndex >= tab.frames.length) return
+
+            tab.playbackFrameIndex = frameIndex
+            const frame = tab.frames[frameIndex]
+            if (frame) {
+              tab.playbackFrameId = frame.id
+              
+              // If not playing, update canvas immediately
+              if (!tab.isPlaying) {
+                const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
+                if (frameData && frameData.canvasData) {
+                  tab.canvasData = { 
+                    ...frameData.canvasData, 
+                    data: new Uint8ClampedArray(frameData.canvasData.data) 
+                  }
+                }
+              }
             }
           })
         },

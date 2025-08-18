@@ -34,23 +34,29 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     updateProject,
     getFrameThumbnail,
     regenerateFrameThumbnail,
+    startPlayback,
+    stopPlayback,
+    togglePlayback,
+    setPlaybackFrame,
+    getActiveTab,
   } = useProjectStore()
 
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [playbackFrame, setPlaybackFrame] = useState(0)
+  // Get playback state from store
+  const activeTab = getActiveTab()
+  const isPlaying = activeTab?.isPlaying || false
+  const playbackFrameIndex = activeTab?.playbackFrameIndex || 0
+  const playbackFrameId = activeTab?.playbackFrameId
   
   const logger = createComponentLogger('FrameManager')
 
-  // Animation playback (simplified) - moved before early return
+  // Clean up intervals on component unmount
   React.useEffect(() => {
-    if (!isPlaying || frames.length <= 1) return
-
-    const interval = setInterval(() => {
-      setPlaybackFrame((prev) => (prev + 1) % frames.length)
-    }, 500) // 500ms per frame
-
-    return () => clearInterval(interval)
-  }, [isPlaying, frames.length])
+    return () => {
+      if (activeTabId && activeTab?.playbackIntervalId) {
+        stopPlayback(activeTabId)
+      }
+    }
+  }, [activeTabId, activeTab?.playbackIntervalId, stopPlayback])
 
   if (!activeTabId) {
     return null
@@ -59,10 +65,19 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
 
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying)
-    if (isPlaying) {
-      setPlaybackFrame(activeFrameIndex >= 0 ? activeFrameIndex : 0)
+    if (!activeTabId) return
+    
+    if (frames.length <= 1) {
+      logger.debug(() => 'Cannot play animation with only one frame', { framesLength: frames.length })
+      return
     }
+    
+    logger.debug(() => isPlaying ? 'Stopping playback' : 'Starting playback', { 
+      isPlaying, 
+      framesLength: frames.length 
+    })
+    
+    togglePlayback(activeTabId)
   }
 
   const handleAddFrame = () => {
@@ -95,25 +110,24 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       return
     }
 
-    // Prevent selection of same frame or during playback
-    if (activeFrameId === frameId) {
+    // Prevent selection of same frame
+    if (activeFrameId === frameId && !isPlaying) {
       logger.debug(() => 'Same frame already selected', { frameId })
-      return
-    }
-
-    if (isPlaying) {
-      logger.debug(() => 'Frame switching blocked during playback', { frameId })
       return
     }
 
     try {
       logger.debug(() => 'Switching to frame', { from: activeFrameId, to: frameId })
       
-      setActiveFrame(activeTabId, frameId)
+      if (!isPlaying) {
+        // Normal frame selection when not playing
+        setActiveFrame(activeTabId, frameId)
+      }
       
+      // Update playback frame index for synchronization
       const frameIndex = frames.findIndex(f => f.id === frameId)
       if (frameIndex >= 0) {
-        setPlaybackFrame(frameIndex)
+        setPlaybackFrame(activeTabId, frameIndex)
       } else {
         logger.warn('Could not find frame index for playback', { frameId })
       }
@@ -131,20 +145,38 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handlePrevFrame = () => {
-    if (activeFrameIndex > 0) {
-      const prevFrame = frames[activeFrameIndex - 1]
-      if (prevFrame) {
-        setActiveFrame(activeTabId, prevFrame.id)
+  const handleNextFrame = () => {
+    if (!activeTabId) return
+    
+    if (isPlaying) {
+      // During playback, just advance playback frame
+      const nextIndex = Math.min(playbackFrameIndex + 1, frames.length - 1)
+      setPlaybackFrame(activeTabId, nextIndex)
+    } else {
+      // Normal navigation
+      if (activeFrameIndex < frames.length - 1) {
+        const nextFrame = frames[activeFrameIndex + 1]
+        if (nextFrame) {
+          setActiveFrame(activeTabId, nextFrame.id)
+        }
       }
     }
   }
 
-  const handleNextFrame = () => {
-    if (activeFrameIndex < frames.length - 1) {
-      const nextFrame = frames[activeFrameIndex + 1]
-      if (nextFrame) {
-        setActiveFrame(activeTabId, nextFrame.id)
+  const handlePrevFrame = () => {
+    if (!activeTabId) return
+    
+    if (isPlaying) {
+      // During playback, just go back playback frame
+      const prevIndex = Math.max(playbackFrameIndex - 1, 0)
+      setPlaybackFrame(activeTabId, prevIndex)
+    } else {
+      // Normal navigation
+      if (activeFrameIndex > 0) {
+        const prevFrame = frames[activeFrameIndex - 1]
+        if (prevFrame) {
+          setActiveFrame(activeTabId, prevFrame.id)
+        }
       }
     }
   }
@@ -192,7 +224,14 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
           </div>
 
           <div className="text-sm text-gray-600">
-            Frame {activeFrameIndex + 1} of {frames.length}
+            {isPlaying ? (
+              <span className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                Playing: Frame {playbackFrameIndex + 1} of {frames.length}
+              </span>
+            ) : (
+              <span>Frame {activeFrameIndex + 1} of {frames.length}</span>
+            )}
           </div>
         </div>
 
@@ -225,7 +264,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                 activeFrameId === frame.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 bg-white hover:border-gray-300',
-                isPlaying && playbackFrame === index && 'ring-2 ring-green-400'
+                isPlaying && playbackFrameIndex === index && 'ring-2 ring-green-400',
+                playbackFrameId === frame.id && isPlaying && 'bg-green-50 border-green-400'
               )}
               onClick={() => handleFrameSelect(frame.id)}
             >
@@ -336,9 +376,22 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
 
       </div>
 
-      {/* Quick Tips */}
-      <div className="rounded bg-amber-50 p-2 text-xs text-amber-700">
-        💡 <strong>Tip:</strong> Click frames to switch between them, or use the play button to preview your animation
+      {/* Playback Info & Quick Tips */}
+      <div className="space-y-2">
+        {isPlaying && (
+          <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">
+            🎬 <strong>Playing Animation:</strong> {frames.filter(f => f.included).length} frames • 
+            {frames[playbackFrameIndex]?.delayMs || 500}ms per frame • 
+            Click frames to jump or use controls to navigate
+          </div>
+        )}
+        
+        <div className="rounded bg-amber-50 p-2 text-xs text-amber-700">
+          💡 <strong>Tip:</strong> {isPlaying 
+            ? 'Use ← → buttons to scrub through frames or click pause to edit'
+            : 'Click frames to switch between them, or use the play button to preview your animation'
+          }
+        </div>
       </div>
     </div>
   )
