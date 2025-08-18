@@ -654,9 +654,12 @@ export function validatePrompt(prompt: string): {
   // Content checks
   const lowerPrompt = prompt.toLowerCase();
   
-  // Check for problematic terms
+  // Remove "Avoid:" sections from validation to prevent self-contradiction
+  const promptForValidation = lowerPrompt.replace(/\.\s*avoid:\s*[^.]*$/g, '').trim();
+  
+  // Check for problematic terms (excluding "Avoid:" contexts)
   const problematicTerms = ['photorealistic', 'high resolution', '4k', '8k', 'detailed textures'];
-  const foundProblems = problematicTerms.filter(term => lowerPrompt.includes(term));
+  const foundProblems = problematicTerms.filter(term => promptForValidation.includes(term));
   
   if (foundProblems.length > 0) {
     issues.push(`Contains terms unsuitable for pixel art: ${foundProblems.join(', ')}`);
@@ -665,7 +668,7 @@ export function validatePrompt(prompt: string): {
   
   // Check for NSFW or inappropriate content (basic check)
   const inappropriateTerms = ['nude', 'sexual', 'violence', 'gore', 'explicit'];
-  const foundInappropriate = inappropriateTerms.filter(term => lowerPrompt.includes(term));
+  const foundInappropriate = inappropriateTerms.filter(term => promptForValidation.includes(term));
   
   if (foundInappropriate.length > 0) {
     issues.push('Contains inappropriate content');
