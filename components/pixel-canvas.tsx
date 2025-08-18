@@ -309,19 +309,20 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           transform: `translate(${canvasState.panX}px, ${canvasState.panY}px)`
         }}
       >
-        {/* Transparent checkerboard background - square pattern */}
+        {/* Transparent checkerboard background - classic checkerboard pattern */}
         <div 
           className="absolute border-2 border-gray-300"
           style={{
             width: project.width * canvasState.zoom,
             height: project.height * canvasState.zoom,
-            backgroundColor: '#f0f0f0',
-            backgroundImage: `
-              linear-gradient(90deg, #e5e5e5 50%, transparent 50%),
-              linear-gradient(90deg, transparent 50%, #e5e5e5 50%)
-            `,
-            backgroundSize: `${Math.max(16, 8 * canvasState.zoom)}px ${Math.max(8, 4 * canvasState.zoom)}px`,
-            backgroundPosition: `0 0, 0 ${Math.max(4, 2 * canvasState.zoom)}px`,
+            backgroundColor: '#ffffff',
+            backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`
+              <svg width="${6 * canvasState.zoom}" height="${6 * canvasState.zoom}" xmlns="http://www.w3.org/2000/svg">
+                <rect width="${3 * canvasState.zoom}" height="${3 * canvasState.zoom}" fill="#e0e0e0"/>
+                <rect x="${3 * canvasState.zoom}" y="${3 * canvasState.zoom}" width="${3 * canvasState.zoom}" height="${3 * canvasState.zoom}" fill="#e0e0e0"/>
+              </svg>
+            `)}")`,
+            backgroundRepeat: 'repeat',
             imageRendering: 'pixelated'
           }}
         />
@@ -335,7 +336,9 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           onMouseLeave={handleMouseUp}
           style={{
             cursor: canvasState.tool === 'pan' ? 'grab' : 
-                   canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair'
+                   canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair',
+            backgroundColor: 'transparent',
+            imageRendering: 'pixelated'
           }}
         />
         
