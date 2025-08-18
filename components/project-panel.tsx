@@ -65,12 +65,22 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   const [aiPrompt, setAiPrompt] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
 
-  // AI Guided Prompt Options State
+  // AI Guided Prompt Options State - Updated for compact checkbox layout
   const [guidedOptions, setGuidedOptions] = useState({
     background: 'transparent' as 'transparent' | 'included',
     characterType: 'game' as 'game' | 'profile', 
     artStyle: 'simple' as 'simple' | 'detailed',
     colorTone: 'bright' as 'bright' | 'dark'
+  });
+
+  // Compact checkbox state (derived from guidedOptions)
+  const [compactStyleOptions, setCompactStyleOptions] = useState({
+    transparentBg: true,
+    gameCharacter: true,
+    detailedArt: false,
+    brightColors: true,
+    addEffects: false,
+    highContrast: false
   });
 
   const activeTab = getActiveTab();
@@ -293,6 +303,37 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   }, [project]);
 
   // Toggle option handler
+  // Handler for compact style options
+  const handleCompactStyleChange = useCallback((optionKey: keyof typeof compactStyleOptions, checked: boolean) => {
+    setCompactStyleOptions(prev => ({
+      ...prev,
+      [optionKey]: checked
+    }));
+
+    // Update guidedOptions based on compact style selections
+    if (optionKey === 'transparentBg') {
+      setGuidedOptions(prev => ({
+        ...prev,
+        background: checked ? 'transparent' : 'included'
+      }));
+    } else if (optionKey === 'gameCharacter') {
+      setGuidedOptions(prev => ({
+        ...prev,
+        characterType: checked ? 'game' : 'profile'
+      }));
+    } else if (optionKey === 'detailedArt') {
+      setGuidedOptions(prev => ({
+        ...prev,
+        artStyle: checked ? 'detailed' : 'simple'
+      }));
+    } else if (optionKey === 'brightColors') {
+      setGuidedOptions(prev => ({
+        ...prev,
+        colorTone: checked ? 'bright' : 'dark'
+      }));
+    }
+  }, []);
+
   const handleGuidedOptionChange = useCallback((category: keyof typeof guidedOptions, value: any) => {
     setGuidedOptions(prev => ({
       ...prev,
@@ -301,6 +342,32 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   }, []);
 
   // Toggle Switch Component
+  // Compact Style Option Component using checkboxes for space efficiency
+  const StyleOption = ({ id, label, emoji, checked, onChange, tooltip }: {
+    id: string;
+    label: string;
+    emoji: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    tooltip?: string;
+  }) => (
+    <label className="flex items-center gap-2 cursor-pointer group" title={tooltip}>
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 transition-colors"
+        aria-label={`${label} option`}
+      />
+      <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+        <span className="mr-1" aria-hidden="true">{emoji}</span>
+        {label}
+      </span>
+    </label>
+  );
+
+  // Legacy ToggleSwitch for compatibility (if still needed elsewhere)
   const ToggleSwitch = ({ label, emoji, leftOption, rightOption, value, onChange }: {
     label: string;
     emoji: string;
@@ -817,45 +884,64 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
             {/* Guided Prompt Options */}
             <div className='space-y-4 rounded-lg border border-purple-200 bg-purple-50 p-4'>
-              <div className='flex items-center space-x-2'>
+              <div className='flex items-center space-x-2 mb-3'>
                 <span className='text-sm font-semibold text-purple-800'>✨ Quick Style Options</span>
               </div>
               
-              <div className='grid grid-cols-1 gap-4'>
-                <ToggleSwitch
-                  label='Background'
-                  emoji='🖼️'
-                  leftOption={{ key: 'transparent', label: 'Transparent' }}
-                  rightOption={{ key: 'included', label: 'Included' }}
-                  value={guidedOptions.background}
-                  onChange={(value) => handleGuidedOptionChange('background', value)}
+              {/* Compact horizontal layout with checkboxes for space efficiency */}
+              <div className='flex flex-wrap gap-x-4 gap-y-2'>
+                <StyleOption
+                  id="transparent-bg"
+                  label="Transparent BG"
+                  emoji="🖼️"
+                  checked={compactStyleOptions.transparentBg}
+                  onChange={(checked) => handleCompactStyleChange('transparentBg', checked)}
+                  tooltip="Generate with transparent background (recommended for pixel art)"
                 />
                 
-                <ToggleSwitch
-                  label='Character Type'
-                  emoji='👤'
-                  leftOption={{ key: 'game', label: 'Game Character' }}
-                  rightOption={{ key: 'profile', label: 'Profile' }}
-                  value={guidedOptions.characterType}
-                  onChange={(value) => handleGuidedOptionChange('characterType', value)}
+                <StyleOption
+                  id="game-character"
+                  label="Game Style"
+                  emoji="👤"
+                  checked={compactStyleOptions.gameCharacter}
+                  onChange={(checked) => handleCompactStyleChange('gameCharacter', checked)}
+                  tooltip="Optimize for game character design"
                 />
                 
-                <ToggleSwitch
-                  label='Art Style'
-                  emoji='🎨'
-                  leftOption={{ key: 'simple', label: 'Simple' }}
-                  rightOption={{ key: 'detailed', label: 'Detailed' }}
-                  value={guidedOptions.artStyle}
-                  onChange={(value) => handleGuidedOptionChange('artStyle', value)}
+                <StyleOption
+                  id="detailed-art"
+                  label="Detailed"
+                  emoji="🎨"
+                  checked={compactStyleOptions.detailedArt}
+                  onChange={(checked) => handleCompactStyleChange('detailedArt', checked)}
+                  tooltip="Add more detail to the artwork"
                 />
                 
-                <ToggleSwitch
-                  label='Color Tone'
-                  emoji='🌈'
-                  leftOption={{ key: 'bright', label: 'Bright' }}
-                  rightOption={{ key: 'dark', label: 'Dark' }}
-                  value={guidedOptions.colorTone}
-                  onChange={(value) => handleGuidedOptionChange('colorTone', value)}
+                <StyleOption
+                  id="bright-colors"
+                  label="Bright Colors"
+                  emoji="🌈"
+                  checked={compactStyleOptions.brightColors}
+                  onChange={(checked) => handleCompactStyleChange('brightColors', checked)}
+                  tooltip="Use bright, vibrant color palette"
+                />
+                
+                <StyleOption
+                  id="add-effects"
+                  label="Effects"
+                  emoji="✨"
+                  checked={compactStyleOptions.addEffects}
+                  onChange={(checked) => handleCompactStyleChange('addEffects', checked)}
+                  tooltip="Add visual effects like glow or particles"
+                />
+                
+                <StyleOption
+                  id="high-contrast"
+                  label="High Contrast"
+                  emoji="⚫"
+                  checked={compactStyleOptions.highContrast}
+                  onChange={(checked) => handleCompactStyleChange('highContrast', checked)}
+                  tooltip="Use high contrast colors for better visibility"
                 />
               </div>
             </div>

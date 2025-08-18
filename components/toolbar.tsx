@@ -4,6 +4,7 @@ import React from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Tooltip } from '@/components/ui/tooltip'
 import {
   Pencil,
   Eraser,
@@ -114,19 +115,30 @@ export function Toolbar({ className }: ToolbarProps) {
       <div className="space-y-2">
         {tools.map((tool) => {
           const Icon = tool.icon
+          const isActive = canvasState.tool === tool.id
           return (
-            <Button
+            <Tooltip
               key={tool.id}
-              variant={canvasState.tool === tool.id ? 'default' : 'outline'}
-              size="lg"
-              className="w-full justify-start text-left"
-              onClick={() => handleToolChange(tool.id)}
-              title={`${tool.name} (${tool.shortcut})`}
+              content={`${tool.name} (Press ${tool.shortcut})`}
+              side="right"
             >
-              <Icon className="mr-3 h-5 w-5" />
-              <span className="flex-1">{tool.name}</span>
-              <span className="text-xs text-gray-500">{tool.shortcut}</span>
-            </Button>
+              <Button
+                variant={isActive ? 'default' : 'outline'}
+                size="lg"
+                className="w-full justify-start text-left"
+                onClick={() => handleToolChange(tool.id)}
+                aria-label={`${tool.name} tool (keyboard shortcut: ${tool.shortcut})`}
+                aria-pressed={isActive}
+                role="button"
+                tabIndex={0}
+              >
+                <Icon className="mr-3 h-5 w-5" aria-hidden="true" />
+                <span className="flex-1">{tool.name}</span>
+                <span className="text-xs text-gray-500" aria-label={`Shortcut: ${tool.shortcut}`}>
+                  {tool.shortcut}
+                </span>
+              </Button>
+            </Tooltip>
           )
         })}
       </div>
@@ -134,61 +146,93 @@ export function Toolbar({ className }: ToolbarProps) {
       <div className="border-t border-gray-200 pt-4">
         <div className="mb-2 text-xs font-medium text-gray-600">ACTIONS</div>
         <div className="space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleUndo}
+          <Tooltip
+            content="Undo last action (Ctrl+Z)"
+            side="right"
             disabled={!activeTab?.historyIndex || activeTab.historyIndex <= 0}
           >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Undo
-            <span className="ml-auto text-xs text-gray-500">⌘Z</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={handleUndo}
+              disabled={!activeTab?.historyIndex || activeTab.historyIndex <= 0}
+              aria-label="Undo last action (Ctrl+Z)"
+              role="button"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Undo
+              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Ctrl+Z">⌘Z</span>
+            </Button>
+          </Tooltip>
           
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleRedo}
-            disabled={
-              !activeTab?.history || 
-              activeTab.historyIndex >= activeTab.history.length - 1
-            }
+          <Tooltip
+            content="Redo last undone action (Ctrl+Shift+Z)"
+            side="right"
+            disabled={!activeTab?.history || activeTab.historyIndex >= activeTab.history.length - 1}
           >
-            <RotateCw className="mr-2 h-4 w-4" />
-            Redo
-            <span className="ml-auto text-xs text-gray-500">⌘⇧Z</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={handleRedo}
+              disabled={
+                !activeTab?.history || 
+                activeTab.historyIndex >= activeTab.history.length - 1
+              }
+              aria-label="Redo last undone action (Ctrl+Shift+Z)"
+              role="button"
+            >
+              <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Redo
+              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Ctrl+Shift+Z">⌘⇧Z</span>
+            </Button>
+          </Tooltip>
         </div>
       </div>
 
       <div className="border-t border-gray-200 pt-4">
         <div className="mb-2 text-xs font-medium text-gray-600">ZOOM</div>
         <div className="space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleZoomIn}
+          <Tooltip
+            content={`Zoom in (Press +) - Current: ${canvasState.zoom.toFixed(1)}x`}
+            side="right"
             disabled={canvasState.zoom >= 32}
           >
-            <ZoomIn className="mr-2 h-4 w-4" />
-            Zoom In
-            <span className="ml-auto text-xs text-gray-500">+</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={handleZoomIn}
+              disabled={canvasState.zoom >= 32}
+              aria-label={`Zoom in (Plus key) - Current zoom: ${canvasState.zoom.toFixed(1)}x`}
+              role="button"
+            >
+              <ZoomIn className="mr-2 h-4 w-4" aria-hidden="true" />
+              Zoom In
+              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Plus key">+</span>
+            </Button>
+          </Tooltip>
           
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleZoomOut}
+          <Tooltip
+            content={`Zoom out (Press -) - Current: ${canvasState.zoom.toFixed(1)}x`}
+            side="right"
             disabled={canvasState.zoom <= 1}
           >
-            <ZoomOut className="mr-2 h-4 w-4" />
-            Zoom Out
-            <span className="ml-auto text-xs text-gray-500">-</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={handleZoomOut}
+              disabled={canvasState.zoom <= 1}
+              aria-label={`Zoom out (Minus key) - Current zoom: ${canvasState.zoom.toFixed(1)}x`}
+              role="button"
+            >
+              <ZoomOut className="mr-2 h-4 w-4" aria-hidden="true" />
+              Zoom Out
+              <span className="ml-auto text-xs text-gray-500" aria-label="Shortcut: Minus key">-</span>
+            </Button>
+          </Tooltip>
         </div>
         
         <div className="mt-2 text-center text-xs text-gray-500">
