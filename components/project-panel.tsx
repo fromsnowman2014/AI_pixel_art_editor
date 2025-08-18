@@ -1012,6 +1012,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Actions */}

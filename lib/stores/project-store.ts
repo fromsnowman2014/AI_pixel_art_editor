@@ -138,6 +138,7 @@ interface ProjectStore {
 
   // Frame operations
   addFrame: (tabId: string) => void
+  addFrameWithData: (tabId: string, imageData: number[], delayMs?: number) => Promise<void>
   deleteFrame: (tabId: string, frameId: string) => void
   duplicateFrame: (tabId: string, frameId: string) => void
   setActiveFrame: (tabId: string, frameId: string) => void
@@ -1101,6 +1102,81 @@ export const useProjectStore = create<ProjectStore>()(
               get().regenerateFrameThumbnail(tabId, newFrameId!)
             }, 100)
           }
+        },
+
+        // Add frame with imported data
+        addFrameWithData: async (tabId, imageData, delayMs = 500) => {
+          storeDebug('ADD_FRAME_WITH_DATA_START', `Adding frame with imported data to tab ${tabId}`)
+
+          // CRITICAL: Save current canvas data before switching
+          const currentTab = get().getTab(tabId)
+          if (currentTab?.currentFrame && currentTab?.canvasData) {
+            storeDebug('ADD_FRAME_WITH_DATA_SAVE_CURRENT', 'Saving current canvas before adding frame', {
+              currentFrameId: currentTab.currentFrame.id,
+              hasCanvasData: !!currentTab.canvasData
+            })
+            get().saveCurrentFrameCanvas(tabId)
+          }
+
+          let newFrameId: string | null = null
+
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (tab) {
+              const frameId = `imported-frame-${Date.now()}`
+              newFrameId = frameId
+              
+              const newFrame: Frame = {
+                id: frameId,
+                ...createDefaultFrame(),
+                delayMs,
+                projectId: tab.project.id,
+                index: tab.frames.length,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+
+              // Convert imageData array to Uint8ClampedArray and create PixelData
+              const uint8Data = new Uint8ClampedArray(imageData)
+              const importedCanvasData: PixelData = {
+                width: tab.project.width,
+                height: tab.project.height,
+                data: uint8Data
+              }
+              
+              // Generate thumbnail immediately
+              const thumbnail = generateThumbnail(importedCanvasData)
+              
+              // Add frame to arrays
+              tab.frames.push(newFrame)
+              tab.project.frames.push(frameId)
+              
+              // Add canvas data for the new frame
+              tab.frameCanvasData.push({
+                frameId,
+                canvasData: importedCanvasData,
+                thumbnail
+              })
+
+              // AUTO-SWITCH: Set the new frame as active and load its canvas data
+              tab.project.activeFrameId = frameId
+              tab.currentFrame = newFrame
+              tab.canvasData = {
+                ...importedCanvasData,
+                data: new Uint8ClampedArray(importedCanvasData.data)
+              }
+              
+              tab.isDirty = true
+
+              storeDebug('ADD_FRAME_WITH_DATA_COMPLETE', `Frame with imported data added successfully`, {
+                frameId,
+                totalFrames: tab.frames.length,
+                frameCanvasDataCount: tab.frameCanvasData.length,
+                autoSwitchedToFrame: frameId,
+                delayMs
+              })
+            }
+          })
         },
 
         // Delete frame
