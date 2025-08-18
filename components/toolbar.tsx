@@ -71,7 +71,7 @@ export function Toolbar({ className }: ToolbarProps) {
   return (
     <div className={cn('space-y-4', className)}>
       {/* Drawing Tools */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         {tools.map((tool) => {
           const Icon = tool.icon
           const isActive = canvasState.tool === tool.id
@@ -84,18 +84,48 @@ export function Toolbar({ className }: ToolbarProps) {
               <Button
                 variant={isActive ? 'default' : 'outline'}
                 size="lg"
-                className="w-full justify-start text-left"
+                className={cn(
+                  "w-full h-12 justify-start text-left font-medium transition-all duration-200",
+                  "border-2 rounded-lg shadow-sm hover:shadow-md",
+                  "focus:ring-2 focus:ring-blue-400/30 focus:ring-offset-2",
+                  isActive
+                    ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-md"
+                    : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300"
+                )}
                 onClick={() => handleToolChange(tool.id)}
                 aria-label={`${tool.name} tool (keyboard shortcut: ${tool.shortcut})`}
                 aria-pressed={isActive}
                 role="button"
                 tabIndex={0}
               >
-                <Icon className="mr-3 h-5 w-5" aria-hidden="true" />
-                <span className="flex-1">{tool.name}</span>
-                <span className="text-xs text-gray-500" aria-label={`Shortcut: ${tool.shortcut}`}>
-                  {tool.shortcut}
-                </span>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center">
+                    <Icon 
+                      className={cn(
+                        "mr-3 h-5 w-5 transition-colors",
+                        isActive ? "text-white" : "text-gray-600"
+                      )} 
+                      aria-hidden="true" 
+                    />
+                    <span className={cn(
+                      "text-sm font-medium",
+                      isActive ? "text-white" : "text-gray-700"
+                    )}>
+                      {tool.name}
+                    </span>
+                  </div>
+                  <span 
+                    className={cn(
+                      "text-xs font-mono px-1.5 py-0.5 rounded bg-opacity-20",
+                      isActive 
+                        ? "text-blue-100 bg-white" 
+                        : "text-gray-500 bg-gray-200"
+                    )}
+                    aria-label={`Shortcut: ${tool.shortcut}`}
+                  >
+                    {tool.shortcut}
+                  </span>
+                </div>
               </Button>
             </Tooltip>
           )
@@ -104,22 +134,30 @@ export function Toolbar({ className }: ToolbarProps) {
 
       {/* Brush Size Control */}
       <div className="border-t border-gray-200 pt-4">
-        <div className="mb-2 text-xs font-medium text-gray-600">BRUSH SIZE</div>
-        <div className="flex items-center space-x-2">
-          <div className="flex-1">
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={canvasState.brushSize}
-              onChange={(e) => 
-                updateCanvasState(activeTabId, { brushSize: parseInt(e.target.value) })
-              }
-              className="w-full"
-            />
+        <div className="mb-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">BRUSH SIZE</div>
+        <div className="bg-white rounded-lg border-2 border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Size</span>
+            <span className="text-xs font-mono px-2 py-1 bg-gray-100 rounded text-gray-600 font-semibold">
+              {canvasState.brushSize}px
+            </span>
           </div>
-          <div className="text-xs text-gray-500 w-8 text-right">
-            {canvasState.brushSize}px
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={canvasState.brushSize}
+            onChange={(e) => 
+              updateCanvasState(activeTabId, { brushSize: parseInt(e.target.value) })
+            }
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 custom-slider"
+            style={{
+              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(canvasState.brushSize - 1) * 11.11}%, #e5e7eb ${(canvasState.brushSize - 1) * 11.11}%, #e5e7eb 100%)`
+            }}
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>1</span>
+            <span>10</span>
           </div>
         </div>
       </div>
