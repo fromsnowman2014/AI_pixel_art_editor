@@ -13,7 +13,7 @@ import { CORS_HEADERS } from '@/lib/utils/api-middleware';
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   
-  console.log('🔍 AI Debug endpoint called');
+  console.log('🔍 AI Debug endpoint called - v2.0 (GPT-Image-1 fixed)');
 
   try {
     const diagnostics: any = {
