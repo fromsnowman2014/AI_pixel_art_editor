@@ -247,9 +247,8 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     // Disable smoothing for pixel art
     ctx.imageSmoothingEnabled = false
 
-    // Clear canvas
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // Clear canvas with transparency (no white fill)
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
 
 
     // Create ImageData from pixel data
