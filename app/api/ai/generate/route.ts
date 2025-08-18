@@ -431,21 +431,29 @@ export async function POST(request: NextRequest) {
     
     const firstItem = dalleResponse.data[0];
     const imageUrl = firstItem?.url || firstItem?.image_url || firstItem?.file_url;
+    const base64Image = firstItem?.b64_json;
     
-    apiLogger.debug(() => 'Image URL extraction attempt', undefined, () => ({
-      url: firstItem?.url,
-      image_url: firstItem?.image_url, 
-      file_url: firstItem?.file_url,
+    apiLogger.debug(() => 'Image data extraction attempt', undefined, () => ({
+      hasUrl: !!imageUrl,
+      hasB64Json: !!base64Image,
       extractedUrl: imageUrl,
       allItemKeys: Object.keys(firstItem || {})
     }));
     
-    if (!imageUrl) {
-      apiLogger.error('No image URL found in GPT-Image-1 response', undefined, {
+    // GPT-Image-1 returns base64 instead of URL
+    if (!imageUrl && !base64Image) {
+      apiLogger.error('No image data found in GPT-Image-1 response', undefined, {
         availableFields: Object.keys(firstItem || {}),
         firstItemContent: firstItem
       });
-      throw new Error(`No image URL returned from GPT-Image-1. Available fields: ${Object.keys(firstItem || {}).join(', ')}`);
+      throw new Error(`No image data returned from GPT-Image-1. Available fields: ${Object.keys(firstItem || {}).join(', ')}`);
+    }
+    
+    // Convert base64 to data URL if needed
+    let finalImageUrl = imageUrl;
+    if (!imageUrl && base64Image) {
+      finalImageUrl = `data:image/png;base64,${base64Image}`;
+      apiLogger.info('GPT-Image-1 returned base64 image, converted to data URL');
     }
 
     apiLogger.info('GPT-Image-1 image generation successful');
@@ -456,12 +464,13 @@ export async function POST(request: NextRequest) {
       
       apiLogger.info('Bypass mode: Returning raw GPT-Image-1 output without processing', {
         totalTime: `${totalTime}ms`,
-        outputSize: '1024x1024'
+        outputSize: '1024x1024',
+        dataType: base64Image ? 'base64' : 'url'
       });
 
       const responseData = {
         assetId: requestId, // Use request ID as asset ID
-        pngUrl: imageUrl, // Return raw OpenAI image URL using pngUrl field
+        pngUrl: finalImageUrl, // Return GPT-Image-1 image data (URL or base64)
         palette: [], // No palette generated in bypass mode  
         width: 1024, // Actual GPT-Image-1 size
         height: 1024,
@@ -497,20 +506,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 8: Download generated image
-    const downloadTimer = apiLogger.time('Image download');
-    const imageResponse = await fetch(imageUrl, {
-      signal: AbortSignal.timeout(600000) // 10 minute timeout
-    });
+    // Step 8: Get image data (download from URL or convert from base64)
+    const downloadTimer = apiLogger.time('Image data processing');
+    let imageBuffer: Buffer;
     
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to download generated image: ${imageResponse.statusText}`);
-    }
+    if (base64Image) {
+      // GPT-Image-1 returns base64 - convert directly to buffer
+      imageBuffer = Buffer.from(base64Image, 'base64');
+      apiLogger.debug(() => `Converted base64 to buffer: ${imageBuffer.length} bytes`);
+    } else if (finalImageUrl) {
+      // URL-based image (DALL-E style) - download it
+      const imageResponse = await fetch(finalImageUrl, {
+        signal: AbortSignal.timeout(600000) // 10 minute timeout
+      });
+      
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download generated image: ${imageResponse.statusText}`);
+      }
 
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    downloadTimer();
+      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      apiLogger.debug(() => `Downloaded image buffer: ${imageBuffer.length} bytes`);
+    } else {
+      throw new Error('No valid image data available');
+    }
     
-    apiLogger.debug(() => `Downloaded image buffer: ${imageBuffer.length} bytes`);
+    downloadTimer();
 
     // Step 9: Process image for pixel art conversion using Sharp
     const processTimer = apiLogger.time('Pixel art processing');
@@ -528,13 +548,13 @@ export async function POST(request: NextRequest) {
     }));
 
     // Convert to base64 data URL
-    const base64Image = `data:image/png;base64,${processed.buffer.toString('base64')}`;
+    const processedBase64Image = `data:image/png;base64,${processed.buffer.toString('base64')}`;
 
     const totalTime = Date.now() - startTime;
 
     const responseData = {
       assetId: requestId, // Use request ID as asset ID
-      pngUrl: base64Image, // Use pngUrl to match frontend expectations
+      pngUrl: processedBase64Image, // Use pngUrl to match frontend expectations
       palette: processed.palette.map(color => `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a || 1})`),
       width: processed.width,
       height: processed.height,
