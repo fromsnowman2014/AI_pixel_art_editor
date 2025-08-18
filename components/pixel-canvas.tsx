@@ -309,20 +309,19 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           transform: `translate(${canvasState.panX}px, ${canvasState.panY}px)`
         }}
       >
-        {/* Transparent checkerboard background */}
+        {/* Transparent checkerboard background - square pattern */}
         <div 
           className="absolute border-2 border-gray-300"
           style={{
             width: project.width * canvasState.zoom,
             height: project.height * canvasState.zoom,
+            backgroundColor: '#f0f0f0',
             backgroundImage: `
-              linear-gradient(45deg, #e5e5e5 25%, transparent 25%),
-              linear-gradient(-45deg, #e5e5e5 25%, transparent 25%),
-              linear-gradient(45deg, transparent 75%, #e5e5e5 75%),
-              linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)
+              linear-gradient(90deg, #e5e5e5 50%, transparent 50%),
+              linear-gradient(90deg, transparent 50%, #e5e5e5 50%)
             `,
-            backgroundSize: `${Math.max(16, 8 * canvasState.zoom)}px ${Math.max(16, 8 * canvasState.zoom)}px`,
-            backgroundPosition: '0 0, 0 0, 0 0, 0 0',
+            backgroundSize: `${Math.max(16, 8 * canvasState.zoom)}px ${Math.max(8, 4 * canvasState.zoom)}px`,
+            backgroundPosition: `0 0, 0 ${Math.max(4, 2 * canvasState.zoom)}px`,
             imageRendering: 'pixelated'
           }}
         />
