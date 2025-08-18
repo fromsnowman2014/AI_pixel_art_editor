@@ -48,7 +48,6 @@ const aiRoutes = (fastify, options, done) => {
                     size: '1024x1024', // Always generate at high res for better quantization
                     quality: 'high',
                     background: 'transparent',
-                    responseFormat: 'url',
                     userId,
                 });
                 if (!result.url) {
@@ -102,7 +101,6 @@ const aiRoutes = (fastify, options, done) => {
                     prompt,
                     n: 1,
                     size: '1024x1024',
-                    responseFormat: 'url',
                     userId,
                 });
                 if (!results[0]?.url) {
@@ -253,7 +251,6 @@ const aiRoutes = (fastify, options, done) => {
                 image: sourceBuffer,
                 n: count,
                 size: '512x512',
-                responseFormat: 'url',
                 userId,
             });
             // Process each variation

@@ -384,7 +384,6 @@ export async function POST(request: NextRequest) {
           size: "1024x1024",
           quality: "high",
           background: "transparent",
-          response_format: "url",
         }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)
@@ -400,7 +399,6 @@ export async function POST(request: NextRequest) {
           size: "1024x1024",
           quality: "high",
           background: "transparent",
-          response_format: "url",
         }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('OpenAI API call timed out after 10 minutes')), 600000)

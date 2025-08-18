@@ -24,7 +24,6 @@ export class OpenAIService {
     size?: '1024x1024' | '1792x1024' | '1024x1792';
     quality?: 'low' | 'medium' | 'high';
     background?: 'transparent' | 'opaque';
-    responseFormat?: 'url' | 'b64_json';
     userId?: string;
   }): Promise<{
     url?: string;
@@ -51,7 +50,6 @@ export class OpenAIService {
         size: params.size || '1024x1024',
         quality: params.quality || 'high',
         background: params.background || 'transparent',
-        response_format: params.responseFormat || 'url',
         user: params.userId, // for abuse monitoring
       });
 
@@ -103,7 +101,6 @@ export class OpenAIService {
     image: File | Buffer | string; // File, Buffer, or base64 string
     n?: number;
     size?: '256x256' | '512x512' | '1024x1024';
-    responseFormat?: 'url' | 'b64_json';
     userId?: string;
   }): Promise<Array<{
     url?: string;
@@ -128,7 +125,6 @@ export class OpenAIService {
         image: imageInput as File,
         n: params.n || 1,
         size: params.size || '512x512',
-        response_format: params.responseFormat || 'url',
         user: params.userId,
       });
 
@@ -171,7 +167,6 @@ export class OpenAIService {
     prompt: string;
     n?: number;
     size?: '256x256' | '512x512' | '1024x1024';
-    responseFormat?: 'url' | 'b64_json';
     userId?: string;
   }): Promise<Array<{
     url?: string;
@@ -182,7 +177,7 @@ export class OpenAIService {
     try {
       const optimizedPrompt = this.optimizePromptForPixelArt(params.prompt);
       
-      logger.info('Editing image with DALL-E', {
+      logger.info('Editing image with GPT-Image-1', {
         originalPrompt: params.prompt,
         optimizedPrompt,
         n: params.n || 1,
@@ -206,7 +201,6 @@ export class OpenAIService {
         prompt: optimizedPrompt,
         n: params.n || 1,
         size: params.size || '512x512',
-        response_format: params.responseFormat || 'url',
         user: params.userId,
       });
 

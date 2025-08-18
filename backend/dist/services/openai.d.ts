@@ -10,7 +10,6 @@ export declare class OpenAIService {
         size?: '1024x1024' | '1792x1024' | '1024x1792';
         quality?: 'low' | 'medium' | 'high';
         background?: 'transparent' | 'opaque';
-        responseFormat?: 'url' | 'b64_json';
         userId?: string;
     }): Promise<{
         url?: string;
@@ -24,7 +23,6 @@ export declare class OpenAIService {
         image: File | Buffer | string;
         n?: number;
         size?: '256x256' | '512x512' | '1024x1024';
-        responseFormat?: 'url' | 'b64_json';
         userId?: string;
     }): Promise<Array<{
         url?: string;
@@ -39,7 +37,6 @@ export declare class OpenAIService {
         prompt: string;
         n?: number;
         size?: '256x256' | '512x512' | '1024x1024';
-        responseFormat?: 'url' | 'b64_json';
         userId?: string;
     }): Promise<Array<{
         url?: string;

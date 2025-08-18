@@ -39,7 +39,6 @@ class OpenAIService {
                 size: params.size || '1024x1024',
                 quality: params.quality || 'high',
                 background: params.background || 'transparent',
-                response_format: params.responseFormat || 'url',
                 user: params.userId, // for abuse monitoring
             });
             const processingTime = Date.now() - startTime;
@@ -98,7 +97,6 @@ class OpenAIService {
                 image: imageInput,
                 n: params.n || 1,
                 size: params.size || '512x512',
-                response_format: params.responseFormat || 'url',
                 user: params.userId,
             });
             const processingTime = Date.now() - startTime;
@@ -132,7 +130,7 @@ class OpenAIService {
         const startTime = Date.now();
         try {
             const optimizedPrompt = this.optimizePromptForPixelArt(params.prompt);
-            logger.info('Editing image with DALL-E', {
+            logger.info('Editing image with GPT-Image-1', {
                 originalPrompt: params.prompt,
                 optimizedPrompt,
                 n: params.n || 1,
@@ -153,7 +151,6 @@ class OpenAIService {
                 prompt: optimizedPrompt,
                 n: params.n || 1,
                 size: params.size || '512x512',
-                response_format: params.responseFormat || 'url',
                 user: params.userId,
             });
             const processingTime = Date.now() - startTime;

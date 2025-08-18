@@ -70,7 +70,6 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
           size: '1024x1024', // Always generate at high res for better quantization
           quality: 'high',
           background: 'transparent',
-          responseFormat: 'url',
           userId,
         });
         
@@ -132,7 +131,6 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
           prompt,
           n: 1,
           size: '1024x1024',
-          responseFormat: 'url',
           userId,
         });
 
@@ -312,7 +310,6 @@ export const aiRoutes: FastifyPluginCallback = (fastify, options, done) => {
         image: sourceBuffer,
         n: count,
         size: '512x512',
-        responseFormat: 'url',
         userId,
       });
 

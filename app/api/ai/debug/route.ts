@@ -133,7 +133,6 @@ export async function GET(request: NextRequest) {
         size: "1024x1024",
         quality: "medium",
         background: "transparent",
-        response_format: "url",
       });
 
       const hasImage = testResponse.data && testResponse.data.length > 0 && testResponse.data[0]?.url;

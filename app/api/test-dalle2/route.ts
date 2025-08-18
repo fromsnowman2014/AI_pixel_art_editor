@@ -69,7 +69,6 @@ export async function GET(request: NextRequest) {
       size: "1024x1024", // Standard size for GPT-Image-1
       quality: "medium",
       background: "transparent",
-      response_format: "url",
     });
 
     console.log(`📊 [${requestId}] Response data length:`, imageResponse.data?.length || 0);
