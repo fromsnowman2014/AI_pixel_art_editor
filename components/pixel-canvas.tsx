@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
+import { performMagicWandSelection, clearSelection } from '@/lib/utils/magic-wand'
 
 // Simplified debug logging
 import { canvasDebug } from '@/lib/utils/debug'
@@ -33,6 +34,99 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   const activeTab = getActiveTab()
   const isPlaying = activeTab?.isPlaying || false
 
+  // Handle keyboard shortcuts for selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeTabId || !canvasState.selection) return
+
+      switch (e.key) {
+        case 'Escape':
+          // Clear selection
+          if (canvasState.selection.isActive) {
+            e.preventDefault()
+            updateCanvasState(activeTabId, {
+              selection: {
+                isActive: false,
+                selectedPixels: new Set(),
+                bounds: null,
+                tolerance: canvasState.selection.tolerance
+              }
+            })
+            canvasDebug('SELECTION', 'Selection cleared via Escape key')
+          }
+          break
+        case 'Delete':
+        case 'Backspace':
+          // Delete selected pixels
+          if (canvasState.selection.isActive && canvasState.selection.selectedPixels.size > 0 && canvasData) {
+            e.preventDefault()
+            const newData = new Uint8ClampedArray(canvasData.data)
+            
+            // Make selected pixels transparent
+            for (const pixelKey of canvasState.selection.selectedPixels) {
+              const [x, y] = pixelKey.split(',').map(Number)
+              const index = (y * project.width + x) * 4
+              newData[index + 3] = 0 // Set alpha to 0 (transparent)
+            }
+
+            const updatedCanvasData = {
+              ...canvasData,
+              data: newData
+            }
+
+            updateCanvasData(activeTabId, updatedCanvasData)
+            
+            // Clear selection after deletion
+            updateCanvasState(activeTabId, {
+              selection: {
+                isActive: false,
+                selectedPixels: new Set(),
+                bounds: null,
+                tolerance: canvasState.selection.tolerance
+              }
+            })
+            
+            canvasDebug('SELECTION', `Deleted ${canvasState.selection.selectedPixels.size} selected pixels`)
+          }
+          break
+        case 'a':
+        case 'A':
+          // Select all (Ctrl+A)
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (canvasData) {
+              const allPixels = new Set<string>()
+              for (let y = 0; y < project.height; y++) {
+                for (let x = 0; x < project.width; x++) {
+                  allPixels.add(`${x},${y}`)
+                }
+              }
+              
+              updateCanvasState(activeTabId, {
+                selection: {
+                  isActive: true,
+                  selectedPixels: allPixels,
+                  bounds: {
+                    minX: 0,
+                    maxX: project.width - 1,
+                    minY: 0,
+                    maxY: project.height - 1
+                  },
+                  tolerance: canvasState.selection.tolerance
+                }
+              })
+              
+              canvasDebug('SELECTION', `Selected all ${allPixels.size} pixels`)
+            }
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTabId, canvasState.selection, canvasData, project.width, project.height, updateCanvasState, updateCanvasData])
+
   // Component mounted
 
   // Props updated (removed debug logs)
@@ -57,13 +151,34 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     // Apply tool-specific drawing logic
     switch (canvasState.tool) {
       case 'pencil':
-        newData[index] = color.r
-        newData[index + 1] = color.g
-        newData[index + 2] = color.b
-        newData[index + 3] = 255
+        // If there's an active selection, only draw within selection
+        if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
+          if (canvasState.selection.selectedPixels.has(`${pixelX},${pixelY}`)) {
+            newData[index] = color.r
+            newData[index + 1] = color.g
+            newData[index + 2] = color.b
+            newData[index + 3] = 255
+          } else {
+            return // Don't draw outside selection
+          }
+        } else {
+          newData[index] = color.r
+          newData[index + 1] = color.g
+          newData[index + 2] = color.b
+          newData[index + 3] = 255
+        }
         break
       case 'eraser':
-        newData[index + 3] = 0 // Make transparent
+        // If there's an active selection, only erase within selection
+        if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
+          if (canvasState.selection.selectedPixels.has(`${pixelX},${pixelY}`)) {
+            newData[index + 3] = 0 // Make transparent
+          } else {
+            return // Don't erase outside selection
+          }
+        } else {
+          newData[index + 3] = 0 // Make transparent
+        }
         break
       case 'eyedropper':
         // Get the color values from the pixel data
@@ -89,9 +204,51 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         updateCanvasState(activeTabId, { color: pickedColor })
         canvasDebug('EYEDROPPER', `Picked color: ${pickedColor}`)
         return
+      case 'magic-wand':
+        // Perform magic wand selection
+        const selectionResult = performMagicWandSelection(
+          canvasData.data,
+          pixelX,
+          pixelY,
+          project.width,
+          project.height,
+          {
+            tolerance: canvasState.selection?.tolerance || 0,
+            contiguous: true,
+            sampleAllLayers: false
+          }
+        )
+        
+        // Update canvas state with selection
+        updateCanvasState(activeTabId, {
+          selection: {
+            isActive: selectionResult.pixelCount > 0,
+            selectedPixels: selectionResult.selectedPixels,
+            bounds: selectionResult.bounds,
+            tolerance: canvasState.selection?.tolerance || 0
+          }
+        })
+        
+        canvasDebug('MAGIC_WAND', `Selected ${selectionResult.pixelCount} pixels`, {
+          targetColor: selectionResult.targetColor,
+          bounds: selectionResult.bounds
+        })
+        return
       case 'fill':
-        // Simple flood fill implementation
-        floodFill(newData, project.width, project.height, pixelX, pixelY, color)
+        // If there's an active selection, fill entire selection
+        if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
+          for (const pixelKey of canvasState.selection.selectedPixels) {
+            const [x, y] = pixelKey.split(',').map(Number)
+            const fillIndex = (y * project.width + x) * 4
+            newData[fillIndex] = color.r
+            newData[fillIndex + 1] = color.g
+            newData[fillIndex + 2] = color.b
+            newData[fillIndex + 3] = 255
+          }
+        } else {
+          // Normal flood fill implementation
+          floodFill(newData, project.width, project.height, pixelX, pixelY, color)
+        }
         break
     }
 
@@ -321,7 +478,94 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         ctx.stroke()
       }
     }
-  }, [canvasData, project, canvasState.zoom, canvasDataId, isPlaying])
+
+    // Draw selection overlay
+    if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
+      // Create animated marching ants effect
+      const time = Date.now() / 100
+      const dashOffset = (time % 20)
+      
+      ctx.save()
+      ctx.setLineDash([4, 4])
+      ctx.lineDashOffset = -dashOffset
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 1
+      
+      // Draw selection for each selected pixel
+      for (const pixelKey of canvasState.selection.selectedPixels) {
+        const [x, y] = pixelKey.split(',').map(Number)
+        const screenX = x * canvasState.zoom
+        const screenY = y * canvasState.zoom
+        const size = canvasState.zoom
+        
+        // Draw marching ants border
+        ctx.strokeRect(screenX, screenY, size, size)
+      }
+      
+      // Draw white dashes for contrast
+      ctx.setLineDash([4, 4])
+      ctx.lineDashOffset = -dashOffset + 4
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 1
+      
+      for (const pixelKey of canvasState.selection.selectedPixels) {
+        const [x, y] = pixelKey.split(',').map(Number)
+        const screenX = x * canvasState.zoom
+        const screenY = y * canvasState.zoom
+        const size = canvasState.zoom
+        
+        ctx.strokeRect(screenX, screenY, size, size)
+      }
+      
+      ctx.restore()
+      
+      // Draw selection bounds indicator
+      if (canvasState.selection.bounds) {
+        const bounds = canvasState.selection.bounds
+        const boundsX = bounds.minX * canvasState.zoom
+        const boundsY = bounds.minY * canvasState.zoom
+        const boundsWidth = (bounds.maxX - bounds.minX + 1) * canvasState.zoom
+        const boundsHeight = (bounds.maxY - bounds.minY + 1) * canvasState.zoom
+        
+        ctx.save()
+        ctx.strokeStyle = '#007AFF'
+        ctx.lineWidth = 2
+        ctx.setLineDash([])
+        ctx.globalAlpha = 0.7
+        
+        // Draw selection bounds rectangle
+        ctx.strokeRect(boundsX - 1, boundsY - 1, boundsWidth + 2, boundsHeight + 2)
+        
+        ctx.restore()
+      }
+    }
+  }, [canvasData, project, canvasState.zoom, canvasDataId, isPlaying, canvasState.selection])
+
+  // Animation loop for marching ants selection
+  useEffect(() => {
+    if (!canvasState.selection?.isActive || canvasState.selection.selectedPixels.size === 0) {
+      return
+    }
+
+    let animationId: number
+    const animate = () => {
+      // Force re-render for marching ants animation
+      const canvas = canvasRef.current
+      if (canvas) {
+        // Trigger re-render by updating canvas data dependency
+        // The main render effect will handle the actual drawing
+        setIsDragging(prev => prev) // No-op state update to trigger re-render
+      }
+      animationId = requestAnimationFrame(animate)
+    }
+
+    animationId = requestAnimationFrame(animate)
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId)
+      }
+    }
+  }, [canvasState.selection?.isActive, canvasState.selection?.selectedPixels.size])
 
   return (
     <div 
@@ -374,6 +618,11 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         <div className="absolute -top-8 left-0 rounded bg-black/75 px-2 py-1 text-xs text-white">
           {isPlaying ? '🎬 Playing Animation - editing disabled' :
            canvasState.tool === 'eyedropper' ? 'Color Picker - click to pick color' :
+           canvasState.tool === 'magic-wand' ? (
+             canvasState.selection?.isActive 
+               ? `🪄 ${canvasState.selection.selectedPixels.size} pixels selected | ${canvasState.zoom}x`
+               : `🪄 Magic Wand - click to select pixels | ${canvasState.zoom}x`
+           ) :
            `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
       </div>

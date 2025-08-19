@@ -175,6 +175,12 @@ const createDefaultCanvasState = (): CanvasState => ({
   zoom: 8, // 8x zoom for pixel art
   panX: 0,
   panY: 0,
+  selection: {
+    isActive: false,
+    selectedPixels: new Set<string>(),
+    bounds: null,
+    tolerance: 0 // Exact color match by default
+  }
 })
 
 const createDefaultProject = (options?: {

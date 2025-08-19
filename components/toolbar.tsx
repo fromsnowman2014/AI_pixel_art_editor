@@ -10,26 +10,29 @@ import {
   Eraser,
   PaintBucket,
   Pipette,
-  Move
+  Move,
+  Wand2
 } from 'lucide-react'
 
 interface ToolbarProps {
   className?: string
 }
 
-type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'pan'
+type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'pan' | 'magic-wand'
 
 const tools: Array<{
   id: Tool
   name: string
   icon: React.ComponentType<{ className?: string }>
   shortcut: string
+  description?: string
 }> = [
-  { id: 'pencil', name: 'Pencil', icon: Pencil, shortcut: 'P' },
-  { id: 'eraser', name: 'Eraser', icon: Eraser, shortcut: 'E' },
-  { id: 'fill', name: 'Paint Bucket', icon: PaintBucket, shortcut: 'B' },
-  { id: 'eyedropper', name: 'Color Picker', icon: Pipette, shortcut: 'I' },
-  { id: 'pan', name: 'Pan', icon: Move, shortcut: 'H' },
+  { id: 'pencil', name: 'Pencil', icon: Pencil, shortcut: 'P', description: 'Draw pixels one by one' },
+  { id: 'eraser', name: 'Eraser', icon: Eraser, shortcut: 'E', description: 'Erase pixels to transparency' },
+  { id: 'fill', name: 'Paint Bucket', icon: PaintBucket, shortcut: 'B', description: 'Fill connected areas with color' },
+  { id: 'magic-wand', name: 'Magic Wand', icon: Wand2, shortcut: 'W', description: 'Select connected pixels of same color' },
+  { id: 'eyedropper', name: 'Color Picker', icon: Pipette, shortcut: 'I', description: 'Pick color from canvas' },
+  { id: 'pan', name: 'Pan', icon: Move, shortcut: 'H', description: 'Move around the canvas' },
 ]
 
 export function Toolbar({ className }: ToolbarProps) {
@@ -64,8 +67,43 @@ export function Toolbar({ className }: ToolbarProps) {
       newTool: tool,
       activeTabId: activeTabId
     })
-    updateCanvasState(activeTabId, { tool })
+    
+    // Clear selection when switching away from magic wand
+    if (canvasState.tool === 'magic-wand' && tool !== 'magic-wand' && canvasState.selection?.isActive) {
+      updateCanvasState(activeTabId, { 
+        tool,
+        selection: {
+          ...canvasState.selection,
+          isActive: false,
+          selectedPixels: new Set(),
+          bounds: null
+        }
+      })
+    } else {
+      updateCanvasState(activeTabId, { tool })
+    }
   }
+
+  // Handle keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle shortcuts if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      const key = e.key.toLowerCase()
+      const tool = tools.find(t => t.shortcut.toLowerCase() === key)
+      
+      if (tool) {
+        e.preventDefault()
+        handleToolChange(tool.id)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleToolChange])
 
 
   return (
@@ -82,7 +120,7 @@ export function Toolbar({ className }: ToolbarProps) {
           "grid gap-2",
           // Desktop: 3 columns (3x2 layout)
           "lg:grid-cols-3",
-          // Tablet: 2 columns (2x3 layout) 
+          // Tablet: 2 columns (3x2 layout) 
           "md:grid-cols-2",
           // Mobile: 3 columns (compact)
           "grid-cols-3"
@@ -94,7 +132,15 @@ export function Toolbar({ className }: ToolbarProps) {
             return (
               <Tooltip
                 key={tool.id}
-                content={`${tool.name} (${tool.shortcut})`}
+                content={
+                  <div className="text-center">
+                    <div className="font-medium">{tool.name}</div>
+                    <div className="text-xs text-gray-500 mt-1">{tool.description}</div>
+                    <div className="text-xs font-mono bg-gray-100 text-gray-700 px-1 rounded mt-1">
+                      Press {tool.shortcut}
+                    </div>
+                  </div>
+                }
                 side="right"
               >
                 <Button
@@ -152,7 +198,15 @@ export function Toolbar({ className }: ToolbarProps) {
             return (
               <Tooltip
                 key={tool.id}
-                content={`${tool.name} (${tool.shortcut})`}
+                content={
+                  <div className="text-center">
+                    <div className="font-medium">{tool.name}</div>
+                    <div className="text-xs text-gray-500 mt-1">{tool.description}</div>
+                    <div className="text-xs font-mono bg-gray-100 text-gray-700 px-1 rounded mt-1">
+                      Press {tool.shortcut}
+                    </div>
+                  </div>
+                }
                 side="right"
               >
                 <Button
@@ -211,12 +265,22 @@ export function Toolbar({ className }: ToolbarProps) {
       <div className="mt-4">
         <div className="space-y-2">
           <div className="rounded bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700">
-            ⌨️ <strong>Shortcuts:</strong> P-Pencil, E-Eraser, B-Fill, I-Color Picker, H-Pan
+            ⌨️ <strong>Shortcuts:</strong> P-Pencil, E-Eraser, B-Fill, W-Magic Wand, I-Color Picker, H-Pan
           </div>
           
           <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">
-            💡 <strong>Tip:</strong> Use Color Picker (I) to sample colors or mouse wheel to zoom.
+            💡 <strong>Tip:</strong> Use Magic Wand (W) to select similar colors. Esc to clear, Del to delete selection.
           </div>
+          
+          {canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0 && (
+            <div className="rounded bg-purple-50 border border-purple-200 p-2 text-xs text-purple-700">
+              🪄 <strong>Selection Active:</strong> {canvasState.selection.selectedPixels.size} pixels selected
+              <br />
+              <span className="text-xs text-purple-600">
+                Use pencil/eraser to edit selection, or paint bucket to fill all selected pixels
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

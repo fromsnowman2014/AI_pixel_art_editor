@@ -199,6 +199,19 @@ export interface CanvasState {
   zoom: number
   panX: number
   panY: number
+  selection?: SelectionState
+}
+
+export interface SelectionState {
+  isActive: boolean
+  selectedPixels: Set<string> // "x,y" format for efficient lookup
+  bounds: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  } | null
+  tolerance: number // For magic wand color tolerance
 }
 
 export interface HistoryEntry {
