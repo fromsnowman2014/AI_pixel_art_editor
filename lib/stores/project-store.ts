@@ -1777,13 +1777,18 @@ export const useProjectStore = create<ProjectStore>()(
                 tab.playbackFrameIndex = nextFrameIndex
                 tab.playbackFrameId = nextFrame.id
 
-                // Load frame canvas data and update canvas
+                // Load frame canvas data and update canvas with proper synchronization
                 const frameData = tab.frameCanvasData.find(f => f.frameId === nextFrame.id)
                 if (frameData && frameData.canvasData) {
+                  // PLAYBACK FIX: Create clean canvas data copy for smooth transitions
                   tab.canvasData = { 
-                    ...frameData.canvasData, 
+                    width: frameData.canvasData.width,
+                    height: frameData.canvasData.height,
                     data: new Uint8ClampedArray(frameData.canvasData.data) 
                   }
+                } else {
+                  // PLAYBACK FIX: Handle missing frame data gracefully
+                  tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                 }
               })
 
@@ -1826,16 +1831,20 @@ export const useProjectStore = create<ProjectStore>()(
               tab.playbackIntervalId = null
             }
 
-            // Restore the active frame
+            // PLAYBACK FIX: Properly restore the active frame with clean canvas data
             if (tab.project.activeFrameId) {
               const activeFrame = tab.frames.find(f => f.id === tab.project.activeFrameId)
               if (activeFrame) {
                 const frameData = tab.frameCanvasData.find(f => f.frameId === activeFrame.id)
                 if (frameData && frameData.canvasData) {
                   tab.canvasData = { 
-                    ...frameData.canvasData, 
+                    width: frameData.canvasData.width,
+                    height: frameData.canvasData.height,
                     data: new Uint8ClampedArray(frameData.canvasData.data) 
                   }
+                } else {
+                  // Restore to empty state if no frame data exists
+                  tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                 }
               }
             }
@@ -1864,14 +1873,18 @@ export const useProjectStore = create<ProjectStore>()(
             if (frame) {
               tab.playbackFrameId = frame.id
               
-              // If not playing, update canvas immediately
+              // If not playing, update canvas immediately with clean data
               if (!tab.isPlaying) {
                 const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
                 if (frameData && frameData.canvasData) {
                   tab.canvasData = { 
-                    ...frameData.canvasData, 
+                    width: frameData.canvasData.width,
+                    height: frameData.canvasData.height,
                     data: new Uint8ClampedArray(frameData.canvasData.data) 
                   }
+                } else {
+                  // PLAYBACK FIX: Handle missing frame data
+                  tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
                 }
               }
             }

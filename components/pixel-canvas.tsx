@@ -438,8 +438,15 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     // Disable smoothing for pixel art
     ctx.imageSmoothingEnabled = false
 
-    // Clear canvas with transparency (no white fill)
+    // Clear canvas with proper transparency handling
+    // During playback, ensure background transparency is preserved
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    
+    // PLAYBACK FIX: Ensure canvas context maintains transparency
+    if (isPlaying) {
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.save()
+    }
 
 
     // Create ImageData from pixel data
@@ -465,6 +472,11 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       
       // Draw scaled image
       ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height)
+    }
+
+    // PLAYBACK FIX: Restore canvas context after frame rendering
+    if (isPlaying) {
+      ctx.restore()
     }
 
     // Draw grid if zoomed in enough and not playing (for performance)
@@ -595,7 +607,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           transform: `translate(${canvasState.panX}px, ${canvasState.panY}px)`
         }}
       >
-        {/* Transparent checkerboard background - classic checkerboard pattern */}
+        {/* Transparent checkerboard background - enhanced for playback stability */}
         <div 
           className="absolute border-2 border-gray-300"
           style={{
@@ -609,13 +621,16 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
               </svg>
             `)}")`,
             backgroundRepeat: 'repeat',
-            imageRendering: 'pixelated'
+            imageRendering: 'pixelated',
+            // PLAYBACK FIX: Ensure background remains stable during animation
+            zIndex: 1,
+            pointerEvents: 'none'
           }}
         />
         
         <canvas
           ref={canvasRef}
-          className="pixel-canvas border-2 border-gray-300 shadow-lg relative z-10"
+          className="pixel-canvas border-2 border-gray-300 shadow-lg relative"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -626,7 +641,9 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
                    canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair',
             backgroundColor: 'transparent',
             imageRendering: 'pixelated',
-            opacity: isPlaying ? 0.9 : 1 // Slightly fade during playback
+            zIndex: 2 // Ensure canvas is above checkerboard background
+            // PLAYBACK FIX: Remove opacity change that causes "bright transparent background"
+            // opacity: isPlaying ? 0.9 : 1 // Removed - was causing visual issues
           }}
         />
         
