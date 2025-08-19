@@ -57,6 +57,68 @@ export class MediaImporter {
   }
 
   /**
+   * Import media from local file and convert to pixel art frames
+   */
+  static async importFromFile(file: File, options: MediaImportOptions): Promise<ImportResult> {
+    try {
+      // Validate file
+      this.validateFile(file)
+
+      // Determine media type from file
+      const mediaType = this.detectMediaTypeFromFile(file)
+      
+      switch (mediaType) {
+        case 'gif':
+          return await this.processFileAsGif(file, options)
+        case 'video':
+          return await this.processFileAsVideo(file, options)
+        case 'image':
+        default:
+          return await this.processFileAsImage(file, options)
+      }
+    } catch (error) {
+      console.error('File import failed:', error)
+      throw new Error(`Failed to import file: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Validate uploaded file
+   */
+  private static validateFile(file: File): void {
+    // Check file size (max 10MB for images, 50MB for videos)
+    const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      throw new Error(`File too large. Maximum size: ${maxSize / (1024 * 1024)}MB`)
+    }
+
+    // Check file type
+    const allowedTypes = [
+      'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+      'video/mp4', 'video/webm', 'video/mov', 'video/avi'
+    ]
+    
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      throw new Error(`Unsupported file type: ${file.type}. Supported: PNG, JPG, WebP, GIF, MP4, WebM`)
+    }
+  }
+
+  /**
+   * Detect media type from file
+   */
+  private static detectMediaTypeFromFile(file: File): 'image' | 'gif' | 'video' {
+    if (file.type === 'image/gif') {
+      return 'gif'
+    }
+    
+    if (file.type.startsWith('video/')) {
+      return 'video'
+    }
+    
+    return 'image'
+  }
+
+  /**
    * Detect media type from URL
    */
   private static detectMediaType(url: string): 'image' | 'gif' | 'video' {
@@ -181,6 +243,129 @@ export class MediaImporter {
       
       video.onerror = () => reject(new Error('Failed to load video'))
       video.src = proxyUrl
+    })
+  }
+
+  /**
+   * Process local image file
+   */
+  private static async processFileAsImage(file: File, options: MediaImportOptions): Promise<ImportResult> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      
+      img.onload = async () => {
+        try {
+          const pixelatedImageData = await this.pixelateImage(img, options)
+          const frame: Frame = {
+            id: `imported_file_${Date.now()}`,
+            projectId: '',
+            index: 0,
+            delayMs: 500,
+            included: true,
+            layers: [],
+            flattenedPngUrl: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+
+          resolve({
+            frames: [{ frame, imageData: Array.from(pixelatedImageData.data) }],
+            originalDimensions: { width: img.width, height: img.height },
+            mediaType: 'image'
+          })
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      img.onerror = () => reject(new Error('Failed to load image file'))
+      
+      // Convert file to data URL
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.src = e.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  /**
+   * Process local GIF file (simplified - extracts first frame only)
+   */
+  private static async processFileAsGif(file: File, options: MediaImportOptions): Promise<ImportResult> {
+    // For now, treat GIF as static image (first frame)
+    // TODO: Add proper GIF frame extraction using gifuct-js library
+    return await this.processFileAsImage(file, options)
+  }
+
+  /**
+   * Process local video file (extracts first frame only)
+   */
+  private static async processFileAsVideo(file: File, options: MediaImportOptions): Promise<ImportResult> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.muted = true
+      video.preload = 'metadata'
+      
+      video.onloadedmetadata = () => {
+        // Limit video duration to 1 second for performance
+        if (video.duration > 1) {
+          console.warn('Video duration limited to 1 second for performance')
+        }
+        video.currentTime = 0 // Get first frame
+      }
+      
+      video.onseeked = async () => {
+        try {
+          const { canvas, ctx } = this.getCanvas()
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          
+          ctx.drawImage(video, 0, 0)
+          
+          // Create temporary image from video frame
+          const tempImg = new Image()
+          tempImg.onload = async () => {
+            try {
+              const pixelatedImageData = await this.pixelateImage(tempImg, options)
+              const frame: Frame = {
+                id: `imported_video_file_${Date.now()}`,
+                projectId: '',
+                index: 0,
+                delayMs: 500,
+                included: true,
+                layers: [],
+                flattenedPngUrl: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+
+              resolve({
+                frames: [{ frame, imageData: Array.from(pixelatedImageData.data) }],
+                originalDimensions: { width: video.videoWidth, height: video.videoHeight },
+                mediaType: 'video'
+              })
+            } catch (error) {
+              reject(error)
+            }
+          }
+          tempImg.src = canvas.toDataURL()
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      video.onerror = () => reject(new Error('Failed to load video file'))
+      
+      // Convert file to object URL
+      const videoUrl = URL.createObjectURL(file)
+      video.src = videoUrl
+      
+      // Clean up object URL when done
+      video.addEventListener('loadeddata', () => {
+        URL.revokeObjectURL(videoUrl)
+      })
     })
   }
 
