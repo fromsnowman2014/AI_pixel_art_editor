@@ -395,6 +395,12 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Close tab
         closeTab: (tabId) => {
+          // Clean up playback before closing tab
+          const tab = get().getTab(tabId)
+          if (tab?.isPlaying) {
+            get().stopPlayback(tabId)
+          }
+
           set((state) => {
             const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
             if (tabIndex === -1) return
@@ -416,6 +422,12 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Set active tab
         setActiveTab: (tabId) => {
+          // Stop playback on previously active tab when switching
+          const currentActiveTab = get().getActiveTab()
+          if (currentActiveTab?.isPlaying && currentActiveTab.id !== tabId) {
+            get().stopPlayback(currentActiveTab.id)
+          }
+
           set((state) => {
             if (state.tabs.find(tab => tab.id === tabId)) {
               state.activeTabId = tabId

@@ -26,7 +26,12 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     updateCanvasState,
     addHistoryEntry,
     regenerateFrameThumbnail,
+    getActiveTab,
   } = useProjectStore()
+
+  // Get playback state for optimized rendering
+  const activeTab = getActiveTab()
+  const isPlaying = activeTab?.isPlaying || false
 
   // Component mounted
 
@@ -157,6 +162,9 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   // Mouse event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!containerRef.current || !canvasRef.current) return
+    
+    // Disable drawing during playback
+    if (isPlaying) return
 
     // Simple approach: use canvas coordinates directly (no pan adjustment needed)
     const canvasRect = canvasRef.current.getBoundingClientRect()
@@ -169,10 +177,13 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     if (canvasState.tool !== 'pan') {
       drawPixel(x, y)
     }
-  }, [canvasState.panX, canvasState.panY, canvasState.tool, drawPixel])
+  }, [canvasState.panX, canvasState.panY, canvasState.tool, drawPixel, isPlaying])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging || !lastMousePos || !containerRef.current || !canvasRef.current) return
+    
+    // Disable drawing during playback (but allow panning)
+    if (isPlaying && canvasState.tool !== 'pan') return
 
     if (canvasState.tool === 'pan') {
       const deltaX = e.clientX - lastMousePos.x
@@ -194,10 +205,10 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     }
 
     setLastMousePos({ x: e.clientX, y: e.clientY })
-  }, [isDragging, lastMousePos, canvasState, activeTabId, updateCanvasState, drawPixel])
+  }, [isDragging, lastMousePos, canvasState, activeTabId, updateCanvasState, drawPixel, isPlaying])
 
   const handleMouseUp = useCallback(() => {
-    if (isDragging && canvasData && activeTabId && canvasState.tool !== 'pan') {
+    if (isDragging && canvasData && activeTabId && canvasState.tool !== 'pan' && !isPlaying) {
       addHistoryEntry(activeTabId, `${canvasState.tool}_draw`, canvasData)
       
       // FINAL THUMBNAIL UPDATE: Ensure thumbnail is updated when drawing is complete
@@ -209,7 +220,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     }
     setIsDragging(false)
     setLastMousePos(null)
-  }, [isDragging, canvasData, activeTabId, canvasState.tool, addHistoryEntry, project.activeFrameId, regenerateFrameThumbnail])
+  }, [isDragging, canvasData, activeTabId, canvasState.tool, addHistoryEntry, project.activeFrameId, regenerateFrameThumbnail, isPlaying])
 
   // Handle zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -224,12 +235,27 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   }, [activeTabId, canvasState.zoom, updateCanvasState])
 
   // Create a stable dependency that changes when canvas data actually changes
+  // Optimized for playback performance
   const canvasDataId = useMemo(() => {
     if (!canvasData) return 'null'
-    // Create a stable ID based on content, not reference
-    const sampleData = Array.from(canvasData.data.slice(0, 32))
-    const nonZeroPixels = Array.from(canvasData.data).filter((_, i) => i % 4 === 3 && (canvasData.data[i] ?? 0) > 0).length
-    return `${canvasData.width}x${canvasData.height}-${sampleData.join(',')}-pixels:${nonZeroPixels}`
+    
+    // For playback optimization: use a lighter hash for frequent updates
+    const width = canvasData.width
+    const height = canvasData.height
+    const dataLength = canvasData.data.length
+    
+    // Sample fewer pixels for better performance during playback
+    const sampleSize = Math.min(16, dataLength / 4)
+    let hash = 0
+    for (let i = 0; i < sampleSize * 4; i += 4) {
+      const r = canvasData.data[i] || 0
+      const g = canvasData.data[i + 1] || 0
+      const b = canvasData.data[i + 2] || 0
+      const a = canvasData.data[i + 3] || 0
+      hash = ((hash << 5) - hash + r + g + b + a) & 0xffffffff
+    }
+    
+    return `${width}x${height}-${dataLength}-${hash}`
   }, [canvasData])
   
   // Render canvas
@@ -276,8 +302,8 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height)
     }
 
-    // Draw grid if zoomed in enough
-    if (canvasState.zoom >= 4) {
+    // Draw grid if zoomed in enough and not playing (for performance)
+    if (canvasState.zoom >= 4 && !isPlaying) {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'
       ctx.lineWidth = 1
       
@@ -295,7 +321,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         ctx.stroke()
       }
     }
-  }, [canvasData, project, canvasState.zoom, canvasDataId])
+  }, [canvasData, project, canvasState.zoom, canvasDataId, isPlaying])
 
   return (
     <div 
@@ -335,16 +361,19 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           style={{
-            cursor: canvasState.tool === 'pan' ? 'grab' : 
+            cursor: isPlaying ? 'not-allowed' : 
+                   canvasState.tool === 'pan' ? 'grab' : 
                    canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair',
             backgroundColor: 'transparent',
-            imageRendering: 'pixelated'
+            imageRendering: 'pixelated',
+            opacity: isPlaying ? 0.9 : 1 // Slightly fade during playback
           }}
         />
         
         {/* Tool indicator */}
         <div className="absolute -top-8 left-0 rounded bg-black/75 px-2 py-1 text-xs text-white">
-          {canvasState.tool === 'eyedropper' ? 'Color Picker - click to pick color' :
+          {isPlaying ? '🎬 Playing Animation - editing disabled' :
+           canvasState.tool === 'eyedropper' ? 'Color Picker - click to pick color' :
            `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
       </div>
