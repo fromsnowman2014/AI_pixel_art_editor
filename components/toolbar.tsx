@@ -69,12 +69,12 @@ export function Toolbar({ className }: ToolbarProps) {
 
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('flex flex-col h-full', className)}>
       {/* Drawing Tools - Responsive Grid Layout */}
-      <div className="space-y-3">
+      <div className="space-y-3 flex-shrink-0">
         <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-2">
-          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-          TOOLS
+          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          DRAWING TOOLS
         </div>
         
         {/* Tools Grid - Responsive Layout */}
@@ -207,73 +207,24 @@ export function Toolbar({ className }: ToolbarProps) {
         </div>
       </div>
 
-      {/* Brush Size Control - Compact Design */}
-      <div className="space-y-3">
-        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-2">
-          <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-          BRUSH SIZE
-        </div>
-        
-        <div className="bg-white rounded-lg border-2 border-gray-200 p-3 shadow-sm hover:shadow-md transition-all duration-200">
-          {/* Size Display */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div 
-                className="rounded-full bg-blue-500 transition-all duration-200"
-                style={{
-                  width: `${Math.max(8, canvasState.brushSize * 2)}px`,
-                  height: `${Math.max(8, canvasState.brushSize * 2)}px`
-                }}
-              />
-              <span className="text-sm text-gray-600">Preview</span>
+      {/* Tips and Shortcuts - Fill remaining space */}
+      <div className="flex-1 flex flex-col justify-end mt-4">
+        <div className="space-y-2">
+          <div className="rounded bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+            ⌨️ <strong>Keyboard Shortcuts:</strong><br/>
+            <div className="mt-1 space-y-1">
+              <div>P - Pencil | E - Eraser</div>
+              <div>B - Fill | I - Color Picker</div>
+              <div>H - Pan | Mouse Wheel - Zoom</div>
             </div>
-            <span className="text-sm font-mono font-bold px-2 py-1 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded text-blue-700">
-              {canvasState.brushSize}px
-            </span>
           </div>
           
-          {/* Slider */}
-          <div className="space-y-2">
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={canvasState.brushSize}
-              onChange={(e) => 
-                updateCanvasState(activeTabId, { brushSize: parseInt(e.target.value) })
-              }
-              className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 slider"
-              style={{
-                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(canvasState.brushSize - 1) * 11.11}%, #e5e7eb ${(canvasState.brushSize - 1) * 11.11}%, #e5e7eb 100%)`
-              }}
-            />
-            
-            {/* Quick Size Buttons */}
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-400 font-mono">1px</span>
-              <div className="flex gap-1">
-                {[1, 2, 4, 6, 8, 10].map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => updateCanvasState(activeTabId, { brushSize: size })}
-                    className={cn(
-                      "w-6 h-6 rounded flex items-center justify-center text-xs font-mono transition-all duration-200",
-                      "hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1",
-                      canvasState.brushSize === size
-                        ? "bg-blue-500 text-white shadow-md"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    )}
-                    aria-label={`Set brush size to ${size}px`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-              <span className="text-xs text-gray-400 font-mono">10px</span>
-            </div>
+          <div className="rounded bg-green-50 border border-green-200 p-3 text-xs text-green-700">
+            💡 <strong>Pro Tip:</strong> Use the Color Picker (I) to sample colors from your artwork, or right-click and drag to pan around the canvas.
           </div>
         </div>
       </div>
+
     </div>
   )
 }
