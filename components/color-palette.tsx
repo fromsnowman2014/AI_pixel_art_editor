@@ -60,9 +60,9 @@ export function ColorPalette({ className }: ColorPaletteProps) {
   }
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('flex flex-col h-full', className)}>
       {/* Current Color Display */}
-      <div className="rounded-lg border border-gray-200 p-3">
+      <div className="rounded-lg border border-gray-200 p-3 flex-shrink-0">
         <div className="mb-2 text-xs font-medium text-gray-600">CURRENT COLOR</div>
         <div className="flex items-center space-x-3">
           <div
@@ -81,7 +81,7 @@ export function ColorPalette({ className }: ColorPaletteProps) {
       </div>
 
       {/* Color Grid */}
-      <div>
+      <div className="flex-shrink-0 mt-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-medium text-gray-600">
             PALETTE ({project.palette.length}/{project.colorLimit})
@@ -118,7 +118,7 @@ export function ColorPalette({ className }: ColorPaletteProps) {
 
       {/* Custom Color Picker */}
       {showColorPicker && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex-shrink-0 mt-3">
           <div className="mb-2 text-xs font-medium text-gray-600">ADD CUSTOM COLOR</div>
           <div className="space-y-3">
             <input
@@ -156,54 +156,152 @@ export function ColorPalette({ className }: ColorPaletteProps) {
         </div>
       )}
 
-      {/* Palette Presets */}
-      <div className="border-t border-gray-200 pt-3">
-        <div className="mb-2 text-xs font-medium text-gray-600">QUICK PALETTES</div>
-        <div className="space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-xs"
-            onClick={() => {
-              const basicPalette = ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00']
-              updateProject(activeTabId, { palette: basicPalette.slice(0, project.colorLimit) })
-            }}
-          >
-            <Palette className="mr-2 h-3 w-3" />
-            Basic Colors
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-xs"
-            onClick={() => {
-              const retroPalette = ['#000000', '#FFFFFF', '#880000', '#AAFFEE', '#CC44CC', '#00CC55', '#0000AA', '#EEEE77']
-              updateProject(activeTabId, { palette: retroPalette.slice(0, project.colorLimit) })
-            }}
-          >
-            <Palette className="mr-2 h-3 w-3" />
-            Retro Gaming
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-xs"
-            onClick={() => {
-              const pastelPalette = ['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFBA', '#BAE1FF', '#FFBAF5', '#D4BAFF', '#BABAFF']
-              updateProject(activeTabId, { palette: pastelPalette.slice(0, project.colorLimit) })
-            }}
-          >
-            <Palette className="mr-2 h-3 w-3" />
-            Pastel Colors
-          </Button>
-        </div>
-      </div>
+      {/* Scrollable Content Area */}
+      <div className="flex-1 min-h-0 mt-3 overflow-y-auto">
+        {/* Palette Presets */}
+        <div className="border-t border-gray-200 pt-3">
+          <div className="mb-3 text-xs font-medium text-gray-600 sticky top-0 bg-white py-1">
+            QUICK PALETTES
+          </div>
+          <div className="space-y-2 pb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-10 px-3"
+              onClick={() => {
+                const basicPalette = ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00']
+                updateProject(activeTabId, { palette: basicPalette.slice(0, project.colorLimit) })
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              <span className="flex-1 text-left">Basic Colors</span>
+              <div className="flex space-x-1">
+                {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00'].slice(0, 4).map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-gray-300"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-10 px-3"
+              onClick={() => {
+                const retroPalette = ['#000000', '#FFFFFF', '#880000', '#AAFFEE', '#CC44CC', '#00CC55', '#0000AA', '#EEEE77']
+                updateProject(activeTabId, { palette: retroPalette.slice(0, project.colorLimit) })
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              <span className="flex-1 text-left">Retro Gaming</span>
+              <div className="flex space-x-1">
+                {['#000000', '#FFFFFF', '#880000', '#AAFFEE'].map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-gray-300"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-10 px-3"
+              onClick={() => {
+                const pastelPalette = ['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFBA', '#BAE1FF', '#FFBAF5', '#D4BAFF', '#BABAFF']
+                updateProject(activeTabId, { palette: pastelPalette.slice(0, project.colorLimit) })
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              <span className="flex-1 text-left">Pastel Colors</span>
+              <div className="flex space-x-1">
+                {['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFBA'].map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-gray-300"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </Button>
 
-      {/* Tips */}
-      <div className="rounded bg-blue-50 p-2 text-xs text-blue-700">
-        💡 <strong>Tip:</strong> Double-click a color to remove it from the palette
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-10 px-3"
+              onClick={() => {
+                const earthyPalette = ['#8B4513', '#D2691E', '#CD853F', '#DEB887', '#F4A460', '#FFDAB9']
+                updateProject(activeTabId, { palette: earthyPalette.slice(0, project.colorLimit) })
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              <span className="flex-1 text-left">Earthy Tones</span>
+              <div className="flex space-x-1">
+                {['#8B4513', '#D2691E', '#CD853F', '#DEB887'].map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-gray-300"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-10 px-3"
+              onClick={() => {
+                const oceanPalette = ['#000080', '#0000CD', '#4169E1', '#1E90FF', '#87CEEB', '#B0E0E6']
+                updateProject(activeTabId, { palette: oceanPalette.slice(0, project.colorLimit) })
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              <span className="flex-1 text-left">Ocean Blues</span>
+              <div className="flex space-x-1">
+                {['#000080', '#0000CD', '#4169E1', '#1E90FF'].map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-gray-300"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-10 px-3"
+              onClick={() => {
+                const monochromePalette = ['#000000', '#404040', '#808080', '#C0C0C0', '#E0E0E0', '#FFFFFF']
+                updateProject(activeTabId, { palette: monochromePalette.slice(0, project.colorLimit) })
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              <span className="flex-1 text-left">Monochrome</span>
+              <div className="flex space-x-1">
+                {['#000000', '#404040', '#808080', '#C0C0C0'].map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-gray-300"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </Button>
+          </div>
+        </div>
+
+        {/* Tips */}
+        <div className="rounded bg-blue-50 p-2 text-xs text-blue-700 mx-1 mb-2">
+          💡 <strong>Tip:</strong> Double-click a color to remove it from the palette
+        </div>
       </div>
     </div>
   )
