@@ -81,20 +81,20 @@ export function PixelEditor({ className }: PixelEditorProps) {
 
       {/* Main editor area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar - Colors and Tools */}
-        <div className="flex w-64 flex-col border-r border-gray-200 bg-white">
-          {/* Colors Section - Top Priority */}
-          <div className="border-b border-gray-200 p-4 flex-shrink-0" style={{ maxHeight: '60%' }}>
-            <h3 className="mb-3 text-sm font-medium text-gray-800">Colors</h3>
-            <div className="h-full max-h-96">
-              <ColorPalette className="h-full" />
+        {/* Left sidebar - Tools and Colors with Full Scroll */}
+        <div className="w-64 border-r border-gray-200 bg-white overflow-y-auto">
+          <div className="p-4 space-y-6">
+            {/* Tools Section - Top Priority */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-800 mb-3">Tools</h3>
+              <Toolbar />
             </div>
-          </div>
-          
-          {/* Tools Section - Bottom */}
-          <div className="flex-1 min-h-0 p-4">
-            <h3 className="text-sm font-medium text-gray-800 mb-3">Tools</h3>
-            <Toolbar className="h-full" />
+            
+            {/* Colors Section - Below Tools */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-800 mb-3">Colors</h3>
+              <ColorPalette />
+            </div>
           </div>
         </div>
 

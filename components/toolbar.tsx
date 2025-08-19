@@ -69,9 +69,9 @@ export function Toolbar({ className }: ToolbarProps) {
 
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn('space-y-3', className)}>
       {/* Drawing Tools - Responsive Grid Layout */}
-      <div className="space-y-3 flex-shrink-0">
+      <div className="space-y-3">
         <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-2">
           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           DRAWING TOOLS
@@ -207,20 +207,15 @@ export function Toolbar({ className }: ToolbarProps) {
         </div>
       </div>
 
-      {/* Tips and Shortcuts - Fill remaining space */}
-      <div className="flex-1 flex flex-col justify-end mt-4">
+      {/* Tips and Shortcuts */}
+      <div className="mt-4">
         <div className="space-y-2">
-          <div className="rounded bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
-            ⌨️ <strong>Keyboard Shortcuts:</strong><br/>
-            <div className="mt-1 space-y-1">
-              <div>P - Pencil | E - Eraser</div>
-              <div>B - Fill | I - Color Picker</div>
-              <div>H - Pan | Mouse Wheel - Zoom</div>
-            </div>
+          <div className="rounded bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700">
+            ⌨️ <strong>Shortcuts:</strong> P-Pencil, E-Eraser, B-Fill, I-Color Picker, H-Pan
           </div>
           
-          <div className="rounded bg-green-50 border border-green-200 p-3 text-xs text-green-700">
-            💡 <strong>Pro Tip:</strong> Use the Color Picker (I) to sample colors from your artwork, or right-click and drag to pan around the canvas.
+          <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">
+            💡 <strong>Tip:</strong> Use Color Picker (I) to sample colors or mouse wheel to zoom.
           </div>
         </div>
       </div>
