@@ -63,10 +63,14 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
             const newData = new Uint8ClampedArray(canvasData.data)
             
             // Make selected pixels transparent
-            for (const pixelKey of canvasState.selection.selectedPixels) {
-              const [x, y] = pixelKey.split(',').map(Number)
-              const index = (y * project.width + x) * 4
-              newData[index + 3] = 0 // Set alpha to 0 (transparent)
+            for (const pixelKey of Array.from(canvasState.selection.selectedPixels)) {
+              const coords = pixelKey.split(',').map(Number)
+              if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+                const x = coords[0]
+                const y = coords[1]
+                const index = (y * project.width + x) * 4
+                newData[index + 3] = 0 // Set alpha to 0 (transparent)
+              }
             }
 
             const updatedCanvasData = {
@@ -237,13 +241,17 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       case 'fill':
         // If there's an active selection, fill entire selection
         if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
-          for (const pixelKey of canvasState.selection.selectedPixels) {
-            const [x, y] = pixelKey.split(',').map(Number)
-            const fillIndex = (y * project.width + x) * 4
-            newData[fillIndex] = color.r
-            newData[fillIndex + 1] = color.g
-            newData[fillIndex + 2] = color.b
-            newData[fillIndex + 3] = 255
+          for (const pixelKey of Array.from(canvasState.selection.selectedPixels)) {
+            const coords = pixelKey.split(',').map(Number)
+            if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+              const x = coords[0]
+              const y = coords[1]
+              const fillIndex = (y * project.width + x) * 4
+              newData[fillIndex] = color.r
+              newData[fillIndex + 1] = color.g
+              newData[fillIndex + 2] = color.b
+              newData[fillIndex + 3] = 255
+            }
           }
         } else {
           // Normal flood fill implementation
@@ -492,14 +500,18 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       ctx.lineWidth = 1
       
       // Draw selection for each selected pixel
-      for (const pixelKey of canvasState.selection.selectedPixels) {
-        const [x, y] = pixelKey.split(',').map(Number)
-        const screenX = x * canvasState.zoom
-        const screenY = y * canvasState.zoom
-        const size = canvasState.zoom
-        
-        // Draw marching ants border
-        ctx.strokeRect(screenX, screenY, size, size)
+      for (const pixelKey of Array.from(canvasState.selection.selectedPixels)) {
+        const coords = pixelKey.split(',').map(Number)
+        if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+          const x = coords[0]
+          const y = coords[1]
+          const screenX = x * canvasState.zoom
+          const screenY = y * canvasState.zoom
+          const size = canvasState.zoom
+          
+          // Draw marching ants border
+          ctx.strokeRect(screenX, screenY, size, size)
+        }
       }
       
       // Draw white dashes for contrast
@@ -508,13 +520,17 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 1
       
-      for (const pixelKey of canvasState.selection.selectedPixels) {
-        const [x, y] = pixelKey.split(',').map(Number)
-        const screenX = x * canvasState.zoom
-        const screenY = y * canvasState.zoom
-        const size = canvasState.zoom
-        
-        ctx.strokeRect(screenX, screenY, size, size)
+      for (const pixelKey of Array.from(canvasState.selection.selectedPixels)) {
+        const coords = pixelKey.split(',').map(Number)
+        if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+          const x = coords[0]
+          const y = coords[1]
+          const screenX = x * canvasState.zoom
+          const screenY = y * canvasState.zoom
+          const size = canvasState.zoom
+          
+          ctx.strokeRect(screenX, screenY, size, size)
+        }
       }
       
       ctx.restore()

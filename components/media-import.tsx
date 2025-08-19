@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MediaImporter, MediaImportOptions } from '@/lib/utils/media-importer'
+import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback } from '@/lib/utils/enhanced-media-importer'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { 
@@ -37,9 +37,14 @@ export function MediaImport({ className }: MediaImportProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   
+  // Progress tracking for multi-frame import
+  const [importProgress, setImportProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('')
+  
   // Advanced options
   const [colorCount, setColorCount] = useState(16)
   const [useColorLimit, setUseColorLimit] = useState(false)
+  const [maxFrames, setMaxFrames] = useState(20)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeTab = getActiveTab()
@@ -118,12 +123,20 @@ export function MediaImport({ className }: MediaImportProps) {
 
   const handleImport = async () => {
     clearMessages()
+    setImportProgress(0)
+    setProgressMessage('')
 
     const options: MediaImportOptions = {
       width: project.width,
       height: project.height,
       colorCount: useColorLimit ? colorCount : undefined,
-      maxFrames: 10 // Limit for performance
+      maxFrames: maxFrames // User-configurable frame limit
+    }
+
+    // Progress callback for enhanced importer
+    const onProgress: ProgressCallback = (progress: number, message: string) => {
+      setImportProgress(Math.round(progress))
+      setProgressMessage(message)
     }
 
     setIsImporting(true)
@@ -141,18 +154,18 @@ export function MediaImport({ className }: MediaImportProps) {
         }
 
         // Validate URL accessibility first
-        const isAccessible = await MediaImporter.validateUrl(url)
+        const isAccessible = await EnhancedMediaImporter.validateUrl(url)
         if (!isAccessible) {
           throw new Error('URL is not accessible or does not contain valid media')
         }
 
-        result = await MediaImporter.importFromUrl(url, options)
+        result = await EnhancedMediaImporter.importFromUrl(url, options, onProgress)
       } else {
         if (!selectedFile) {
           throw new Error('Please select a file')
         }
 
-        result = await MediaImporter.importFromFile(selectedFile, options)
+        result = await EnhancedMediaImporter.importFromFile(selectedFile, options, onProgress)
       }
       
       // Add imported frames to the project
@@ -165,7 +178,8 @@ export function MediaImport({ className }: MediaImportProps) {
       
       setSuccess(
         `Successfully imported ${frameCount} frame${frameCount > 1 ? 's' : ''} from ${mediaType}! ` +
-        `Original size: ${result.originalDimensions.width}×${result.originalDimensions.height}px`
+        `Original size: ${result.originalDimensions.width}×${result.originalDimensions.height}px. ` +
+        (frameCount > 1 ? `Average delay: ${result.avgFrameDelay}ms per frame.` : '')
       )
       
       // Clear inputs on success
@@ -361,7 +375,8 @@ export function MediaImport({ className }: MediaImportProps) {
         {isImporting ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Processing...
+            {progressMessage || 'Processing...'}
+            {importProgress > 0 && ` (${importProgress}%)`}
           </>
         ) : (
           <>
@@ -370,6 +385,19 @@ export function MediaImport({ className }: MediaImportProps) {
           </>
         )}
       </Button>
+
+      {/* Progress Bar */}
+      {isImporting && importProgress > 0 && (
+        <div className="space-y-1">
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${importProgress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-600 text-center">{progressMessage}</p>
+        </div>
+      )}
 
       {/* Advanced Options */}
       {showAdvanced && (
@@ -406,6 +434,25 @@ export function MediaImport({ className }: MediaImportProps) {
               />
             </div>
           )}
+          
+          <div className="space-y-1">
+            <label htmlFor="max-frames" className="text-xs text-gray-600">
+              Max Frames (for GIFs/Videos): {maxFrames}
+            </label>
+            <input
+              id="max-frames"
+              type="range"
+              min="5"
+              max="50"
+              step="5"
+              value={maxFrames}
+              onChange={(e) => setMaxFrames(parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg slider"
+            />
+            <p className="text-xs text-gray-500">
+              Higher values = more frames but slower processing
+            </p>
+          </div>
         </div>
       )}
 
@@ -429,9 +476,14 @@ export function MediaImport({ className }: MediaImportProps) {
         <p className="flex items-center gap-1">
           <FileImage className="h-3 w-3" />
           {mode === 'url' 
-            ? 'Supports URLs to images (PNG, JPG, WebP), GIFs, and videos (MP4, WebM)'
-            : 'Supports local files: images (PNG, JPG, WebP), GIFs, and videos (MP4, WebM)'
+            ? 'Supports URLs to images (PNG, JPG, WebP), animated GIFs, and videos (MP4, WebM)'
+            : 'Supports local files: images (PNG, JPG, WebP), animated GIFs, and videos (MP4, WebM)'
           }
+        </p>
+        <p className="flex items-center gap-1">
+          <Film className="h-3 w-3" />
+          <span className="font-medium text-green-600">Enhanced Multi-Frame Support:</span>
+          GIFs extract all frames, videos extract up to {maxFrames} frames (1 sec max)
         </p>
         <p className="flex items-center gap-1">
           {mode === 'url' ? (

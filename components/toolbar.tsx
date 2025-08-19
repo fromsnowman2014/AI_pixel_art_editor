@@ -56,12 +56,9 @@ export function Toolbar({ className }: ToolbarProps) {
     }
   }
 
-  if (!activeTabId || !canvasState) {
-    debugLog('RENDER_ERROR', 'Missing activeTabId or canvasState', { activeTabId, hasCanvasState: !!canvasState })
-    return null
-  }
-
-  const handleToolChange = (tool: Tool) => {
+  const handleToolChange = React.useCallback((tool: Tool) => {
+    if (!canvasState || !activeTabId) return
+    
     debugLog('TOOL_CHANGE', `Tool changed from ${canvasState.tool} to ${tool}`, {
       previousTool: canvasState.tool,
       newTool: tool,
@@ -82,7 +79,7 @@ export function Toolbar({ className }: ToolbarProps) {
     } else {
       updateCanvasState(activeTabId, { tool })
     }
-  }
+  }, [canvasState, activeTabId, debugLog, updateCanvasState])
 
   // Handle keyboard shortcuts
   React.useEffect(() => {
@@ -104,6 +101,11 @@ export function Toolbar({ className }: ToolbarProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleToolChange])
+
+  if (!activeTabId || !canvasState) {
+    debugLog('RENDER_ERROR', 'Missing activeTabId or canvasState', { activeTabId, hasCanvasState: !!canvasState })
+    return null
+  }
 
 
   return (
@@ -132,15 +134,7 @@ export function Toolbar({ className }: ToolbarProps) {
             return (
               <Tooltip
                 key={tool.id}
-                content={
-                  <div className="text-center">
-                    <div className="font-medium">{tool.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{tool.description}</div>
-                    <div className="text-xs font-mono bg-gray-100 text-gray-700 px-1 rounded mt-1">
-                      Press {tool.shortcut}
-                    </div>
-                  </div>
-                }
+                content={`${tool.name} - ${tool.description} (Press ${tool.shortcut})`}
                 side="right"
               >
                 <Button
@@ -198,15 +192,7 @@ export function Toolbar({ className }: ToolbarProps) {
             return (
               <Tooltip
                 key={tool.id}
-                content={
-                  <div className="text-center">
-                    <div className="font-medium">{tool.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{tool.description}</div>
-                    <div className="text-xs font-mono bg-gray-100 text-gray-700 px-1 rounded mt-1">
-                      Press {tool.shortcut}
-                    </div>
-                  </div>
-                }
+                content={`${tool.name} - ${tool.description} (Press ${tool.shortcut})`}
                 side="right"
               >
                 <Button

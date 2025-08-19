@@ -169,12 +169,16 @@ function calculateBounds(selectedPixels: Set<string>): {
   let minY = Infinity
   let maxY = -Infinity
   
-  for (const pixelKey of selectedPixels) {
-    const [x, y] = pixelKey.split(',').map(Number)
-    minX = Math.min(minX, x)
-    maxX = Math.max(maxX, x)
-    minY = Math.min(minY, y)
-    maxY = Math.max(maxY, y)
+  for (const pixelKey of Array.from(selectedPixels)) {
+    const coords = pixelKey.split(',').map(Number)
+    if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+      const x = coords[0]
+      const y = coords[1]
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+    }
   }
   
   return { minX, maxX, minY, maxY }
@@ -265,25 +269,29 @@ export function expandSelection(
 ): Set<string> {
   const expandedPixels = new Set(selectedPixels)
   
-  for (const pixelKey of selectedPixels) {
-    const [x, y] = pixelKey.split(',').map(Number)
-    
-    // Add neighboring pixels
-    const neighbors = [
-      { x: x + 1, y },
-      { x: x - 1, y },
-      { x, y: y + 1 },
-      { x, y: y - 1 },
-      // Diagonal neighbors for smoother expansion
-      { x: x + 1, y: y + 1 },
-      { x: x + 1, y: y - 1 },
-      { x: x - 1, y: y + 1 },
-      { x: x - 1, y: y - 1 }
-    ]
-    
-    for (const neighbor of neighbors) {
-      if (neighbor.x >= 0 && neighbor.x < width && neighbor.y >= 0 && neighbor.y < height) {
-        expandedPixels.add(`${neighbor.x},${neighbor.y}`)
+  for (const pixelKey of Array.from(selectedPixels)) {
+    const coords = pixelKey.split(',').map(Number)
+    if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+      const x = coords[0]
+      const y = coords[1]
+      
+      // Add neighboring pixels
+      const neighbors = [
+        { x: x + 1, y },
+        { x: x - 1, y },
+        { x, y: y + 1 },
+        { x, y: y - 1 },
+        // Diagonal neighbors for smoother expansion
+        { x: x + 1, y: y + 1 },
+        { x: x + 1, y: y - 1 },
+        { x: x - 1, y: y + 1 },
+        { x: x - 1, y: y - 1 }
+      ]
+      
+      for (const neighbor of neighbors) {
+        if (neighbor.x >= 0 && neighbor.x < width && neighbor.y >= 0 && neighbor.y < height) {
+          expandedPixels.add(`${neighbor.x},${neighbor.y}`)
+        }
       }
     }
   }
@@ -301,26 +309,35 @@ export function contractSelection(
 ): Set<string> {
   const contractedPixels = new Set<string>()
   
-  for (const pixelKey of selectedPixels) {
-    const [x, y] = pixelKey.split(',').map(Number)
-    
-    // Check if all 4-way neighbors are also selected
-    const neighbors = [
-      `${x + 1},${y}`,
-      `${x - 1},${y}`,
-      `${x},${y + 1}`,
-      `${x},${y - 1}`
-    ]
-    
-    const allNeighborsSelected = neighbors.every(neighborKey => {
-      const [nx, ny] = neighborKey.split(',').map(Number)
-      // Boundary pixels are considered "selected" for contraction
-      if (nx < 0 || nx >= width || ny < 0 || ny >= height) return true
-      return selectedPixels.has(neighborKey)
-    })
-    
-    if (allNeighborsSelected) {
-      contractedPixels.add(pixelKey)
+  for (const pixelKey of Array.from(selectedPixels)) {
+    const coords = pixelKey.split(',').map(Number)
+    if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+      const x = coords[0]
+      const y = coords[1]
+      
+      // Check if all 4-way neighbors are also selected
+      const neighbors = [
+        `${x + 1},${y}`,
+        `${x - 1},${y}`,
+        `${x},${y + 1}`,
+        `${x},${y - 1}`
+      ]
+      
+      const allNeighborsSelected = neighbors.every(neighborKey => {
+        const neighborCoords = neighborKey.split(',').map(Number)
+        if (neighborCoords.length === 2 && neighborCoords[0] !== undefined && neighborCoords[1] !== undefined) {
+          const nx = neighborCoords[0]
+          const ny = neighborCoords[1]
+          // Boundary pixels are considered "selected" for contraction
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) return true
+          return selectedPixels.has(neighborKey)
+        }
+        return false
+      })
+      
+      if (allNeighborsSelected) {
+        contractedPixels.add(pixelKey)
+      }
     }
   }
   
