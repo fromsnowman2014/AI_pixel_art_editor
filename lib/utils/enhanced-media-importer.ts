@@ -110,6 +110,15 @@ export class EnhancedMediaImporter {
       const mediaType = this.detectMediaTypeFromFile(file)
       onProgress?.(10, `Processing ${mediaType} file`)
       
+      // ENHANCED: Add safety checks for target dimensions
+      if (options.width <= 0 || options.height <= 0) {
+        throw new Error(`Invalid target dimensions: ${options.width}x${options.height}`)
+      }
+      
+      if (options.width > 512 || options.height > 512) {
+        console.warn(`Large target dimensions detected: ${options.width}x${options.height}`)
+      }
+      
       switch (mediaType) {
         case 'gif':
           return await this.processGifFromFile(file, options, onProgress)
@@ -147,7 +156,7 @@ export class EnhancedMediaImporter {
   }
 
   /**
-   * Process animated GIF from local file
+   * Process animated GIF from local file - ENHANCED WITH VALIDATION
    */
   private static async processGifFromFile(
     file: File, 
@@ -156,12 +165,39 @@ export class EnhancedMediaImporter {
   ): Promise<ImportResult> {
     onProgress?.(20, 'Reading GIF file...')
     
-    const arrayBuffer = await file.arrayBuffer()
-    return await this.processGifData(arrayBuffer, options, onProgress)
+    // Additional GIF file validation
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit for GIFs
+      throw new Error(`GIF file too large: ${Math.round(file.size / (1024 * 1024))}MB. Maximum: 10MB`)
+    }
+    
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      
+      // Validate ArrayBuffer
+      if (arrayBuffer.byteLength === 0) {
+        throw new Error('GIF file is empty')
+      }
+      
+      if (arrayBuffer.byteLength < 6) {
+        throw new Error('Invalid GIF file: Too small to contain GIF header')
+      }
+      
+      // Check GIF header signature
+      const headerBytes = new Uint8Array(arrayBuffer.slice(0, 6))
+      const headerString = String.fromCharCode.apply(null, Array.from(headerBytes))
+      if (!headerString.startsWith('GIF87a') && !headerString.startsWith('GIF89a')) {
+        throw new Error('Invalid GIF file: Missing GIF header signature')
+      }
+      
+      return await this.processGifData(arrayBuffer, options, onProgress)
+    } catch (error) {
+      console.error('GIF file processing failed:', error)
+      throw new Error(`Failed to process GIF file: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   /**
-   * Core GIF processing logic with frame extraction
+   * Core GIF processing logic with frame extraction - ENHANCED WITH ROBUST ERROR HANDLING
    */
   private static async processGifData(
     arrayBuffer: ArrayBuffer,
@@ -170,13 +206,42 @@ export class EnhancedMediaImporter {
   ): Promise<ImportResult> {
     onProgress?.(30, 'Parsing GIF frames...')
 
-    // Parse GIF using gifuct-js
-    const gif = parseGIF(arrayBuffer)
-    const frames = decompressFrames(gif, true)
+    // Parse GIF using gifuct-js with enhanced error handling
+    let gif: any
+    let frames: any[]
     
-    if (frames.length === 0) {
+    try {
+      gif = parseGIF(arrayBuffer)
+    } catch (parseError) {
+      console.error('GIF parsing failed:', parseError)
+      throw new Error(`Invalid GIF format: Unable to parse GIF structure. ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`)
+    }
+    
+    // Validate GIF structure
+    if (!gif || !gif.lsd) {
+      throw new Error('Invalid GIF format: Missing logical screen descriptor')
+    }
+    
+    if (gif.lsd.width <= 0 || gif.lsd.height <= 0) {
+      throw new Error(`Invalid GIF dimensions: ${gif.lsd.width}x${gif.lsd.height}`)
+    }
+    
+    if (gif.lsd.width > 4096 || gif.lsd.height > 4096) {
+      throw new Error(`GIF too large: ${gif.lsd.width}x${gif.lsd.height}. Maximum: 4096x4096`)
+    }
+    
+    try {
+      frames = decompressFrames(gif, true)
+    } catch (decompressError) {
+      console.error('GIF decompression failed:', decompressError)
+      throw new Error(`Failed to decompress GIF frames: ${decompressError instanceof Error ? decompressError.message : 'Unknown decompression error'}`)
+    }
+    
+    if (!frames || frames.length === 0) {
       throw new Error('No frames found in GIF')
     }
+    
+    console.log(`GIF Analysis: ${gif.lsd.width}x${gif.lsd.height}, ${frames.length} frames`)
 
     onProgress?.(40, `Found ${frames.length} frames, processing...`)
 
@@ -188,10 +253,15 @@ export class EnhancedMediaImporter {
     const { canvas, ctx } = this.getCanvas()
     
     // Set canvas to GIF dimensions for processing
-    canvas.width = gif.lsd.width
-    canvas.height = gif.lsd.height
+    const gifWidth = gif.lsd.width
+    const gifHeight = gif.lsd.height
+    canvas.width = gifWidth
+    canvas.height = gifHeight
     
     let totalDelay = 0
+    
+    // Initialize canvas with transparent background
+    ctx.clearRect(0, 0, gifWidth, gifHeight)
 
     for (let i = 0; i < framesToProcess.length; i++) {
       const gifFrame = framesToProcess[i]
@@ -200,58 +270,144 @@ export class EnhancedMediaImporter {
       const progress = 40 + ((i / framesToProcess.length) * 50)
       onProgress?.(progress, `Processing frame ${i + 1}/${framesToProcess.length}`)
 
-      // Create ImageData from GIF frame
-      const imageData = new ImageData(
-        new Uint8ClampedArray(gifFrame.pixels), 
-        gifFrame.dims.width, 
-        gifFrame.dims.height
-      )
-      
-      // Clear canvas and draw frame
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      
-      // Handle frame positioning
-      ctx.putImageData(imageData, gifFrame.dims.left, gifFrame.dims.top)
-      
-      // Create image from canvas for pixelation
-      const tempImg = new Image()
-      await new Promise<void>((resolve, reject) => {
-        tempImg.onload = () => resolve()
-        tempImg.onerror = () => reject(new Error(`Failed to process frame ${i + 1}`))
-        tempImg.src = canvas.toDataURL()
-      })
+      try {
+        // ENHANCED FRAME VALIDATION: Comprehensive frame data validation
+        if (!gifFrame.dims || typeof gifFrame.dims.width !== 'number' || typeof gifFrame.dims.height !== 'number') {
+          throw new Error(`Frame ${i + 1}: Invalid frame dimensions structure`)
+        }
+        
+        if (gifFrame.dims.width <= 0 || gifFrame.dims.height <= 0) {
+          throw new Error(`Frame ${i + 1}: Invalid dimensions: ${gifFrame.dims.width}x${gifFrame.dims.height}`)
+        }
+        
+        if (gifFrame.dims.left < 0 || gifFrame.dims.top < 0) {
+          console.warn(`Frame ${i + 1}: Negative frame offset: ${gifFrame.dims.left},${gifFrame.dims.top}`)
+        }
+        
+        // Check frame boundaries
+        if (gifFrame.dims.left + gifFrame.dims.width > gifWidth ||
+            gifFrame.dims.top + gifFrame.dims.height > gifHeight) {
+          console.warn(`Frame ${i + 1}: Frame exceeds GIF boundaries`)
+        }
+        
+        // Validate pixel data existence and type
+        if (!gifFrame.pixels || !(gifFrame.pixels instanceof Uint8ClampedArray)) {
+          throw new Error(`Frame ${i + 1}: Invalid or missing pixel data`)
+        }
+        
+        // CRITICAL FIX: Validate frame data before ImageData creation
+        const expectedPixelCount = gifFrame.dims.width * gifFrame.dims.height
+        const expectedDataLength = expectedPixelCount * 4 // RGBA
+        const actualDataLength = gifFrame.pixels.length
 
-      // Pixelate the frame
-      const pixelatedImageData = await this.pixelateImage(tempImg, options)
-      
-      // Calculate frame delay (convert centiseconds to milliseconds)
-      const frameDelay = Math.max(50, (gifFrame.delay || 10) * 10) // Minimum 50ms
-      totalDelay += frameDelay
+        if (actualDataLength !== expectedDataLength) {
+          console.warn(`Frame ${i + 1}: Data length mismatch. Expected: ${expectedDataLength}, Got: ${actualDataLength}`)
+          
+          // Advanced data correction strategies
+          if (actualDataLength < expectedDataLength) {
+            // Pad with transparent pixels if data is too short
+            const paddedPixels = new Uint8ClampedArray(expectedDataLength)
+            
+            // Copy existing data
+            paddedPixels.set(gifFrame.pixels.slice(0, Math.min(actualDataLength, expectedDataLength)))
+            
+            // Fill remaining pixels with transparent
+            for (let j = actualDataLength; j < expectedDataLength; j += 4) {
+              paddedPixels[j] = 0     // R
+              paddedPixels[j + 1] = 0 // G 
+              paddedPixels[j + 2] = 0 // B
+              paddedPixels[j + 3] = 0 // A (transparent)
+            }
+            gifFrame.pixels = paddedPixels
+            
+          } else if (actualDataLength > expectedDataLength) {
+            // Truncate if data is too long
+            gifFrame.pixels = gifFrame.pixels.slice(0, expectedDataLength)
+            
+          } else if (actualDataLength % 4 !== 0) {
+            // Handle non-RGBA aligned data
+            const alignedLength = Math.floor(actualDataLength / 4) * 4
+            console.warn(`Frame ${i + 1}: Non-RGBA aligned data, truncating to ${alignedLength} bytes`)
+            gifFrame.pixels = gifFrame.pixels.slice(0, alignedLength)
+          }
+        }
+        
+        // Final validation of corrected data
+        if (gifFrame.pixels.length !== expectedDataLength) {
+          throw new Error(`Frame ${i + 1}: Failed to correct pixel data length after validation`)
+        }
 
-      // Create frame object
-      const frame: Frame = {
-        id: `gif_frame_${i}_${Date.now()}`,
-        projectId: '',
-        index: i,
-        delayMs: frameDelay,
-        included: true,
-        layers: [],
-        flattenedPngUrl: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        // Create ImageData from validated GIF frame pixels
+        const frameImageData = new ImageData(
+          new Uint8ClampedArray(gifFrame.pixels), 
+          gifFrame.dims.width, 
+          gifFrame.dims.height
+        )
+        
+        // ENHANCED FRAME COMPOSITING: Handle disposal methods properly
+        if (i === 0 || gifFrame.disposal === 2) {
+          // First frame or "restore to background" - clear canvas
+          ctx.clearRect(0, 0, gifWidth, gifHeight)
+        } else if (gifFrame.disposal === 3) {
+          // "restore to previous" - not fully supported, use current state
+          // This would require maintaining previous frame state
+          console.warn(`Frame ${i + 1}: Disposal method 3 not fully supported`)
+        }
+        // For disposal method 0 or 1, keep the current canvas state (do nothing)
+
+        // Place frame at correct position on full canvas
+        ctx.putImageData(frameImageData, gifFrame.dims.left, gifFrame.dims.top)
+        
+        // Create image from full canvas for pixelation
+        const tempImg = new Image()
+        await new Promise<void>((resolve, reject) => {
+          tempImg.onload = () => resolve()
+          tempImg.onerror = () => reject(new Error(`Failed to process frame ${i + 1}`))
+          tempImg.src = canvas.toDataURL()
+        })
+
+        // Pixelate the full frame
+        const pixelatedImageData = await this.pixelateImage(tempImg, options)
+        
+        // Calculate frame delay (convert centiseconds to milliseconds)
+        const frameDelay = Math.max(50, (gifFrame.delay || 10) * 10) // Minimum 50ms
+        totalDelay += frameDelay
+
+        // Create frame object
+        const frame: Frame = {
+          id: `gif_frame_${i}_${Date.now()}`,
+          projectId: '',
+          index: i,
+          delayMs: frameDelay,
+          included: true,
+          layers: [],
+          flattenedPngUrl: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+
+        processedFrames.push({
+          frame,
+          imageData: Array.from(pixelatedImageData.data)
+        })
+
+      } catch (frameError) {
+        console.error(`Failed to process frame ${i + 1}:`, frameError)
+        // Continue with next frame instead of failing entirely
+        onProgress?.(progress, `Skipping corrupted frame ${i + 1}/${framesToProcess.length}`)
+        continue
       }
+    }
 
-      processedFrames.push({
-        frame,
-        imageData: Array.from(pixelatedImageData.data)
-      })
+    if (processedFrames.length === 0) {
+      throw new Error('No frames could be successfully processed from GIF')
     }
 
     onProgress?.(100, `Successfully processed ${processedFrames.length} frames`)
 
     return {
       frames: processedFrames,
-      originalDimensions: { width: gif.lsd.width, height: gif.lsd.height },
+      originalDimensions: { width: gifWidth, height: gifHeight },
       mediaType: 'gif',
       totalFrames: processedFrames.length,
       avgFrameDelay: Math.round(totalDelay / processedFrames.length)
