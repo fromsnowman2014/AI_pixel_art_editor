@@ -317,9 +317,9 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
             height: project.height * canvasState.zoom,
             backgroundColor: '#ffffff',
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`
-              <svg width="${6 * canvasState.zoom}" height="${6 * canvasState.zoom}" xmlns="http://www.w3.org/2000/svg">
-                <rect width="${3 * canvasState.zoom}" height="${3 * canvasState.zoom}" fill="#e0e0e0"/>
-                <rect x="${3 * canvasState.zoom}" y="${3 * canvasState.zoom}" width="${3 * canvasState.zoom}" height="${3 * canvasState.zoom}" fill="#e0e0e0"/>
+              <svg width="${8 * canvasState.zoom}" height="${8 * canvasState.zoom}" xmlns="http://www.w3.org/2000/svg">
+                <rect width="${4 * canvasState.zoom}" height="${4 * canvasState.zoom}" fill="#e0e0e0"/>
+                <rect x="${4 * canvasState.zoom}" y="${4 * canvasState.zoom}" width="${4 * canvasState.zoom}" height="${4 * canvasState.zoom}" fill="#e0e0e0"/>
               </svg>
             `)}")`,
             backgroundRepeat: 'repeat',
