@@ -53,6 +53,122 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isFocused, setIsFocused] = useState(false)
 
+  // Enhanced keyboard navigation with safety checks
+  const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+    // Only handle keyboard events when timeline is focused
+    if (!isFocused || !activeTabId || !frames.length) {
+      return
+    }
+
+    // Prevent default behavior for navigation keys
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    // Handle navigation based on current state
+    try {
+      switch (e.key) {
+        case 'ArrowLeft':
+          logger.debug(() => 'Keyboard navigation: Previous frame', { 
+            currentFrame: activeFrameId, 
+            isPlaying, 
+            totalFrames: frames.length 
+          })
+          if (frames.findIndex(f => f.id === activeFrameId) > 0) {
+            const currentIndex = frames.findIndex(f => f.id === activeFrameId)
+            const prevFrame = frames[currentIndex - 1]
+            if (prevFrame && prevFrame.id !== activeFrameId) {
+              setActiveFrame(activeTabId, prevFrame.id)
+            }
+          }
+          break
+
+        case 'ArrowRight':
+          logger.debug(() => 'Keyboard navigation: Next frame', { 
+            currentFrame: activeFrameId, 
+            isPlaying, 
+            totalFrames: frames.length 
+          })
+          if (frames.findIndex(f => f.id === activeFrameId) < frames.length - 1) {
+            const currentIndex = frames.findIndex(f => f.id === activeFrameId)
+            const nextFrame = frames[currentIndex + 1]
+            if (nextFrame && nextFrame.id !== activeFrameId) {
+              setActiveFrame(activeTabId, nextFrame.id)
+            }
+          }
+          break
+
+        case ' ':
+        case 'Space':
+          // Space bar for play/pause
+          if (frames.length > 1) {
+            e.preventDefault()
+            togglePlayback(activeTabId)
+          }
+          break
+
+        case 'Home':
+          // Go to first frame
+          if (frames.length > 0) {
+            e.preventDefault()
+            const firstFrame = frames[0]
+            if (firstFrame && firstFrame.id !== activeFrameId) {
+              setActiveFrame(activeTabId, firstFrame.id)
+            }
+          }
+          break
+
+        case 'End':
+          // Go to last frame
+          if (frames.length > 0) {
+            e.preventDefault()
+            const lastFrame = frames[frames.length - 1]
+            if (lastFrame && lastFrame.id !== activeFrameId) {
+              setActiveFrame(activeTabId, lastFrame.id)
+            }
+          }
+          break
+      }
+    } catch (error) {
+      logger.error('Keyboard navigation error', { key: e.key, activeFrameId }, error)
+    }
+  }, [isFocused, activeTabId, frames, activeFrameId, isPlaying, logger, setActiveFrame, togglePlayback])
+
+  // Set up keyboard event listeners
+  useEffect(() => {
+    if (isFocused) {
+      document.addEventListener('keydown', handleKeyboardNavigation)
+      logger.debug(() => 'Keyboard navigation listeners attached', { framesCount: frames.length })
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyboardNavigation)
+      if (isFocused) {
+        logger.debug(() => 'Keyboard navigation listeners removed')
+      }
+    }
+  }, [handleKeyboardNavigation, isFocused, frames.length, logger])
+
+  // Handle focus events for timeline
+  const handleTimelineFocus = useCallback(() => {
+    setIsFocused(true)
+    logger.debug(() => 'Timeline focused - keyboard navigation enabled')
+  }, [logger])
+
+  const handleTimelineBlur = useCallback(() => {
+    setIsFocused(false)
+    logger.debug(() => 'Timeline blurred - keyboard navigation disabled')
+  }, [logger])
+
+  // Handle clicks on timeline to set focus
+  const handleTimelineClick = useCallback(() => {
+    if (timelineRef.current) {
+      timelineRef.current.focus()
+      setIsFocused(true)
+    }
+  }, [])
+
   // Clean up intervals on component unmount
   React.useEffect(() => {
     return () => {
@@ -62,6 +178,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }, [activeTabId, activeTab?.playbackIntervalId, stopPlayback])
 
+  // Early return after all hooks are defined
   if (!activeTabId) {
     return null
   }
@@ -184,110 +301,6 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       }
     }
   }
-
-  // Enhanced keyboard navigation with safety checks
-  const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
-    // Only handle keyboard events when timeline is focused
-    if (!isFocused || !activeTabId || !frames.length) {
-      return
-    }
-
-    // Prevent default behavior for navigation keys
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      e.preventDefault()
-      e.stopPropagation()
-    }
-
-    // Handle navigation based on current state
-    try {
-      switch (e.key) {
-        case 'ArrowLeft':
-          logger.debug(() => 'Keyboard navigation: Previous frame', { 
-            currentFrame: activeFrameId, 
-            isPlaying, 
-            totalFrames: frames.length 
-          })
-          handlePrevFrame()
-          break
-
-        case 'ArrowRight':
-          logger.debug(() => 'Keyboard navigation: Next frame', { 
-            currentFrame: activeFrameId, 
-            isPlaying, 
-            totalFrames: frames.length 
-          })
-          handleNextFrame()
-          break
-
-        case ' ':
-        case 'Space':
-          // Space bar for play/pause
-          if (frames.length > 1) {
-            e.preventDefault()
-            handlePlayPause()
-          }
-          break
-
-        case 'Home':
-          // Go to first frame
-          if (frames.length > 0) {
-            e.preventDefault()
-            const firstFrame = frames[0]
-            if (firstFrame && firstFrame.id !== activeFrameId) {
-              handleFrameSelect(firstFrame.id)
-            }
-          }
-          break
-
-        case 'End':
-          // Go to last frame
-          if (frames.length > 0) {
-            e.preventDefault()
-            const lastFrame = frames[frames.length - 1]
-            if (lastFrame && lastFrame.id !== activeFrameId) {
-              handleFrameSelect(lastFrame.id)
-            }
-          }
-          break
-      }
-    } catch (error) {
-      logger.error('Keyboard navigation error', { key: e.key, activeFrameId }, error)
-    }
-  }, [isFocused, activeTabId, frames, activeFrameId, isPlaying, logger])
-
-  // Set up keyboard event listeners
-  useEffect(() => {
-    if (isFocused) {
-      document.addEventListener('keydown', handleKeyboardNavigation)
-      logger.debug(() => 'Keyboard navigation listeners attached', { framesCount: frames.length })
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyboardNavigation)
-      if (isFocused) {
-        logger.debug(() => 'Keyboard navigation listeners removed')
-      }
-    }
-  }, [handleKeyboardNavigation, isFocused, frames.length, logger])
-
-  // Handle focus events for timeline
-  const handleTimelineFocus = useCallback(() => {
-    setIsFocused(true)
-    logger.debug(() => 'Timeline focused - keyboard navigation enabled')
-  }, [logger])
-
-  const handleTimelineBlur = useCallback(() => {
-    setIsFocused(false)
-    logger.debug(() => 'Timeline blurred - keyboard navigation disabled')
-  }, [logger])
-
-  // Handle clicks on timeline to set focus
-  const handleTimelineClick = useCallback(() => {
-    if (timelineRef.current) {
-      timelineRef.current.focus()
-      setIsFocused(true)
-    }
-  }, [])
 
   return (
     <div className={cn('space-y-3', className)}>

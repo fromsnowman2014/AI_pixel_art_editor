@@ -29,8 +29,6 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
   const [customWidth, setCustomWidth] = useState(64)
   const [customHeight, setCustomHeight] = useState(64)
 
-  if (!open) return null
-
   const handleQuickCreate = (size: typeof QUICK_SIZES[0]) => {
     onCreateProject({ width: size.width, height: size.height })
     onOpenChange(false)
