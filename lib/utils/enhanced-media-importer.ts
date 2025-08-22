@@ -1,6 +1,7 @@
 'use client'
 
 import { Frame } from '@/lib/types/api'
+import { getVideoFrameLimit, getGifFrameLimit } from '@/lib/types/user'
 import { decompressFrames, parseGIF } from 'gifuct-js'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
@@ -32,11 +33,61 @@ export class EnhancedMediaImporter {
   private static getCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
     if (!this.canvas || !this.ctx) {
       this.canvas = document.createElement('canvas')
-      this.ctx = this.canvas.getContext('2d')!
+      const ctx = this.canvas.getContext('2d')
+      if (!ctx) {
+        throw new Error('Failed to get 2D canvas context - browser may not support canvas')
+      }
+      this.ctx = ctx
       // Optimize for pixel art
       this.ctx.imageSmoothingEnabled = false
     }
     return { canvas: this.canvas, ctx: this.ctx }
+  }
+
+  /**
+   * Clean up static canvas to prevent memory leaks
+   */
+  private static cleanupCanvas(): void {
+    if (this.canvas && this.ctx) {
+      // Clear the canvas content
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+      // Reset canvas size to minimum to free memory
+      this.canvas.width = 1
+      this.canvas.height = 1
+      // Keep references for reuse (don't null them out)
+    }
+  }
+
+  /**
+   * Create temporary canvas for one-time use
+   */
+  private static createTempCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      throw new Error('Failed to get 2D canvas context for temporary canvas')
+    }
+    
+    // Validate canvas dimensions (browser limits)
+    const maxSize = 32768 // Most browsers support up to ~32k pixels
+    if (width > maxSize || height > maxSize) {
+      throw new Error(`Canvas dimensions too large: ${width}x${height}. Maximum: ${maxSize}x${maxSize}`)
+    }
+    
+    canvas.width = width
+    canvas.height = height
+    ctx.imageSmoothingEnabled = false
+    
+    return { canvas, ctx }
+  }
+
+  /**
+   * Cleanup temporary canvas
+   */
+  private static cleanupTempCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    canvas.width = 1
+    canvas.height = 1
   }
 
   /**
@@ -152,11 +203,76 @@ export class EnhancedMediaImporter {
     }
 
     const arrayBuffer = await response.arrayBuffer()
-    return await this.processGifData(arrayBuffer, options, onProgress)
+    
+    try {
+      return await this.processGifData(arrayBuffer, options, onProgress)
+    } catch (gifProcessingError) {
+      console.warn('Primary GIF processing failed for URL, attempting canvas-based fallback...', gifProcessingError)
+      
+      // FALLBACK: Canvas-based GIF processing for URL
+      onProgress?.(50, 'Primary processing failed, trying fallback method...')
+      return await this.processGifFromUrlWithCanvasFallback(url, options, onProgress)
+    }
   }
 
   /**
-   * Process animated GIF from local file - ENHANCED WITH VALIDATION
+   * Fallback canvas-based GIF processing for URLs when gifuct-js fails
+   */
+  private static async processGifFromUrlWithCanvasFallback(
+    url: string,
+    options: MediaImportOptions,
+    onProgress?: ProgressCallback
+  ): Promise<ImportResult> {
+    onProgress?.(60, 'Using canvas-based fallback for URL...')
+    
+    const proxyUrl = `/api/proxy-media?url=${encodeURIComponent(url)}`
+    
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      
+      img.onload = async () => {
+        try {
+          console.log('Canvas fallback for URL: GIF loaded as image, extracting first frame only')
+          
+          const pixelatedImageData = await this.pixelateImage(img, options)
+          
+          const frame: Frame = {
+            id: `gif_url_fallback_frame_${Date.now()}`,
+            projectId: '',
+            index: 0,
+            delayMs: 500,
+            included: true,
+            layers: [],
+            flattenedPngUrl: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+
+          onProgress?.(100, 'URL fallback processing complete (single frame extracted)')
+
+          resolve({
+            frames: [{ frame, imageData: Array.from(pixelatedImageData.data) }],
+            originalDimensions: { width: img.width, height: img.height },
+            mediaType: 'gif',
+            totalFrames: 1,
+            avgFrameDelay: 500
+          })
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      img.onerror = () => {
+        reject(new Error('Canvas fallback failed: Could not load GIF from URL'))
+      }
+      
+      img.src = proxyUrl
+    })
+  }
+
+  /**
+   * Process animated GIF from local file - ENHANCED WITH VALIDATION AND FALLBACK
    */
   private static async processGifFromFile(
     file: File, 
@@ -189,7 +305,15 @@ export class EnhancedMediaImporter {
         throw new Error('Invalid GIF file: Missing GIF header signature')
       }
       
-      return await this.processGifData(arrayBuffer, options, onProgress)
+      try {
+        return await this.processGifData(arrayBuffer, options, onProgress)
+      } catch (gifProcessingError) {
+        console.warn('Primary GIF processing failed, attempting canvas-based fallback...', gifProcessingError)
+        
+        // FALLBACK: Canvas-based GIF processing
+        onProgress?.(50, 'Primary processing failed, trying fallback method...')
+        return await this.processGifWithCanvasFallback(file, options, onProgress)
+      }
     } catch (error) {
       console.error('GIF file processing failed:', error)
       throw new Error(`Failed to process GIF file: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -197,7 +321,70 @@ export class EnhancedMediaImporter {
   }
 
   /**
-   * Core GIF processing logic with frame extraction - ENHANCED WITH ROBUST ERROR HANDLING
+   * Fallback canvas-based GIF processing when gifuct-js fails
+   */
+  private static async processGifWithCanvasFallback(
+    file: File,
+    options: MediaImportOptions,
+    onProgress?: ProgressCallback
+  ): Promise<ImportResult> {
+    onProgress?.(60, 'Using canvas-based fallback processing...')
+    
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      
+      img.onload = async () => {
+        try {
+          console.log('Canvas fallback: GIF loaded as image, extracting first frame only')
+          
+          // Since canvas can only extract the first frame of a GIF,
+          // we treat it as a single-frame image
+          const pixelatedImageData = await this.pixelateImage(img, options)
+          
+          const frame: Frame = {
+            id: `gif_fallback_frame_${Date.now()}`,
+            projectId: '',
+            index: 0,
+            delayMs: 500, // Default delay
+            included: true,
+            layers: [],
+            flattenedPngUrl: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+
+          onProgress?.(100, 'Fallback processing complete (single frame extracted)')
+
+          resolve({
+            frames: [{ frame, imageData: Array.from(pixelatedImageData.data) }],
+            originalDimensions: { width: img.width, height: img.height },
+            mediaType: 'gif',
+            totalFrames: 1, // Only first frame available with this method
+            avgFrameDelay: 500
+          })
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      img.onerror = () => {
+        reject(new Error('Canvas fallback failed: Could not load GIF as image'))
+      }
+      
+      // Convert file to data URL for image loading
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.src = e.target?.result as string
+      }
+      reader.onerror = () => {
+        reject(new Error('Failed to read GIF file for canvas fallback'))
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  /**
+   * Core GIF processing logic with frame extraction - ENHANCED WITH COMPREHENSIVE ERROR RECOVERY
    */
   private static async processGifData(
     arrayBuffer: ArrayBuffer,
@@ -245,8 +432,9 @@ export class EnhancedMediaImporter {
 
     onProgress?.(40, `Found ${frames.length} frames, processing...`)
 
-    // Limit frames for performance
-    const maxFrames = options.maxFrames || 30
+    // Limit frames based on user tier
+    const tierFrameLimit = getGifFrameLimit()
+    const maxFrames = Math.min(options.maxFrames || tierFrameLimit, tierFrameLimit)
     const framesToProcess = frames.slice(0, maxFrames)
     
     const processedFrames: { frame: Frame; imageData: number[] }[] = []
@@ -259,40 +447,120 @@ export class EnhancedMediaImporter {
     canvas.height = gifHeight
     
     let totalDelay = 0
+    let skippedFrames = 0
+    let recoveredFrames = 0
     
-    // Initialize canvas with transparent background
+    // Initialize canvas with transparent background and maintain frame history for recovery
     ctx.clearRect(0, 0, gifWidth, gifHeight)
+    let previousFrameImageData: ImageData | null = null
 
     for (let i = 0; i < framesToProcess.length; i++) {
       const gifFrame = framesToProcess[i]
-      if (!gifFrame) continue
+      if (!gifFrame) {
+        skippedFrames++
+        continue
+      }
       
       const progress = 40 + ((i / framesToProcess.length) * 50)
-      onProgress?.(progress, `Processing frame ${i + 1}/${framesToProcess.length}`)
+      onProgress?.(progress, `Processing frame ${i + 1}/${framesToProcess.length} (${skippedFrames} skipped)`)
 
       try {
-        // ENHANCED FRAME VALIDATION: Comprehensive frame data validation
+        // ENHANCED FRAME VALIDATION: Comprehensive frame data validation with recovery
         if (!gifFrame.dims || typeof gifFrame.dims.width !== 'number' || typeof gifFrame.dims.height !== 'number') {
-          throw new Error(`Frame ${i + 1}: Invalid frame dimensions structure`)
+          console.warn(`Frame ${i + 1}: Invalid frame dimensions structure, attempting recovery...`)
+          
+          // RECOVERY STRATEGY 1: Use default frame dimensions
+          gifFrame.dims = {
+            width: gifWidth,
+            height: gifHeight,
+            left: 0,
+            top: 0
+          }
+          recoveredFrames++
         }
         
         if (gifFrame.dims.width <= 0 || gifFrame.dims.height <= 0) {
-          throw new Error(`Frame ${i + 1}: Invalid dimensions: ${gifFrame.dims.width}x${gifFrame.dims.height}`)
+          console.warn(`Frame ${i + 1}: Invalid dimensions: ${gifFrame.dims.width}x${gifFrame.dims.height}, using full GIF size`)
+          gifFrame.dims.width = gifWidth
+          gifFrame.dims.height = gifHeight
+          recoveredFrames++
         }
         
         if (gifFrame.dims.left < 0 || gifFrame.dims.top < 0) {
-          console.warn(`Frame ${i + 1}: Negative frame offset: ${gifFrame.dims.left},${gifFrame.dims.top}`)
+          console.warn(`Frame ${i + 1}: Negative frame offset: ${gifFrame.dims.left},${gifFrame.dims.top}, normalizing...`)
+          gifFrame.dims.left = Math.max(0, gifFrame.dims.left)
+          gifFrame.dims.top = Math.max(0, gifFrame.dims.top)
         }
         
-        // Check frame boundaries
+        // Check frame boundaries and adjust if necessary
         if (gifFrame.dims.left + gifFrame.dims.width > gifWidth ||
             gifFrame.dims.top + gifFrame.dims.height > gifHeight) {
-          console.warn(`Frame ${i + 1}: Frame exceeds GIF boundaries`)
+          console.warn(`Frame ${i + 1}: Frame exceeds GIF boundaries, adjusting...`)
+          gifFrame.dims.width = Math.min(gifFrame.dims.width, gifWidth - gifFrame.dims.left)
+          gifFrame.dims.height = Math.min(gifFrame.dims.height, gifHeight - gifFrame.dims.top)
         }
         
-        // Validate pixel data existence and type
+        // CRITICAL FIX: Enhanced pixel data validation with multiple recovery strategies
         if (!gifFrame.pixels || !(gifFrame.pixels instanceof Uint8ClampedArray)) {
-          throw new Error(`Frame ${i + 1}: Invalid or missing pixel data`)
+          console.warn(`Frame ${i + 1}: Missing or invalid pixel data, attempting recovery...`)
+          
+          let recoveredPixels: Uint8ClampedArray | null = null
+          
+          // RECOVERY STRATEGY 1: Use imageData or patch if available
+          if (gifFrame.imageData && gifFrame.imageData instanceof Uint8ClampedArray) {
+            console.log(`Frame ${i + 1}: Using imageData as pixel source`)
+            recoveredPixels = gifFrame.imageData
+          } else if (gifFrame.patch && gifFrame.patch instanceof Uint8ClampedArray) {
+            console.log(`Frame ${i + 1}: Using patch as pixel source`)
+            recoveredPixels = gifFrame.patch
+          }
+          
+          // RECOVERY STRATEGY 2: Use previous frame data if available
+          if (!recoveredPixels && previousFrameImageData) {
+            console.log(`Frame ${i + 1}: Creating frame from previous frame data`)
+            const expectedSize = gifFrame.dims.width * gifFrame.dims.height * 4
+            recoveredPixels = new Uint8ClampedArray(expectedSize)
+            
+            // Extract relevant portion from previous frame
+            for (let y = 0; y < gifFrame.dims.height; y++) {
+              for (let x = 0; x < gifFrame.dims.width; x++) {
+                const srcX = Math.min(gifFrame.dims.left + x, gifWidth - 1)
+                const srcY = Math.min(gifFrame.dims.top + y, gifHeight - 1)
+                const srcIndex = (srcY * gifWidth + srcX) * 4
+                const dstIndex = (y * gifFrame.dims.width + x) * 4
+                
+                if (srcIndex < previousFrameImageData.data.length - 3 && dstIndex < recoveredPixels.length - 3) {
+                  recoveredPixels[dstIndex] = previousFrameImageData.data[srcIndex] || 0
+                  recoveredPixels[dstIndex + 1] = previousFrameImageData.data[srcIndex + 1] || 0
+                  recoveredPixels[dstIndex + 2] = previousFrameImageData.data[srcIndex + 2] || 0
+                  recoveredPixels[dstIndex + 3] = previousFrameImageData.data[srcIndex + 3] || 0
+                }
+              }
+            }
+          }
+          
+          // RECOVERY STRATEGY 3: Create transparent frame if no data available
+          if (!recoveredPixels) {
+            console.log(`Frame ${i + 1}: Creating transparent frame as fallback`)
+            const expectedSize = gifFrame.dims.width * gifFrame.dims.height * 4
+            recoveredPixels = new Uint8ClampedArray(expectedSize)
+            
+            // Fill with transparent pixels (RGBA: 0,0,0,0)
+            for (let j = 0; j < expectedSize; j += 4) {
+              recoveredPixels[j] = 0     // R
+              recoveredPixels[j + 1] = 0 // G
+              recoveredPixels[j + 2] = 0 // B
+              recoveredPixels[j + 3] = 0 // A (transparent)
+            }
+          }
+          
+          if (recoveredPixels) {
+            gifFrame.pixels = recoveredPixels
+            recoveredFrames++
+            console.log(`Frame ${i + 1}: Successfully recovered pixel data (${recoveredPixels.length} bytes)`)
+          } else {
+            throw new Error(`Frame ${i + 1}: Failed all recovery attempts for pixel data`)
+          }
         }
         
         // CRITICAL FIX: Validate frame data before ImageData creation
@@ -344,30 +612,37 @@ export class EnhancedMediaImporter {
           gifFrame.dims.height
         )
         
-        // ENHANCED FRAME COMPOSITING: Handle disposal methods properly
-        if (i === 0 || gifFrame.disposal === 2) {
-          // First frame or "restore to background" - clear canvas
-          ctx.clearRect(0, 0, gifWidth, gifHeight)
-        } else if (gifFrame.disposal === 3) {
-          // "restore to previous" - not fully supported, use current state
-          // This would require maintaining previous frame state
-          console.warn(`Frame ${i + 1}: Disposal method 3 not fully supported`)
-        }
-        // For disposal method 0 or 1, keep the current canvas state (do nothing)
-
-        // Place frame at correct position on full canvas
-        ctx.putImageData(frameImageData, gifFrame.dims.left, gifFrame.dims.top)
+        // FIXED: Process each frame independently to avoid cross-frame contamination
+        // Create a separate temporary canvas for individual frame processing
+        const { canvas: frameCanvas, ctx: frameCtx } = this.createTempCanvas(gifWidth, gifHeight)
         
-        // Create image from full canvas for pixelation
+        // Place ONLY this frame's data on the clean canvas
+        frameCtx.putImageData(frameImageData, gifFrame.dims.left, gifFrame.dims.top)
+        
+        // Create image from the clean frame canvas
         const tempImg = new Image()
         await new Promise<void>((resolve, reject) => {
           tempImg.onload = () => resolve()
           tempImg.onerror = () => reject(new Error(`Failed to process frame ${i + 1}`))
-          tempImg.src = canvas.toDataURL()
+          tempImg.src = frameCanvas.toDataURL()
         })
 
-        // Pixelate the full frame
+        // Pixelate this individual frame with consistent sizing
         const pixelatedImageData = await this.pixelateImage(tempImg, options)
+        
+        console.log(`Frame ${i + 1} processing: ${gifFrame.dims.width}x${gifFrame.dims.height} -> ${options.width}x${options.height}`)
+        
+        // Clean up temporary canvas immediately after processing
+        this.cleanupTempCanvas(frameCanvas, frameCtx)
+        
+        // OPTIONAL: Still maintain the main canvas for disposal method tracking (for reference)
+        // This helps with debugging but doesn't affect the final output
+        if (i === 0 || gifFrame.disposal === 2) {
+          ctx.clearRect(0, 0, gifWidth, gifHeight)
+        } else if (gifFrame.disposal === 3) {
+          console.warn(`Frame ${i + 1}: Disposal method 3 not fully supported`)
+        }
+        ctx.putImageData(frameImageData, gifFrame.dims.left, gifFrame.dims.top)
         
         // Calculate frame delay (convert centiseconds to milliseconds)
         const frameDelay = Math.max(50, (gifFrame.delay || 10) * 10) // Minimum 50ms
@@ -391,19 +666,77 @@ export class EnhancedMediaImporter {
           imageData: Array.from(pixelatedImageData.data)
         })
 
+        // Store current frame for potential use in recovery of next frame
+        const currentFrameImageData = ctx.getImageData(0, 0, gifWidth, gifHeight)
+        previousFrameImageData = currentFrameImageData
+        
       } catch (frameError) {
         console.error(`Failed to process frame ${i + 1}:`, frameError)
-        // Continue with next frame instead of failing entirely
-        onProgress?.(progress, `Skipping corrupted frame ${i + 1}/${framesToProcess.length}`)
+        skippedFrames++
+        
+        // ENHANCED ERROR RECOVERY: Try alternative processing methods
+        try {
+          console.log(`Frame ${i + 1}: Attempting alternative processing...`)
+          
+          // Alternative 1: Create a duplicate of the previous frame if available
+          if (processedFrames.length > 0) {
+            const lastProcessedFrame = processedFrames[processedFrames.length - 1]
+            if (lastProcessedFrame) {
+              const duplicateFrame: Frame = {
+                id: `gif_frame_recovery_${i}_${Date.now()}`,
+                projectId: '',
+                index: i,
+                delayMs: Math.max(50, (gifFrame?.delay || 10) * 10),
+                included: true,
+                layers: [],
+                flattenedPngUrl: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+              
+              processedFrames.push({
+                frame: duplicateFrame,
+                imageData: [...lastProcessedFrame.imageData] // Clone the array
+              })
+              
+              console.log(`Frame ${i + 1}: Successfully created duplicate frame for recovery`)
+              recoveredFrames++
+            }
+          } else {
+            console.log(`Frame ${i + 1}: No previous frame available for duplication, skipping...`)
+          }
+        } catch (recoveryError) {
+          console.error(`Frame ${i + 1}: Recovery attempt also failed:`, recoveryError)
+        }
+        
+        onProgress?.(progress, `Skipped frame ${i + 1}/${framesToProcess.length} (${skippedFrames} total skipped)`)
         continue
       }
     }
 
     if (processedFrames.length === 0) {
-      throw new Error('No frames could be successfully processed from GIF')
+      throw new Error('No frames could be successfully processed from GIF. The GIF may be severely corrupted.')
     }
 
-    onProgress?.(100, `Successfully processed ${processedFrames.length} frames`)
+    const finalMessage = [
+      `Successfully processed ${processedFrames.length} frames`,
+      skippedFrames > 0 ? `(${skippedFrames} skipped)` : '',
+      recoveredFrames > 0 ? `(${recoveredFrames} recovered)` : ''
+    ].filter(Boolean).join(' ')
+    
+    onProgress?.(100, finalMessage)
+    
+    // Log final statistics
+    console.log(`GIF Import Complete:`, {
+      originalFrames: framesToProcess.length,
+      processedFrames: processedFrames.length,
+      skippedFrames,
+      recoveredFrames,
+      successRate: `${Math.round((processedFrames.length / framesToProcess.length) * 100)}%`
+    })
+
+    // Clean up static canvas after processing
+    this.cleanupCanvas()
 
     return {
       frames: processedFrames,
@@ -468,9 +801,10 @@ export class EnhancedMediaImporter {
     // Write input file
     await ffmpeg.writeFile(filename, new Uint8Array(arrayBuffer))
     
-    // Extract frames (max 1 second, 10 FPS = max 10 frames)
-    const maxFrames = Math.min(options.maxFrames || 10, 10)
-    const frameRate = maxFrames // frames per second
+    // Extract frames based on user tier limits
+    const tierFrameLimit = getVideoFrameLimit()
+    const maxFrames = Math.min(options.maxFrames || tierFrameLimit, tierFrameLimit)
+    const frameRate = Math.min(maxFrames, 10) // Max 10 FPS for processing efficiency
     
     await ffmpeg.exec([
       '-i', filename,

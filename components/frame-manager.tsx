@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -48,6 +48,10 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const playbackFrameId = activeTab?.playbackFrameId
   
   const logger = createComponentLogger('FrameManager')
+  
+  // Focus management for keyboard navigation
+  const timelineRef = useRef<HTMLDivElement>(null)
+  const [isFocused, setIsFocused] = useState(false)
 
   // Clean up intervals on component unmount
   React.useEffect(() => {
@@ -181,6 +185,110 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
+  // Enhanced keyboard navigation with safety checks
+  const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+    // Only handle keyboard events when timeline is focused
+    if (!isFocused || !activeTabId || !frames.length) {
+      return
+    }
+
+    // Prevent default behavior for navigation keys
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    // Handle navigation based on current state
+    try {
+      switch (e.key) {
+        case 'ArrowLeft':
+          logger.debug(() => 'Keyboard navigation: Previous frame', { 
+            currentFrame: activeFrameId, 
+            isPlaying, 
+            totalFrames: frames.length 
+          })
+          handlePrevFrame()
+          break
+
+        case 'ArrowRight':
+          logger.debug(() => 'Keyboard navigation: Next frame', { 
+            currentFrame: activeFrameId, 
+            isPlaying, 
+            totalFrames: frames.length 
+          })
+          handleNextFrame()
+          break
+
+        case ' ':
+        case 'Space':
+          // Space bar for play/pause
+          if (frames.length > 1) {
+            e.preventDefault()
+            handlePlayPause()
+          }
+          break
+
+        case 'Home':
+          // Go to first frame
+          if (frames.length > 0) {
+            e.preventDefault()
+            const firstFrame = frames[0]
+            if (firstFrame && firstFrame.id !== activeFrameId) {
+              handleFrameSelect(firstFrame.id)
+            }
+          }
+          break
+
+        case 'End':
+          // Go to last frame
+          if (frames.length > 0) {
+            e.preventDefault()
+            const lastFrame = frames[frames.length - 1]
+            if (lastFrame && lastFrame.id !== activeFrameId) {
+              handleFrameSelect(lastFrame.id)
+            }
+          }
+          break
+      }
+    } catch (error) {
+      logger.error('Keyboard navigation error', { key: e.key, activeFrameId }, error)
+    }
+  }, [isFocused, activeTabId, frames, activeFrameId, isPlaying, logger])
+
+  // Set up keyboard event listeners
+  useEffect(() => {
+    if (isFocused) {
+      document.addEventListener('keydown', handleKeyboardNavigation)
+      logger.debug(() => 'Keyboard navigation listeners attached', { framesCount: frames.length })
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyboardNavigation)
+      if (isFocused) {
+        logger.debug(() => 'Keyboard navigation listeners removed')
+      }
+    }
+  }, [handleKeyboardNavigation, isFocused, frames.length, logger])
+
+  // Handle focus events for timeline
+  const handleTimelineFocus = useCallback(() => {
+    setIsFocused(true)
+    logger.debug(() => 'Timeline focused - keyboard navigation enabled')
+  }, [logger])
+
+  const handleTimelineBlur = useCallback(() => {
+    setIsFocused(false)
+    logger.debug(() => 'Timeline blurred - keyboard navigation disabled')
+  }, [logger])
+
+  // Handle clicks on timeline to set focus
+  const handleTimelineClick = useCallback(() => {
+    if (timelineRef.current) {
+      timelineRef.current.focus()
+      setIsFocused(true)
+    }
+  }, [])
+
   return (
     <div className={cn('space-y-3', className)}>
       {/* Animation Controls */}
@@ -247,9 +355,36 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       </div>
 
       {/* Frame Timeline */}
-      <div className="rounded-lg border border-gray-200 bg-white p-3">
+      <div 
+        ref={timelineRef}
+        className={cn(
+          "rounded-lg border bg-white p-3 outline-none transition-all",
+          isFocused 
+            ? "border-blue-400 ring-2 ring-blue-100" 
+            : "border-gray-200 hover:border-gray-300"
+        )}
+        tabIndex={0}
+        role="tablist"
+        aria-label="Frame timeline"
+        onFocus={handleTimelineFocus}
+        onBlur={handleTimelineBlur}
+        onClick={handleTimelineClick}
+        onKeyDown={(e) => {
+          // Allow space and arrow keys to trigger keyboard navigation
+          if ([' ', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+            e.preventDefault()
+          }
+        }}
+      >
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-800">Timeline</span>
+          <span className="text-sm font-medium text-gray-800">
+            Timeline
+            {isFocused && (
+              <span className="ml-2 text-xs text-blue-600">
+                (Use ← → keys to navigate)
+              </span>
+            )}
+          </span>
           <span className="text-xs text-gray-500">
             {frames.filter(f => f.included).length} frames in animation
           </span>
@@ -267,7 +402,18 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                 isPlaying && playbackFrameIndex === index && 'ring-2 ring-green-400',
                 playbackFrameId === frame.id && isPlaying && 'bg-green-50 border-green-400'
               )}
+              role="tab"
+              aria-selected={activeFrameId === frame.id}
+              aria-label={`Frame ${index + 1} of ${frames.length}, ${frame.delayMs}ms delay${frame.included ? ', included in animation' : ', excluded from animation'}`}
+              title={`Frame ${index + 1} - ${frame.delayMs}ms delay${activeFrameId === frame.id ? ' (active)' : ''}`}
               onClick={() => handleFrameSelect(frame.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleFrameSelect(frame.id)
+                }
+              }}
+              tabIndex={-1} // Timeline container handles keyboard navigation
             >
               {/* Frame Preview with Thumbnail */}
               <div className="h-12 w-12 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
@@ -388,8 +534,10 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         
         <div className="rounded bg-amber-50 p-2 text-xs text-amber-700">
           💡 <strong>Tip:</strong> {isPlaying 
-            ? 'Use ← → buttons to scrub through frames or click pause to edit'
-            : 'Click frames to switch between them, or use the play button to preview your animation'
+            ? 'Use ← → keys or buttons to scrub through frames, or click pause to edit'
+            : isFocused
+              ? 'Use ← → keys to navigate frames, Space to play/pause, Home/End for first/last frame'
+              : 'Click the timeline to enable keyboard navigation, or click frames to switch between them'
           }
         </div>
       </div>

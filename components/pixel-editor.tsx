@@ -11,6 +11,7 @@ import { ColorPalette } from './color-palette'
 import { FrameManager } from './frame-manager'
 import { ProjectPanel } from './project-panel'
 import { AppHeader } from './app-header'
+import { ProjectEmptyState } from './project-empty-state'
 import toast from 'react-hot-toast'
 
 interface PixelEditorProps {
@@ -23,6 +24,7 @@ export function PixelEditor({ className }: PixelEditorProps) {
     activeTabId,
     getActiveTab,
     initializeApp,
+    createNewProject,
     clearError,
     error
   } = useProjectStore()
@@ -53,15 +55,11 @@ export function PixelEditor({ className }: PixelEditorProps) {
           <ProjectTabs />
         </div>
 
-        {/* Empty state in main area */}
-        <div className="flex flex-1 items-center justify-center">
-          <div className="text-center">
-            <div className="mb-6 text-6xl">🎨</div>
-            <h2 className="mb-2 text-2xl font-semibold text-gray-800">Welcome to PixelBuddy!</h2>
-            <p className="mb-4 text-gray-600">Create pixel art and animated GIFs with ease.</p>
-            <p className="text-gray-500">Click the + button above to create your first project!</p>
-          </div>
-        </div>
+        {/* Enhanced Empty State */}
+        <ProjectEmptyState 
+          onCreateProject={(options) => createNewProject(options)}
+          className="flex-1"
+        />
       </div>
     )
   }

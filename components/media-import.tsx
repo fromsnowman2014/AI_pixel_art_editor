@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback } from '@/lib/utils/enhanced-media-importer'
 import { useProjectStore } from '@/lib/stores/project-store'
+import { FrameImportOptionsModal } from './frame-import-options-modal'
+import { getVideoFrameLimit, getGifFrameLimit, getCurrentUserTier } from '@/lib/types/user'
 import { cn } from '@/lib/utils'
 import { 
   Download, 
@@ -17,7 +19,8 @@ import {
   FileImage,
   Upload,
   Globe,
-  HardDrive
+  HardDrive,
+  X
 } from 'lucide-react'
 
 interface MediaImportProps {
@@ -27,7 +30,7 @@ interface MediaImportProps {
 type ImportMode = 'url' | 'file'
 
 export function MediaImport({ className }: MediaImportProps) {
-  const { activeTabId, getActiveTab, addFrameWithData } = useProjectStore()
+  const { activeTabId, getActiveTab, addFrameWithData, resetToSingleFrame } = useProjectStore()
   const [mode, setMode] = useState<ImportMode>('file')
   const [url, setUrl] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -44,7 +47,23 @@ export function MediaImport({ className }: MediaImportProps) {
   // Advanced options
   const [colorCount, setColorCount] = useState(16)
   const [useColorLimit, setUseColorLimit] = useState(false)
-  const [maxFrames, setMaxFrames] = useState(20)
+  
+  // Get tier-based limits
+  const userTier = getCurrentUserTier()
+  const videoFrameLimit = getVideoFrameLimit()
+  const gifFrameLimit = getGifFrameLimit()
+  const [maxFrames, setMaxFrames] = useState(Math.min(videoFrameLimit, gifFrameLimit))
+
+  // Frame import options  
+  const [showImportOptionsModal, setShowImportOptionsModal] = useState(false)
+  const [pendingImportData, setPendingImportData] = useState<{
+    result: any
+    mediaType: 'image' | 'gif' | 'video'
+  } | null>(null)
+  
+  // Import operation tracking for race condition prevention
+  const [importOperationId, setImportOperationId] = useState<string | null>(null)
+  const importAbortController = useRef<AbortController | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeTab = getActiveTab()
@@ -59,26 +78,102 @@ export function MediaImport({ className }: MediaImportProps) {
     setSuccess(null)
   }
 
-  const validateUrl = (inputUrl: string): boolean => {
+  // Cancel any ongoing import operation
+  const cancelImport = () => {
+    if (importAbortController.current) {
+      importAbortController.current.abort()
+      importAbortController.current = null
+    }
+    setImportOperationId(null)
+    setIsImporting(false)
+    setImportProgress(0)
+    setProgressMessage('')
+    setPendingImportData(null)
+    setShowImportOptionsModal(false)
+  }
+
+  // Check if import is safe to start (no race conditions)
+  const canStartImport = (): boolean => {
+    return !isImporting && !importOperationId && !showImportOptionsModal
+  }
+
+  // Generate unique operation ID for tracking
+  const generateOperationId = (): string => {
+    return `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  const validateUrl = (inputUrl: string): { isValid: boolean; error?: string } => {
     try {
-      const urlObj = new URL(inputUrl)
-      return ['http:', 'https:'].includes(urlObj.protocol)
+      if (!inputUrl?.trim()) {
+        return { isValid: false, error: 'URL cannot be empty' }
+      }
+      
+      const urlObj = new URL(inputUrl.trim())
+      
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        return { isValid: false, error: 'Only HTTP and HTTPS URLs are supported' }
+      }
+      
+      // Check for obvious non-media URLs
+      const suspiciousPatterns = ['/api/', '/admin/', '/login', '.html', '.php', '.jsp']
+      if (suspiciousPatterns.some(pattern => urlObj.pathname.toLowerCase().includes(pattern))) {
+        return { isValid: false, error: 'URL does not appear to be a direct media link' }
+      }
+      
+      return { isValid: true }
     } catch {
-      return false
+      return { isValid: false, error: 'Invalid URL format' }
     }
   }
 
-  const getMediaTypeFromUrl = (url: string): 'image' | 'gif' | 'video' => {
-    const lowerUrl = url.toLowerCase()
-    if (lowerUrl.includes('.gif')) return 'gif'
-    if (['.mp4', '.webm', '.mov', '.avi'].some(ext => lowerUrl.includes(ext))) return 'video'
-    return 'image'
+  const getMediaTypeFromUrl = (url: string): 'image' | 'gif' | 'video' | null => {
+    try {
+      if (!url?.trim()) return null
+      
+      const urlObj = new URL(url.trim())
+      const pathname = urlObj.pathname.toLowerCase()
+      
+      // More precise extension matching
+      if (pathname.endsWith('.gif') || urlObj.search.includes('gif')) return 'gif'
+      
+      const videoExts = ['.mp4', '.webm', '.mov', '.avi', '.m4v']
+      if (videoExts.some(ext => pathname.endsWith(ext))) return 'video'
+      
+      const imageExts = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
+      if (imageExts.some(ext => pathname.endsWith(ext))) return 'image'
+      
+      // Fallback for URLs without clear extensions
+      return 'image'
+    } catch {
+      return null
+    }
   }
 
-  const getMediaTypeFromFile = (file: File): 'image' | 'gif' | 'video' => {
-    if (file.type === 'image/gif') return 'gif'
-    if (file.type.startsWith('video/')) return 'video'
-    return 'image'
+  const getMediaTypeFromFile = (file: File): 'image' | 'gif' | 'video' | null => {
+    try {
+      if (!file?.type && !file?.name) return null
+      
+      // Primary: MIME type detection
+      if (file.type === 'image/gif') return 'gif'
+      if (file.type.startsWith('video/')) return 'video'
+      if (file.type.startsWith('image/')) return 'image'
+      
+      // Fallback: filename extension detection
+      if (file.name) {
+        const extension = file.name.toLowerCase().split('.').pop()
+        if (extension === 'gif') return 'gif'
+        
+        const videoExts = ['mp4', 'webm', 'mov', 'avi', 'm4v']
+        if (videoExts.includes(extension || '')) return 'video'
+        
+        const imageExts = ['png', 'jpg', 'jpeg', 'webp', 'bmp']
+        if (imageExts.includes(extension || '')) return 'image'
+      }
+      
+      return null
+    } catch {
+      return null
+    }
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -121,66 +216,43 @@ export function MediaImport({ className }: MediaImportProps) {
     }
   }
 
-  const handleImport = async () => {
-    clearMessages()
-    setImportProgress(0)
-    setProgressMessage('')
-
-    const options: MediaImportOptions = {
-      width: project.width,
-      height: project.height,
-      colorCount: useColorLimit ? colorCount : undefined,
-      maxFrames: maxFrames // User-configurable frame limit
-    }
-
-    // Progress callback for enhanced importer
-    const onProgress: ProgressCallback = (progress: number, message: string) => {
-      setImportProgress(Math.round(progress))
-      setProgressMessage(message)
-    }
-
-    setIsImporting(true)
-
+  // Process the actual import after option selection
+  const processImport = async (result: any, importOption: 'add' | 'replace') => {
     try {
-      let result: any
+      const mediaType = result.mediaType
+      const frameCount = result.frames.length
 
-      if (mode === 'url') {
-        if (!url.trim()) {
-          throw new Error('Please enter a valid URL')
-        }
-
-        if (!validateUrl(url)) {
-          throw new Error('Please enter a valid HTTP or HTTPS URL')
-        }
-
-        // Validate URL accessibility first
-        const isAccessible = await EnhancedMediaImporter.validateUrl(url)
-        if (!isAccessible) {
-          throw new Error('URL is not accessible or does not contain valid media')
-        }
-
-        result = await EnhancedMediaImporter.importFromUrl(url, options, onProgress)
-      } else {
-        if (!selectedFile) {
-          throw new Error('Please select a file')
-        }
-
-        result = await EnhancedMediaImporter.importFromFile(selectedFile, options, onProgress)
+      // Handle replace option - reset to single frame first
+      if (importOption === 'replace') {
+        resetToSingleFrame(activeTabId)
       }
-      
+
       // Add imported frames to the project
       for (const frameData of result.frames) {
         await addFrameWithData(activeTabId, frameData.imageData, frameData.frame.delayMs)
       }
-
-      const mediaType = result.mediaType
-      const frameCount = result.frames.length
       
-      setSuccess(
-        `Successfully imported ${frameCount} frame${frameCount > 1 ? 's' : ''} from ${mediaType}! ` +
-        `Original size: ${result.originalDimensions.width}×${result.originalDimensions.height}px. ` +
-        (frameCount > 1 ? `Average delay: ${result.avgFrameDelay}ms per frame.` : '')
-      )
+      // Enhanced success message with recovery information
+      let successMessage = `Successfully imported ${frameCount} frame${frameCount > 1 ? 's' : ''} from ${mediaType}! `
+      successMessage += `Original size: ${result.originalDimensions.width}×${result.originalDimensions.height}px. `
+      
+      if (frameCount > 1) {
+        successMessage += `Average delay: ${result.avgFrameDelay}ms per frame. `
+      }
+      
+      // Add import strategy info
+      if (importOption === 'replace') {
+        successMessage += `Replaced all existing frames. `
+      } else {
+        successMessage += `Added after existing frames. `
+      }
+      
+      // Check if this was a fallback result (single frame from multi-frame GIF)
+      if (mediaType === 'gif' && frameCount === 1 && progressMessage.includes('fallback')) {
+        successMessage += `Note: Used fallback processing (single frame extracted). `
+      }
+      
+      setSuccess(successMessage)
       
       // Clear inputs on success
       if (mode === 'url') {
@@ -200,12 +272,153 @@ export function MediaImport({ className }: MediaImportProps) {
     }
   }
 
+  const handleImport = async () => {
+    // Race condition protection
+    if (!canStartImport()) {
+      console.warn('Import already in progress or blocked by modal state')
+      return
+    }
+
+    clearMessages()
+    setImportProgress(0)
+    setProgressMessage('')
+
+    // Generate unique operation ID and abort controller
+    const operationId = generateOperationId()
+    setImportOperationId(operationId)
+    importAbortController.current = new AbortController()
+
+    const options: MediaImportOptions = {
+      width: project.width,
+      height: project.height,
+      colorCount: useColorLimit ? colorCount : undefined,
+      maxFrames: maxFrames // User-configurable frame limit
+    }
+
+    // Enhanced progress callback with operation tracking
+    const onProgress: ProgressCallback = (progress: number, message: string) => {
+      // Only update if this is still the current operation
+      if (importOperationId === operationId) {
+        setImportProgress(Math.round(progress))
+        setProgressMessage(message)
+      }
+    }
+
+    setIsImporting(true)
+
+    try {
+      let result: any
+
+      if (mode === 'url') {
+        const urlValidation = validateUrl(url)
+        if (!urlValidation.isValid) {
+          throw new Error(urlValidation.error || 'Invalid URL')
+        }
+
+        // Check operation hasn't been cancelled
+        if (importAbortController.current?.signal.aborted) {
+          throw new Error('Import cancelled by user')
+        }
+
+        // Validate URL accessibility first
+        onProgress(10, 'Validating URL accessibility...')
+        const isAccessible = await EnhancedMediaImporter.validateUrl(url)
+        if (!isAccessible) {
+          throw new Error('URL is not accessible or does not contain valid media')
+        }
+
+        // Check for cancellation again before expensive operation
+        if (importAbortController.current?.signal.aborted) {
+          throw new Error('Import cancelled by user')
+        }
+
+        result = await EnhancedMediaImporter.importFromUrl(url, options, onProgress)
+      } else {
+        if (!selectedFile) {
+          throw new Error('Please select a file')
+        }
+
+        // Enhanced file validation
+        const detectedType = getMediaTypeFromFile(selectedFile)
+        if (!detectedType) {
+          throw new Error(`Unable to determine file type for: ${selectedFile.name}`)
+        }
+
+        // Check file size limits based on type
+        const maxSize = detectedType === 'video' ? 50 * 1024 * 1024 : 10 * 1024 * 1024
+        if (selectedFile.size > maxSize) {
+          throw new Error(`File too large: ${formatFileSize(selectedFile.size)}. Maximum: ${formatFileSize(maxSize)}`)
+        }
+
+        // Check operation hasn't been cancelled
+        if (importAbortController.current?.signal.aborted) {
+          throw new Error('Import cancelled by user')
+        }
+
+        onProgress(15, 'Processing file...')
+        result = await EnhancedMediaImporter.importFromFile(selectedFile, options, onProgress)
+      }
+
+      const mediaType = result.mediaType
+      const frameCount = result.frames.length
+      const existingFrameCount = activeTab?.frames?.length || 0
+
+      // Check if we need to show import options modal
+      const isMultiFrame = frameCount > 1
+      const hasExistingFrames = existingFrameCount > 0
+      const needsOptions = isMultiFrame && hasExistingFrames
+
+      if (needsOptions) {
+        // Show options modal
+        setPendingImportData({ result, mediaType })
+        setShowImportOptionsModal(true)
+        setIsImporting(false) // Stop loading state while user decides
+      } else {
+        // Process directly (single frame or no existing frames)
+        await processImport(result, 'add')
+      }
+
+    } catch (err) {
+      // Only show error if this is still the current operation (not cancelled)
+      if (importOperationId === operationId) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+        if (!errorMessage.includes('cancelled by user')) {
+          setError(`Import failed: ${errorMessage}`)
+        }
+        setIsImporting(false)
+        setImportProgress(0)
+        setProgressMessage('')
+      }
+    } finally {
+      // Cleanup for current operation only
+      if (importOperationId === operationId) {
+        setImportOperationId(null)
+        if (importAbortController.current) {
+          importAbortController.current = null
+        }
+      }
+    }
+  }
+
+  // Handle import option selection from modal
+  const handleImportOptionSelected = async (option: 'add' | 'replace') => {
+    if (!pendingImportData) return
+
+    setShowImportOptionsModal(false)
+    setIsImporting(true)
+
+    await processImport(pendingImportData.result, option)
+    
+    setPendingImportData(null)
+  }
+
   const mediaType = mode === 'url' 
     ? (url ? getMediaTypeFromUrl(url) : null)
     : (selectedFile ? getMediaTypeFromFile(selectedFile) : null)
   
-  const isValidUrl = url && validateUrl(url)
-  const canImport = mode === 'url' ? isValidUrl : selectedFile
+  const urlValidation = url ? validateUrl(url) : { isValid: false }
+  const isValidUrl = urlValidation.isValid
+  const canImport = mode === 'url' ? isValidUrl : (selectedFile && mediaType !== null)
   
   return (
     <div className={cn('space-y-4', className)}>
@@ -263,7 +476,8 @@ export function MediaImport({ className }: MediaImportProps) {
                 className={cn(
                   "text-sm",
                   error && "border-red-300 focus:border-red-500 focus:ring-red-200",
-                  success && "border-green-300 focus:border-green-500 focus:ring-green-200"
+                  success && "border-green-300 focus:border-green-500 focus:ring-green-200",
+                  url && !urlValidation.isValid && "border-orange-300 focus:border-orange-500 focus:ring-orange-200"
                 )}
                 disabled={isImporting}
               />
@@ -279,6 +493,13 @@ export function MediaImport({ className }: MediaImportProps) {
               )}
             </div>
           </div>
+          
+          {/* URL Validation Error */}
+          {url && !urlValidation.isValid && (
+            <div className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-2 py-1">
+              {urlValidation.error}
+            </div>
+          )}
         </div>
       ) : (
         /* File Upload */
@@ -366,25 +587,39 @@ export function MediaImport({ className }: MediaImportProps) {
       )}
 
       {/* Import Button */}
-      <Button
-        onClick={handleImport}
-        disabled={!canImport || isImporting}
-        className="w-full"
-        size="sm"
-      >
-        {isImporting ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            {progressMessage || 'Processing...'}
-            {importProgress > 0 && ` (${importProgress}%)`}
-          </>
-        ) : (
-          <>
-            <Download className="h-4 w-4 mr-2" />
-            Import {mode === 'url' ? 'from URL' : 'File'}
-          </>
+      <div className="flex gap-2">
+        <Button
+          onClick={handleImport}
+          disabled={!canImport || isImporting}
+          className="flex-1"
+          size="sm"
+        >
+          {isImporting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              {progressMessage || 'Processing...'}
+              {importProgress > 0 && ` (${importProgress}%)`}
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Import {mode === 'url' ? 'from URL' : 'File'}
+            </>
+          )}
+        </Button>
+        
+        {isImporting && (
+          <Button
+            onClick={cancelImport}
+            variant="outline"
+            size="sm"
+            className="px-3"
+            title="Cancel import"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         )}
-      </Button>
+      </div>
 
       {/* Progress Bar */}
       {isImporting && importProgress > 0 && (
@@ -436,22 +671,46 @@ export function MediaImport({ className }: MediaImportProps) {
           )}
           
           <div className="space-y-1">
-            <label htmlFor="max-frames" className="text-xs text-gray-600">
-              Max Frames (for GIFs/Videos): {maxFrames}
-            </label>
-            <input
-              id="max-frames"
-              type="range"
-              min="5"
-              max="50"
-              step="5"
-              value={maxFrames}
-              onChange={(e) => setMaxFrames(parseInt(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg slider"
-            />
-            <p className="text-xs text-gray-500">
-              Higher values = more frames but slower processing
-            </p>
+            {/* Dynamic frame limits based on media type */}
+            {(() => {
+              const currentMediaType = mode === 'url' 
+                ? (url ? getMediaTypeFromUrl(url) : null)
+                : (selectedFile ? getMediaTypeFromFile(selectedFile) : null)
+              
+              const isVideo = currentMediaType === 'video'
+              const currentLimit = isVideo ? videoFrameLimit : gifFrameLimit
+              const limitType = isVideo ? 'Videos' : 'GIFs'
+              
+              return (
+                <>
+                  <label htmlFor="max-frames" className="text-xs text-gray-600 flex items-center gap-2">
+                    Max Frames for {limitType}: {maxFrames}
+                    {isVideo && (
+                      <span className="text-orange-600 font-medium">
+                        (Video: {videoFrameLimit} max)
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    id="max-frames"
+                    type="range"
+                    min="5"
+                    max={currentLimit}
+                    step="5"
+                    value={Math.min(maxFrames, currentLimit)}
+                    onChange={(e) => setMaxFrames(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg slider"
+                  />
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div>Higher values = more frames but slower processing</div>
+                    <div className="flex items-center gap-2 text-orange-600">
+                      <span className="font-medium">Current tier ({userTier}):</span>
+                      <span>Videos max {videoFrameLimit}, GIFs max {gifFrameLimit} frames</span>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -483,7 +742,11 @@ export function MediaImport({ className }: MediaImportProps) {
         <p className="flex items-center gap-1">
           <Film className="h-3 w-3" />
           <span className="font-medium text-green-600">Enhanced Multi-Frame Support:</span>
-          GIFs extract all frames, videos extract up to {maxFrames} frames (1 sec max)
+          GIFs up to {gifFrameLimit} frames, Videos up to {videoFrameLimit} frames (first 1 sec)
+        </p>
+        <p className="flex items-center gap-1 text-orange-600">
+          <span className="font-medium">⚡ {userTier.toUpperCase()} tier limits:</span>
+          Video imports limited to first {videoFrameLimit} frames for optimal performance
         </p>
         <p className="flex items-center gap-1">
           {mode === 'url' ? (
@@ -500,6 +763,16 @@ export function MediaImport({ className }: MediaImportProps) {
           </p>
         )}
       </div>
+
+      {/* Frame Import Options Modal */}
+      <FrameImportOptionsModal
+        open={showImportOptionsModal}
+        onOpenChange={setShowImportOptionsModal}
+        onSelectOption={handleImportOptionSelected}
+        mediaType={pendingImportData?.mediaType || 'image'}
+        frameCount={pendingImportData?.result?.frames?.length || 0}
+        existingFrameCount={activeTab?.frames?.length || 0}
+      />
     </div>
   )
 }

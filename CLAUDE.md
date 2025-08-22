@@ -35,6 +35,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+### Frontend Commands
 ```bash
 # Install dependencies
 npm install
@@ -51,6 +52,9 @@ npm start
 # Run tests
 npm test
 
+# Run tests with watch mode
+npm run test:watch
+
 # Run tests with coverage
 npm run test:coverage
 
@@ -65,6 +69,34 @@ npm run format
 
 # Check formatting
 npm run format:check
+```
+
+### Backend Commands (in /backend directory)
+```bash
+# Development server with hot reload
+npm run dev
+
+# Build TypeScript
+npm run build
+
+# Start production server
+npm run start
+
+# Start production with NODE_ENV=production
+npm run start:prod
+
+# Database operations
+npm run db:generate    # Generate Drizzle schema
+npm run db:migrate     # Push schema to database
+npm run db:studio      # Open Drizzle Studio
+
+# Testing and linting
+npm test
+npm run test:watch
+npm run test:coverage
+npm run lint
+npm run lint:fix
+npm run type-check
 ```
 
 ## Key Implementation Guidelines
@@ -121,6 +153,70 @@ User -> Project -> Frame -> Layer (optional)
 - Validate export formats (PNG with transparency, GIF loops)
 - Cross-browser compatibility (Chrome, Edge, Safari latest)
 - Performance testing on target hardware
+
+## Code Architecture Overview
+
+### Frontend Structure
+- **State Management**: Zustand with Immer for immutable updates and persistence
+- **Canvas System**: Multi-frame pixel editor with frame-specific canvas data storage
+- **Component Architecture**: 
+  - `PixelCanvas`: Main drawing canvas with tool handling
+  - `FrameManager`: Multi-frame animation timeline
+  - `ProjectTabs`: Multi-project workspace
+  - `Toolbar`: Drawing tools and canvas controls
+- **AI Integration**: Frontend API calls to backend AI proxy endpoints
+
+### Backend Structure (Fastify + TypeScript)
+- **Database**: Drizzle ORM with PostgreSQL
+- **Routes**: Modular route handlers (`/routes/*.ts`)
+  - `ai.ts`: AI image generation with post-processing
+  - `projects.ts`: Project CRUD operations
+  - `frames.ts`: Frame management
+  - `export.ts`: GIF/image export
+  - `upload.ts`: Image upload and processing
+- **Services**: Business logic layer (`/services/*.ts`)
+  - `openai.ts`: OpenAI API integration
+  - `imageProcessing.ts`: Canvas manipulation and quantization
+  - `rateLimit.ts`: Redis-based rate limiting
+- **Middleware**: Authentication, rate limiting, validation
+
+### Key Data Flow
+1. **Project Storage**: Zustand store manages multiple project tabs with frame-specific canvas data
+2. **Frame Management**: Each frame stores separate `PixelData` with automatic thumbnail generation
+3. **Canvas Sync**: Real-time canvas updates with history tracking for undo/redo
+4. **Export Pipeline**: Frame data → scaling → format conversion (PNG/GIF) → download
+
+### Performance Optimizations
+- Canvas rendering uses nearest-neighbor scaling for pixel-perfect output
+- Thumbnail generation with automatic memory cleanup
+- Frame data persistence with selective serialization
+- Playback synchronization with optimized canvas updates
+
+## Testing Framework
+
+### Jest Configuration
+- Custom Jest config with Next.js integration
+- Test environment: `jest-environment-jsdom`
+- Module mapping: `@/*` aliases supported
+- Coverage thresholds: 70% across branches, functions, lines, statements
+
+### Test Structure
+- Unit tests: `__tests__/**/*.{test,spec}.{ts,tsx}`
+- Component tests: `components/**/*.test.tsx`
+- Utility tests: `lib/utils/__tests__/*.test.ts`
+- Integration tests: AI generation, canvas functionality, project store
+
+### Common Test Patterns
+```bash
+# Run specific test file
+npm test -- canvas-functionality.test.ts
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
 
 ## Success Metrics
 - 90%+ first-time users export within 10 minutes

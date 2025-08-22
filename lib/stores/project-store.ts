@@ -145,6 +145,7 @@ interface ProjectStore {
   // Frame operations
   addFrame: (tabId: string) => void
   addFrameWithData: (tabId: string, imageData: number[], delayMs?: number) => Promise<void>
+  resetToSingleFrame: (tabId: string) => void
   deleteFrame: (tabId: string, frameId: string) => void
   duplicateFrame: (tabId: string, frameId: string) => void
   setActiveFrame: (tabId: string, frameId: string) => void
@@ -224,13 +225,11 @@ export const useProjectStore = create<ProjectStore>()(
         isLoading: false,
         error: null,
 
-        // Initialize app with default project
+        // Initialize app - restore existing state without auto-creating projects
         initializeApp: () => {
           const { tabs } = get()
 
-          if (tabs.length === 0) {
-            get().createNewProject()
-          } else {
+          if (tabs.length > 0) {
             
             // CRITICAL: Regenerate thumbnails after persistence restore
             get().regenerateAllThumbnails()
@@ -1283,6 +1282,69 @@ export const useProjectStore = create<ProjectStore>()(
                 })
               }
             }
+          })
+        },
+
+        // Reset to single frame (clear all frames except first)
+        resetToSingleFrame: (tabId) => {
+          storeDebug('RESET_TO_SINGLE_FRAME_START', `Resetting tab ${tabId} to single frame`)
+
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (!tab || tab.frames.length <= 1) {
+              storeDebug('RESET_TO_SINGLE_FRAME_SKIP', 'No frames to delete or already single frame')
+              return
+            }
+
+            // Keep only the first frame
+            const firstFrame = tab.frames[0]
+            if (!firstFrame) {
+              storeDebug('RESET_TO_SINGLE_FRAME_ERROR', 'No first frame found')
+              return
+            }
+
+            // Remove all frames except the first one
+            const framesToDelete = tab.frames.slice(1)
+            tab.frames = [firstFrame]
+            tab.project.frames = [firstFrame.id]
+
+            // Remove canvas data for deleted frames
+            const firstFrameCanvasData = tab.frameCanvasData.find(f => f.frameId === firstFrame.id)
+            tab.frameCanvasData = firstFrameCanvasData ? [firstFrameCanvasData] : []
+
+            // Reset frame index
+            firstFrame.index = 0
+
+            // Set first frame as active
+            tab.project.activeFrameId = firstFrame.id
+            tab.currentFrame = firstFrame
+
+            // Load canvas data for the first frame
+            if (firstFrameCanvasData) {
+              tab.canvasData = {
+                ...firstFrameCanvasData.canvasData,
+                data: new Uint8ClampedArray(firstFrameCanvasData.canvasData.data)
+              }
+            }
+
+            // Stop playback if running
+            if (tab.isPlaying) {
+              if (tab.playbackIntervalId) {
+                clearInterval(tab.playbackIntervalId)
+                tab.playbackIntervalId = null
+              }
+              tab.isPlaying = false
+              tab.playbackFrameIndex = 0
+              tab.playbackFrameId = null
+            }
+
+            tab.isDirty = true
+
+            storeDebug('RESET_TO_SINGLE_FRAME_COMPLETE', 'Successfully reset to single frame', {
+              remainingFrames: tab.frames.length,
+              activeFrameId: tab.project.activeFrameId,
+              deletedFrameCount: framesToDelete.length
+            })
           })
         },
 

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { X, Plus, Copy, Save } from 'lucide-react'
 import { ProjectDeletionModal, SimpleConfirmationModal } from './project-deletion-modal'
+import { NewProjectModal } from './new-project-modal'
 import { analyzeProjectFrames, needsSaveConfirmation } from '@/lib/utils/project-helpers'
 
 export function ProjectTabs() {
@@ -44,6 +45,8 @@ export function ProjectTabs() {
     tabId: null,
     projectName: ''
   })
+
+  const [newProjectModal, setNewProjectModal] = useState(false)
   
   const [isLoading, setIsLoading] = useState(false)
 
@@ -201,7 +204,11 @@ export function ProjectTabs() {
             "flex-shrink-0 h-full px-4 rounded-none border-r border-gray-200 hover:bg-gray-50 transition-all duration-300",
             tabs.length === 0 && "bg-blue-50 hover:bg-blue-100 animate-pulse"
           )}
-          onClick={() => createNewProject()}
+          onClick={() => {
+            // If no existing tabs, show quick options modal for better UX
+            // If tabs exist, still show modal for consistency
+            setNewProjectModal(true)
+          }}
           title="Create new project"
         >
           <Plus className={cn(
@@ -242,6 +249,12 @@ export function ProjectTabs() {
         projectName={simpleModal.projectName}
         onConfirm={handleSimpleClose}
         isLoading={isLoading}
+      />
+
+      <NewProjectModal
+        open={newProjectModal}
+        onOpenChange={setNewProjectModal}
+        onCreateProject={(options) => createNewProject(options)}
       />
     </div>
   )
