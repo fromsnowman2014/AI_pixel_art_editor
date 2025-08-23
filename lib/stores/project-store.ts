@@ -167,6 +167,10 @@ interface ProjectStore {
   getTab: (tabId: string) => ProjectTab | null
   markTabDirty: (tabId: string) => void
   clearError: () => void
+  
+  // Storage optimization flags (optional)
+  _storageOptimized?: boolean
+  _lastSaveSize?: number
 }
 
 const createDefaultCanvasState = (): CanvasState => ({
@@ -2092,7 +2096,7 @@ export const useProjectStore = create<ProjectStore>()(
         },
         
         // Add storage monitoring
-        onRehydrateStorage: (name, state) => {
+        onRehydrateStorage: (state) => {
           return (restoredState, error) => {
             if (error) {
               console.error('❌ Failed to restore from localStorage:', error)
