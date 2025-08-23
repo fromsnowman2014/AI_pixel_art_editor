@@ -400,29 +400,84 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Close tab
         closeTab: (tabId) => {
-          // Clean up playback before closing tab
-          const tab = get().getTab(tabId)
-          if (tab?.isPlaying) {
-            get().stopPlayback(tabId)
-          }
+          try {
+            // Clean up playback before closing tab
+            const tab = get().getTab(tabId)
+            if (tab?.isPlaying) {
+              get().stopPlayback(tabId)
+            }
 
-          set((state) => {
-            const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
-            if (tabIndex === -1) return
+            // ENHANCED: Check localStorage usage before closing to prevent quota errors
+            const currentState = get()
+            const totalTabs = currentState.tabs.length
+            
+            // If this is the last tab or we have storage issues, clear localStorage
+            const shouldClearStorage = totalTabs <= 1 || 
+              currentState.tabs.some(t => 
+                (t.frameCanvasData?.length || 0) > 20 || // Many frames
+                t.project.width * t.project.height > 16384 // Large canvas
+              )
 
-            state.tabs.splice(tabIndex, 1)
-
-            // Update active tab
-            if (state.activeTabId === tabId) {
-              if (state.tabs.length > 0) {
-                // Select next tab or previous if it was the last
-                const newIndex = Math.min(tabIndex, state.tabs.length - 1)
-                state.activeTabId = state.tabs[newIndex]?.id || null
-              } else {
-                state.activeTabId = null
+            if (shouldClearStorage) {
+              console.log('🧹 Clearing localStorage before tab close to prevent quota errors')
+              try {
+                localStorage.removeItem('pixelbuddy-projects')
+              } catch (storageError) {
+                console.warn('Failed to clear localStorage:', storageError)
               }
             }
-          })
+
+            set((state) => {
+              const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
+              if (tabIndex === -1) return
+
+              // Clean up tab data to reduce memory usage
+              const tabToRemove = state.tabs[tabIndex]
+              if (tabToRemove) {
+                // Clear heavy data before removal
+                tabToRemove.frameCanvasData = []
+                tabToRemove.canvasData = null
+                tabToRemove.history = []
+              }
+
+              state.tabs.splice(tabIndex, 1)
+
+              // Update active tab
+              if (state.activeTabId === tabId) {
+                if (state.tabs.length > 0) {
+                  // Select next tab or previous if it was the last
+                  const newIndex = Math.min(tabIndex, state.tabs.length - 1)
+                  state.activeTabId = state.tabs[newIndex]?.id || null
+                } else {
+                  state.activeTabId = null
+                }
+              }
+            })
+          } catch (error) {
+            console.error('❌ Error during tab close:', error)
+            
+            // Fallback: Force clear localStorage if we get QuotaExceededError
+            if (error instanceof Error && error.name === 'QuotaExceededError') {
+              try {
+                localStorage.clear()
+                console.log('🚨 Emergency localStorage clear due to quota error')
+              } catch (clearError) {
+                console.error('Failed to clear localStorage:', clearError)
+              }
+            }
+            
+            // Continue with tab closure even if localStorage operations fail
+            set((state) => {
+              const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
+              if (tabIndex === -1) return
+              
+              state.tabs.splice(tabIndex, 1)
+              
+              if (state.activeTabId === tabId) {
+                state.activeTabId = state.tabs.length > 0 ? state.tabs[0]?.id || null : null
+              }
+            })
+          }
         },
 
         // Set active tab
@@ -1171,6 +1226,46 @@ export const useProjectStore = create<ProjectStore>()(
               hasCanvasData: !!currentTab.canvasData
             })
             get().saveCurrentFrameCanvas(tabId)
+          }
+
+          // ENHANCED: Check and remove empty first frame if it exists
+          if (currentTab && currentTab.frames.length === 1) {
+            const firstFrame = currentTab.frames[0]
+            const firstFrameData = currentTab.frameCanvasData.find(f => f.frameId === firstFrame?.id)
+            
+            // Check if the first frame is empty (all pixels are transparent)
+            let isFirstFrameEmpty = true
+            if (firstFrameData?.canvasData?.data) {
+              const data = firstFrameData.canvasData.data
+              for (let i = 3; i < data.length; i += 4) { // Check alpha channel
+                if ((data[i] ?? 0) > 0) {
+                  isFirstFrameEmpty = false
+                  break
+                }
+              }
+            }
+            
+            if (isFirstFrameEmpty && firstFrame) {
+              storeDebug('REMOVE_EMPTY_FRAME', `Removing empty first frame before import`, {
+                emptyFrameId: firstFrame.id,
+                totalFrames: currentTab.frames.length
+              })
+              
+              // Remove the empty frame before adding new imported frames
+              set((state) => {
+                const tab = state.tabs.find(t => t.id === tabId)
+                if (tab && tab.frames.length === 1) {
+                  // Clear the single empty frame
+                  tab.frames = []
+                  tab.project.frames = []
+                  tab.frameCanvasData = []
+                  tab.currentFrame = null
+                  tab.project.activeFrameId = null
+                  
+                  storeDebug('EMPTY_FRAME_REMOVED', 'Empty frame successfully removed')
+                }
+              })
+            }
           }
 
           let newFrameId: string | null = null
@@ -1955,19 +2050,60 @@ export const useProjectStore = create<ProjectStore>()(
       })),
       {
         name: 'pixelbuddy-projects',
-        partialize: (state) => ({
-          // Only persist essential data, not the full canvas data or thumbnails
-          tabs: state.tabs.map(tab => ({
-            ...tab,
-            canvasData: null, // Don't persist heavy canvas data
-            history: [], // Don't persist history
-            frameCanvasData: (tab.frameCanvasData || []).map(frameData => ({
-              ...frameData,
-              thumbnail: null // Don't persist thumbnails - regenerate on load
-            }))
-          })),
-          activeTabId: state.activeTabId,
-        }),
+        partialize: (state) => {
+          // Calculate storage usage and optimize accordingly
+          const totalFrameData = state.tabs.reduce((total, tab) => {
+            return total + (tab.frameCanvasData || []).reduce((frameTotal, frame) => {
+              return frameTotal + (frame.canvasData?.data?.length || 0)
+            }, 0)
+          }, 0)
+          
+          // Storage optimization: limit what we persist based on size
+          const STORAGE_LIMIT = 2 * 1024 * 1024 // 2MB limit for localStorage
+          const shouldOptimizeStorage = totalFrameData > STORAGE_LIMIT
+          
+          console.log(`📦 Storage usage: ${Math.round(totalFrameData / 1024)}KB, Optimizing: ${shouldOptimizeStorage}`)
+          
+          return {
+            // Only persist essential data, not the full canvas data or thumbnails
+            tabs: state.tabs.map(tab => ({
+              ...tab,
+              canvasData: null, // Don't persist heavy canvas data
+              history: [], // Don't persist history
+              frameCanvasData: shouldOptimizeStorage 
+                ? [] // Don't persist any frame data if over limit
+                : (tab.frameCanvasData || []).map(frameData => ({
+                    frameId: frameData.frameId,
+                    canvasData: {
+                      width: frameData.canvasData.width,
+                      height: frameData.canvasData.height,
+                      // Only persist data for smaller projects
+                      data: frameData.canvasData.data.length > 50000 
+                        ? new Uint8ClampedArray() // Empty for large frames
+                        : frameData.canvasData.data
+                    },
+                    thumbnail: null // Don't persist thumbnails - regenerate on load
+                  }))
+            })),
+            activeTabId: state.activeTabId,
+            _storageOptimized: shouldOptimizeStorage, // Flag for debugging
+            _lastSaveSize: totalFrameData
+          }
+        },
+        
+        // Add storage monitoring
+        onRehydrateStorage: (name, state) => {
+          return (restoredState, error) => {
+            if (error) {
+              console.error('❌ Failed to restore from localStorage:', error)
+            } else {
+              console.log('✅ Restored project state from localStorage')
+              if (restoredState?._storageOptimized) {
+                console.warn('⚠️ Previous session was storage-optimized (frame data truncated)')
+              }
+            }
+          }
+        }
       }
     ),
     { name: 'pixelbuddy-store' }

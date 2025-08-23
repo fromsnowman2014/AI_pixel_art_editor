@@ -227,9 +227,53 @@ export function MediaImport({ className }: MediaImportProps) {
         resetToSingleFrame(activeTabId)
       }
 
-      // Add imported frames to the project
-      for (const frameData of result.frames) {
-        await addFrameWithData(activeTabId, frameData.imageData, frameData.frame.delayMs)
+      // Add imported frames to the project with localStorage monitoring
+      for (let i = 0; i < result.frames.length; i++) {
+        const frameData = result.frames[i]
+        try {
+          // Monitor localStorage usage for large imports
+          const frameSize = frameData.imageData.length * 4 // Approximate size
+          const estimatedTotalSize = frameSize * result.frames.length
+          
+          // If estimated size is large, warn and potentially limit frames
+          if (estimatedTotalSize > 5 * 1024 * 1024) { // 5MB threshold
+            console.warn(`⚠️ Large GIF import detected: ~${Math.round(estimatedTotalSize / (1024 * 1024))}MB`)
+            
+            // For very large imports, limit to prevent quota errors
+            if (i > 10) { // Maximum 10 frames for large imports
+              console.log(`🛑 Limiting large import to ${i} frames to prevent localStorage quota errors`)
+              break
+            }
+          }
+          
+          await addFrameWithData(activeTabId, frameData.imageData, frameData.frame.delayMs)
+          
+          // Check localStorage quota after each frame for large imports
+          if (frameSize > 100000 && i > 0) { // 100KB+ per frame
+            try {
+              // Test localStorage write to detect quota issues early
+              const testKey = `test_quota_${Date.now()}`
+              localStorage.setItem(testKey, 'test')
+              localStorage.removeItem(testKey)
+            } catch (quotaError) {
+              console.error(`💾 localStorage quota reached at frame ${i + 1}/${result.frames.length}`)
+              setError(`Import partially successful: ${i} frames imported. Storage limit reached.`)
+              break
+            }
+          }
+          
+        } catch (frameError) {
+          console.error(`Failed to import frame ${i + 1}:`, frameError)
+          
+          // If it's a quota error, stop importing
+          if (frameError instanceof Error && frameError.name === 'QuotaExceededError') {
+            setError(`Import stopped at frame ${i}: Storage limit reached. Try reducing canvas size or frame count.`)
+            break
+          }
+          
+          // For other errors, continue with next frame
+          continue
+        }
       }
       
       // Enhanced success message with recovery information
