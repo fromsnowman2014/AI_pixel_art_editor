@@ -8,6 +8,7 @@ import { Frame } from '@/lib/types/api'
 import {
   Play,
   Pause,
+  Square,
   Plus,
   Copy,
   Trash2,
@@ -193,12 +194,33 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       return
     }
     
-    logger.debug(() => isPlaying ? 'Stopping playback' : 'Starting playback', { 
+    logger.debug(() => isPlaying ? 'Pausing playback' : 'Starting playback', { 
       isPlaying, 
       framesLength: frames.length 
     })
     
     togglePlayback(activeTabId)
+  }
+
+  const handleStop = () => {
+    if (!activeTabId) return
+    
+    logger.debug(() => 'Stopping playback and resetting to first frame', { 
+      isPlaying, 
+      currentFrame: playbackFrameIndex,
+      totalFrames: frames.length 
+    })
+    
+    // Stop playback
+    stopPlayback(activeTabId)
+    
+    // Reset to first frame
+    setPlaybackFrame(activeTabId, 0)
+    
+    // If we have frames, set the first frame as active
+    if (frames.length > 0 && frames[0]) {
+      setActiveFrame(activeTabId, frames[0].id)
+    }
   }
 
   const handleAddFrame = () => {
@@ -308,18 +330,40 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Button
-            variant="outline"
+            variant={isPlaying ? 'secondary' : 'default'}
             size="sm"
-            onClick={handlePlayPause}
-            disabled={frames.length <= 1}
+            onClick={() => {
+              if (!isPlaying) {
+                handlePlayPause()
+              }
+            }}
+            disabled={frames.length <= 1 || isPlaying}
             className="px-3"
           >
-            {isPlaying ? (
-              <Pause className="h-4 w-4 mr-2" />
-            ) : (
-              <Play className="h-4 w-4 mr-2" />
-            )}
-            {isPlaying ? 'Pause' : 'Play'}
+            <Play className="h-4 w-4 mr-2" />
+            Play
+          </Button>
+          
+          <Button
+            variant={isPlaying ? 'default' : 'secondary'}
+            size="sm"
+            onClick={handlePlayPause}
+            disabled={frames.length <= 1 || !isPlaying}
+            className="px-3"
+          >
+            <Pause className="h-4 w-4 mr-2" />
+            Pause
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStop}
+            disabled={frames.length <= 1 || (!isPlaying && playbackFrameIndex === 0)}
+            className="px-3"
+          >
+            <Square className="h-4 w-4 mr-2" />
+            Stop
           </Button>
 
           <div className="flex items-center space-x-1">

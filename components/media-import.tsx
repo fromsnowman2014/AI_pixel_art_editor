@@ -25,12 +25,13 @@ import {
 
 interface MediaImportProps {
   className?: string
+  onImportSuccess?: () => void
 }
 
 type ImportMode = 'url' | 'file'
 
-export function MediaImport({ className }: MediaImportProps) {
-  const { activeTabId, getActiveTab, addFrameWithData, resetToSingleFrame } = useProjectStore()
+export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
+  const { activeTabId, getActiveTab, addFrameWithData, resetToSingleFrame, setActiveFrame } = useProjectStore()
   const [mode, setMode] = useState<ImportMode>('file')
   const [url, setUrl] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -297,6 +298,21 @@ export function MediaImport({ className }: MediaImportProps) {
       }
       
       setSuccess(successMessage)
+      
+      // Auto-select first frame after successful import and close popup for multi-frame imports
+      setTimeout(() => {
+        if (activeTabId && result.frames && result.frames.length > 0) {
+          const firstFrame = result.frames[0]
+          if (firstFrame && firstFrame.frame && firstFrame.frame.id) {
+            setActiveFrame(activeTabId, firstFrame.frame.id)
+            
+            // Auto-close import modal after successful GIF/multi-frame import
+            if ((mediaType === 'gif' || mediaType === 'video') && frameCount > 1 && onImportSuccess) {
+              onImportSuccess()
+            }
+          }
+        }
+      }, 500) // Small delay to ensure frames are properly added
       
       // Clear inputs on success
       if (mode === 'url') {

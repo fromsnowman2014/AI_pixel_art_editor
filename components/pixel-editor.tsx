@@ -26,10 +26,25 @@ export function PixelEditor({ className }: PixelEditorProps) {
     initializeApp,
     createNewProject,
     clearError,
-    error
+    error,
+    stopPlayback
   } = useProjectStore()
 
   const activeTab = getActiveTab()
+  
+  // Auto-stop playback when clicking outside frame manager
+  const handleGlobalClick = (e: React.MouseEvent) => {
+    if (activeTabId && activeTab?.isPlaying) {
+      // Check if click is inside frame manager area
+      const target = e.target as HTMLElement
+      const frameManagerArea = target.closest('[data-frame-manager]')
+      
+      if (!frameManagerArea) {
+        // Click is outside frame manager, stop playback
+        stopPlayback(activeTabId)
+      }
+    }
+  }
 
   useEffect(() => {
     // Initialize the app with default project if no tabs exist
@@ -65,7 +80,7 @@ export function PixelEditor({ className }: PixelEditorProps) {
   }
 
   return (
-    <div className={cn('flex h-screen flex-col bg-gray-50', className)}>
+    <div className={cn('flex h-screen flex-col bg-gray-50', className)} onClick={handleGlobalClick}>
       {/* App Header */}
       <AppHeader />
       
@@ -109,7 +124,7 @@ export function PixelEditor({ className }: PixelEditorProps) {
               </div>
               
               {/* Bottom - Frame Manager */}
-              <div className="border-t border-gray-200 bg-white p-4">
+              <div className="border-t border-gray-200 bg-white p-4" data-frame-manager>
                 <FrameManager 
                   frames={activeTab.frames}
                   activeFrameId={activeTab.project.activeFrameId}

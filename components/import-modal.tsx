@@ -56,7 +56,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
 
         {/* Content */}
         <div className="p-6 pt-2">
-          <MediaImport className="space-y-4" />
+          <MediaImport className="space-y-4" onImportSuccess={onClose} />
         </div>
 
         {/* Footer Info */}
