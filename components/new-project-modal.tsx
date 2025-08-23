@@ -30,25 +30,54 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
   const [customHeight, setCustomHeight] = useState(64)
 
   const handleQuickCreate = (size: typeof QUICK_SIZES[0]) => {
+    console.log('🚀 handleQuickCreate called with:', size)
     onCreateProject({ width: size.width, height: size.height })
-    onOpenChange(false)
+    handleClose()
   }
 
   const handleCustomCreate = () => {
+    console.log('🚀 handleCustomCreate called with:', { customWidth, customHeight })
     if (customWidth > 0 && customHeight > 0) {
       onCreateProject({ width: customWidth, height: customHeight })
-      onOpenChange(false)
+      handleClose()
     }
   }
 
   const handleClose = () => {
+    console.log('🚀 handleClose called')
     setShowCustom(false)
+    setCustomWidth(64)
+    setCustomHeight(64)
     onOpenChange(false)
   }
 
+  const handleBackgroundClick = (e: React.MouseEvent) => {
+    console.log('🚀 handleBackgroundClick called')
+    if (e.target === e.currentTarget) {
+      handleClose()
+    }
+  }
+
+  // Don't render modal if not open
+  if (!open) {
+    console.log('🚀 Modal not rendering because open =', open)
+    return null
+  }
+
+  console.log('🚀 Modal rendering with open =', open)
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="max-w-md w-full mx-4 bg-white rounded-lg shadow-xl animate-in zoom-in-95 duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={handleBackgroundClick}
+    >
+      <div 
+        className="max-w-md w-full mx-4 bg-white rounded-lg shadow-xl animate-in zoom-in-95 duration-200"
+        onClick={(e) => {
+          console.log('🚀 Modal content clicked - preventing propagation')
+          e.stopPropagation()
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
@@ -60,7 +89,16 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
               <p className="text-xs text-gray-500">Choose your canvas size</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 p-0">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={(e) => {
+              console.log('🚀 X button clicked')
+              e.stopPropagation()
+              handleClose()
+            }} 
+            className="h-8 w-8 p-0"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -79,7 +117,11 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
                   {QUICK_SIZES.map((size, index) => (
                     <button
                       key={index}
-                      onClick={() => handleQuickCreate(size)}
+                      onClick={(e) => {
+                        console.log('🚀 Quick size button clicked:', size)
+                        e.stopPropagation()
+                        handleQuickCreate(size)
+                      }}
                       className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
                     >
                       <span className="text-xl">{size.emoji}</span>
