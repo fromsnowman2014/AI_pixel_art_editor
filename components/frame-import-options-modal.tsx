@@ -3,7 +3,7 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { X, Plus, RotateCcw, AlertCircle, Layers, FileImage, Film, Square, MousePointer, Hash, Crop, ArrowUp, Target, Zap } from 'lucide-react'
+import { X, Plus, AlertCircle, FileImage, Film, Square, MousePointer, Hash, Crop, ArrowUp, Target, Zap, CheckCircle2, Settings2, HelpCircle } from 'lucide-react'
 import { 
   analyzeSizeRelationship, 
   getAvailableScalingModes,
@@ -50,10 +50,55 @@ export function FrameImportOptionsModal({
     sizeAnalysis.recommendation
   )
   
+  const [importAction, setImportAction] = React.useState<'add' | 'replace'>('add')
+  const [showAdvanced, setShowAdvanced] = React.useState(false)
+  const [hoveredMode, setHoveredMode] = React.useState<string | null>(null)
+  
+  // Quick preset options
+  const quickPresets = React.useMemo(() => [
+    {
+      id: 'smart-add',
+      label: 'Smart Import (Recommended)',
+      description: 'Add frames with intelligent scaling',
+      action: 'add' as const,
+      scalingMode: sizeAnalysis.recommendation,
+      icon: CheckCircle2,
+      recommended: true
+    },
+    {
+      id: 'safe-add',
+      label: 'Safe Add',
+      description: 'Preserve existing work, add new frames',
+      action: 'add' as const,
+      scalingMode: 'fit' as ExtendedScalingMode,
+      icon: Plus,
+      recommended: false
+    }
+  ], [sizeAnalysis.recommendation])
+  
   if (!open) return null
 
   const mediaIcon = mediaType === 'gif' || mediaType === 'video' ? Film : FileImage
   const MediaIcon = mediaIcon
+  
+  // Tooltip component for compact descriptions
+  const Tooltip = ({ children, content, side = 'top' }: { children: React.ReactNode, content: string, side?: 'top' | 'bottom' }) => (
+    <div className="group relative">
+      {children}
+      <div className={cn(
+        "absolute z-10 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+        "px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg whitespace-nowrap",
+        "pointer-events-none",
+        side === 'top' ? "bottom-full mb-2 left-1/2 -translate-x-1/2" : "top-full mt-2 left-1/2 -translate-x-1/2"
+      )}>
+        {content}
+        <div className={cn(
+          "absolute w-2 h-2 bg-gray-900 rotate-45",
+          side === 'top' ? "top-full left-1/2 -translate-x-1/2 -mt-1" : "bottom-full left-1/2 -translate-x-1/2 -mb-1"
+        )} />
+      </div>
+    </div>
+  )
 
   // Enhanced scaling result calculation with extended mode support
   const calculateScalingResult = (mode: ExtendedScalingMode) => {
@@ -189,16 +234,16 @@ export function FrameImportOptionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
-      <div className="max-w-lg w-full mx-4 bg-white rounded-xl shadow-2xl border border-gray-200">
-        {/* Header */}
-        <div className="border-b border-gray-100 px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <MediaIcon className="h-5 w-5 text-blue-600" />
+      <div className="max-w-md w-full mx-4 bg-white rounded-xl shadow-2xl border border-gray-200">
+        {/* Compact Header */}
+        <div className="border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-50 rounded-lg">
+              <MediaIcon className="h-4 w-4 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Import Settings</h2>
-              <p className="text-sm text-gray-500">Configure how your {mediaType} should be imported</p>
+              <h2 className="text-lg font-semibold text-gray-900">Import {frameCount} Frame{frameCount !== 1 ? 's' : ''}</h2>
+              <p className="text-xs text-gray-500">{originalDimensions.width}×{originalDimensions.height} → {targetDimensions.width}×{targetDimensions.height}</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-gray-400 hover:text-gray-600">
@@ -206,320 +251,166 @@ export function FrameImportOptionsModal({
           </Button>
         </div>
 
-        <div className="p-6 space-y-8">
-          {/* Media Info Card - Redesigned */}
-          <div className="rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <MediaIcon className="h-4 w-4 text-blue-700" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Import Summary</h3>
-                  <p className="text-xs text-gray-600">{originalDimensions.width}×{originalDimensions.height} → {targetDimensions.width}×{targetDimensions.height}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-blue-700">{frameCount}</div>
-                <div className="text-xs text-blue-600 uppercase tracking-wide">{frameCount === 1 ? 'Frame' : 'Frames'}</div>
-              </div>
-            </div>
+        <div className="p-4 space-y-4">
+          {/* Quick Presets - New compact section */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              Quick Import
+              <Tooltip content="One-click import with smart defaults" side="top">
+                <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+              </Tooltip>
+            </h3>
             
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-white/60 rounded-lg p-3">
-                <div className="text-sm font-semibold text-gray-900 capitalize">{mediaType}</div>
-                <div className="text-xs text-gray-600">Media Type</div>
-              </div>
-              <div className="bg-white/60 rounded-lg p-3">
-                <div className="text-sm font-semibold text-blue-600">{frameCount}</div>
-                <div className="text-xs text-gray-600">New Frames</div>
-              </div>
-              <div className="bg-white/60 rounded-lg p-3">
-                <div className="text-sm font-semibold text-orange-600">{existingFrameCount}</div>
-                <div className="text-xs text-gray-600">Current Frames</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Size Analysis Section - New for Small-to-Large Detection */}
-          {sizeAnalysis.relationship === 'small-to-large' && (
-            <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <ArrowUp className="h-4 w-4 text-emerald-700" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-emerald-900">Small to Large Canvas Detected</h3>
-                  <p className="text-xs text-emerald-700">Your image is significantly smaller than the target canvas</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/80 rounded-lg p-3">
-                  <div className="text-xs text-emerald-600 font-medium uppercase tracking-wide mb-1">Size Difference</div>
-                  <div className="text-sm font-bold text-gray-900">
-                    {Math.round(Math.min(sizeAnalysis.scaleFactorX, sizeAnalysis.scaleFactorY))}× smaller
-                  </div>
-                </div>
-                
-                {sizeAnalysis.optimalIntegerScale && (
-                  <div className="bg-white/80 rounded-lg p-3">
-                    <div className="text-xs text-emerald-600 font-medium uppercase tracking-wide mb-1">Perfect Scale</div>
-                    <div className="text-sm font-bold text-gray-900">
-                      {sizeAnalysis.optimalIntegerScale}× upscaling available
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="mt-4 flex flex-wrap gap-1">
-                {sizeAnalysis.reasons.map((reason, index) => (
-                  <span key={index} className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                    {reason}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Scaling Options - Professional Redesign */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">Scaling Mode</h3>
-              <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                {originalDimensions.width}×{originalDimensions.height} → {targetDimensions.width}×{targetDimensions.height}
-              </div>
-            </div>
-            
-            <div className={`grid gap-3 ${availableScalingModes.length > 4 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
-              {availableScalingModes.map((modeConfig) => {
-                const result = calculateScalingResult(modeConfig.mode)
-                const Icon = result.icon
-                const isSelected = selectedScalingMode === modeConfig.mode
-                const colorClassesMap = {
-                  blue: {
-                    border: isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300',
-                    icon: 'text-blue-600',
-                    result: 'text-blue-600',
-                    badge: 'bg-blue-100 text-blue-700'
-                  },
-                  orange: {
-                    border: isSelected ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white hover:border-orange-300',
-                    icon: 'text-orange-600',
-                    result: 'text-orange-600',
-                    badge: 'bg-orange-100 text-orange-700'
-                  },
-                  green: {
-                    border: isSelected ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-green-300',
-                    icon: 'text-green-600',
-                    result: 'text-green-600',
-                    badge: 'bg-green-100 text-green-700'
-                  },
-                  purple: {
-                    border: isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-purple-300',
-                    icon: 'text-purple-600',
-                    result: 'text-purple-600',
-                    badge: 'bg-purple-100 text-purple-700'
-                  },
-                  teal: {
-                    border: isSelected ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-teal-300',
-                    icon: 'text-teal-600',
-                    result: 'text-teal-600',
-                    badge: 'bg-teal-100 text-teal-700'
-                  },
-                  pink: {
-                    border: isSelected ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white hover:border-pink-300',
-                    icon: 'text-pink-600',
-                    result: 'text-pink-600',
-                    badge: 'bg-pink-100 text-pink-700'
-                  }
-                } as const
-                
-                const colorClasses = colorClassesMap[result.color as keyof typeof colorClassesMap] || colorClassesMap.blue
-                
+            <div className="grid gap-2">
+              {quickPresets.map((preset) => {
+                const Icon = preset.icon
+                const result = calculateScalingResult(preset.scalingMode)
                 return (
                   <button
-                    key={modeConfig.mode}
-                    onClick={() => setSelectedScalingMode(modeConfig.mode)}
+                    key={preset.id}
+                    onClick={() => onSelectOption(preset.action, preset.scalingMode)}
                     className={cn(
-                      "relative p-4 rounded-xl border-2 text-left transition-all duration-200 transform hover:scale-[1.02]",
-                      colorClasses.border,
-                      isSelected && "ring-2 ring-offset-2 ring-current ring-opacity-20"
+                      "flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all hover:shadow-md",
+                      preset.recommended 
+                        ? "border-green-200 bg-green-50 hover:border-green-300" 
+                        : "border-gray-200 bg-white hover:border-blue-300"
                     )}
                   >
-                    <div className="space-y-3">
+                    <div className={cn(
+                      "p-2 rounded-lg", 
+                      preset.recommended ? "bg-green-100" : "bg-blue-100"
+                    )}>
+                      <Icon className={cn(
+                        "h-4 w-4", 
+                        preset.recommended ? "text-green-600" : "text-blue-600"
+                      )} />
+                    </div>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <Icon className={cn("h-5 w-5", colorClasses.icon)} />
-                        <span className="font-semibold text-gray-900 text-sm">
-                          {modeConfig.displayName}
-                        </span>
-                        {modeConfig.isUpscaling && (
-                          <div className="flex items-center" title="Upscaling mode">
-                            <ArrowUp className="h-3 w-3 text-emerald-500" />
-                          </div>
+                        <span className="font-medium text-gray-900 text-sm">{preset.label}</span>
+                        {preset.recommended && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                            ⭐ Best
+                          </span>
                         )}
                       </div>
-                      
-                      <div className="space-y-2">
-                        <p className="text-xs text-gray-600 leading-relaxed">
-                          {result.description}
-                        </p>
-                        
-                        <div className={cn("text-xs font-medium", colorClasses.result)}>
-                          {result.width}×{result.height}
-                        </div>
-                        
-                        {result.recommendation && (
-                          <div className={cn(
-                            "text-xs px-2 py-1 rounded-full font-medium",
-                            colorClasses.badge
-                          )}>
-                            {result.recommendation}
-                          </div>
-                        )}
-                        
-                        {modeConfig.recommendation && (
-                          <div className="text-xs px-2 py-1 rounded-full font-bold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200">
-                            ⭐ Recommended
-                          </div>
-                        )}
+                      <div className="text-xs text-gray-600 mt-0.5">
+                        {existingFrameCount + (preset.action === 'add' ? frameCount : 0)} total frames • {result.width}×{result.height}
                       </div>
                     </div>
-                    
-                    {isSelected && (
-                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-current text-white rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-                    )}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Frame Import Options - Enhanced UX */}
-          <div className="space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">Import Strategy</h3>
+          {/* Advanced Options - Collapsible */}
+          <div className="space-y-3">
+            <button 
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center justify-between w-full text-sm font-semibold text-gray-900 hover:text-gray-700"
+            >
+              <span className="flex items-center gap-2">
+                <Settings2 className="h-4 w-4" />
+                Advanced Options
+              </span>
+              <div className={cn("transition-transform", showAdvanced && "rotate-180")}>
+                <ArrowUp className="h-3 w-3" />
+              </div>
+            </button>
             
-            <div className="grid grid-cols-1 gap-4">
-              {/* Add to existing option - Enhanced */}
-              <button
-                onClick={() => onSelectOption('add', selectedScalingMode)}
-                className={cn(
-                  "group relative w-full p-5 rounded-xl border-2 text-left transition-all duration-200",
-                  "border-gray-200 bg-white hover:border-green-300 hover:bg-green-50 hover:shadow-md transform hover:scale-[1.01]"
-                )}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="mt-1 p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                    <Plus className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 mb-2 text-base">Add to Project</div>
-                    <div className="text-sm text-gray-600 mb-3 leading-relaxed">
-                      Keep your current {existingFrameCount} frame{existingFrameCount !== 1 ? 's' : ''} and append {frameCount} new frame{frameCount !== 1 ? 's' : ''} to the timeline.
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-green-700 bg-green-100 px-3 py-1 rounded-full font-semibold">
-                        {existingFrameCount + frameCount} total frames
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        • Safe • Preserves work
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Replace all option - Enhanced with warning styling */}
-              <button
-                onClick={() => onSelectOption('replace', selectedScalingMode)}
-                className={cn(
-                  "group relative w-full p-5 rounded-xl border-2 text-left transition-all duration-200",
-                  "border-red-200 bg-red-50/30 hover:border-red-400 hover:bg-red-50 hover:shadow-md transform hover:scale-[1.01]"
-                )}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="mt-1 p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
-                    <RotateCcw className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 mb-2 text-base flex items-center gap-2">
-                      Replace All Frames
-                      {existingFrameCount > 0 && (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 mb-3 leading-relaxed">
-                      Remove all {existingFrameCount} current frame{existingFrameCount !== 1 ? 's' : ''} and replace with {frameCount} new frame{frameCount !== 1 ? 's' : ''}.
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-red-700 bg-red-100 px-3 py-1 rounded-full font-semibold">
-                        {frameCount} total frames
-                      </div>
-                      <div className="text-xs text-red-600">
-                        • Destructive • Work will be lost
-                      </div>
-                    </div>
+            {showAdvanced && (
+              <div className="space-y-4 pl-6 border-l-2 border-gray-100">
+                {/* Compact scaling options */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Scaling Mode</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableScalingModes.slice(0, 4).map((modeConfig) => {
+                      const result = calculateScalingResult(modeConfig.mode)
+                      const Icon = result.icon
+                      const isSelected = selectedScalingMode === modeConfig.mode
+                      
+                      return (
+                        <Tooltip key={modeConfig.mode} content={result.description} side="top">
+                          <button
+                            onClick={() => setSelectedScalingMode(modeConfig.mode)}
+                            className={cn(
+                              "p-2 rounded-lg border text-center transition-all text-xs",
+                              isSelected 
+                                ? "border-blue-500 bg-blue-50 text-blue-700" 
+                                : "border-gray-200 hover:border-gray-300"
+                            )}
+                          >
+                            <Icon className="h-3 w-3 mx-auto mb-1" />
+                            <div className="font-medium">{modeConfig.displayName}</div>
+                            <div className="text-xs opacity-75">{result.width}×{result.height}</div>
+                          </button>
+                        </Tooltip>
+                      )
+                    })}
                   </div>
                 </div>
-              </button>
-            </div>
+                
+                {/* Import strategy checkboxes */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Import Strategy</label>
+                  <div className="space-y-2">
+                    {(['add', 'replace'] as const).map((action) => (
+                      <label key={action} className="flex items-start gap-3 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="importAction" 
+                          value={action}
+                          checked={importAction === action}
+                          onChange={(e) => setImportAction(e.target.value as 'add' | 'replace')}
+                          className="mt-0.5 w-3 h-3 text-blue-600"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            {action === 'add' ? 'Add to Project' : 'Replace All Frames'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {action === 'add' 
+                              ? `Keep ${existingFrameCount} + add ${frameCount} frames` 
+                              : `Replace ${existingFrameCount} with ${frameCount} frames`
+                            }
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => onSelectOption(importAction, selectedScalingMode)}
+                    className="flex-1"
+                    size="sm"
+                  >
+                    Import Frames
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => onOpenChange(false)}
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Enhanced Warning for replace option */}
-          {existingFrameCount > 0 && (
-            <div className="rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="p-1 bg-amber-100 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-amber-600" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-amber-900 mb-2">Important Notice</div>
-                  <div className="text-sm text-amber-800 leading-relaxed">
-                    Choosing "Replace All Frames" will permanently delete your current {existingFrameCount} frame{existingFrameCount !== 1 ? 's' : ''}. 
-                    <span className="font-medium">This action cannot be undone.</span>
-                  </div>
-                  <div className="mt-3 text-xs text-amber-700 bg-amber-100 px-3 py-2 rounded-lg">
-                    💡 <strong>Tip:</strong> Use "Add to Project" to safely preserve your existing work
-                  </div>
-                </div>
+          {/* Warning only if replace is selected */}
+          {importAction === 'replace' && existingFrameCount > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
+                <span className="font-medium">Warning:</span> This will permanently delete your {existingFrameCount} existing frame{existingFrameCount !== 1 ? 's' : ''}.
               </div>
             </div>
           )}
 
-          {/* Current Project Status - Redesigned */}
-          <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 border border-gray-100">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1 bg-gray-200 rounded">
-                <Layers className="h-4 w-4 text-gray-600" />
-              </div>
-              <span className="text-sm font-semibold text-gray-800">Project Status</span>
-            </div>
-            <div className="text-sm text-gray-600">
-              {existingFrameCount === 0 ? (
-                "This is a new project with no existing frames."
-              ) : existingFrameCount === 1 ? (
-                "Your project has 1 frame. Adding frames will create an animation."
-              ) : (
-                `Your project contains ${existingFrameCount} frames in the animation timeline.`
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer - Enhanced */}
-        <div className="border-t border-gray-100 bg-gray-50 px-6 py-4 rounded-b-xl flex justify-between items-center">
-          <div className="text-xs text-gray-500">
-            Using <span className="font-medium text-gray-700 capitalize">{selectedScalingMode}</span> scaling mode
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-            className="bg-white hover:bg-gray-50 border-gray-300"
-          >
-            Cancel Import
-          </Button>
         </div>
       </div>
     </div>
