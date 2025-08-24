@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback } from '@/lib/utils/enhanced-media-importer'
+import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback, type ScalingMode } from '@/lib/utils/enhanced-media-importer'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { FrameImportOptionsModal } from './frame-import-options-modal'
 import { getVideoFrameLimit, getGifFrameLimit, getCurrentUserTier } from '@/lib/types/user'
@@ -218,7 +218,7 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
   }
 
   // Process the actual import after option selection
-  const processImport = async (result: any, importOption: 'add' | 'replace') => {
+  const processImport = async (result: any, importOption: 'add' | 'replace', scalingMode: ScalingMode = 'fit') => {
     try {
       const mediaType = result.mediaType
       const frameCount = result.frames.length
@@ -352,7 +352,8 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
       width: project.width,
       height: project.height,
       colorCount: useColorLimit ? colorCount : undefined,
-      maxFrames: maxFrames // User-configurable frame limit
+      maxFrames: maxFrames, // User-configurable frame limit
+      scalingMode: 'fit' // Default scaling mode, can be changed later
     }
 
     // Enhanced progress callback with operation tracking
@@ -461,13 +462,13 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
   }
 
   // Handle import option selection from modal
-  const handleImportOptionSelected = async (option: 'add' | 'replace') => {
+  const handleImportOptionSelected = async (option: 'add' | 'replace', scalingMode: ScalingMode) => {
     if (!pendingImportData) return
 
     setShowImportOptionsModal(false)
     setIsImporting(true)
 
-    await processImport(pendingImportData.result, option)
+    await processImport(pendingImportData.result, option, scalingMode)
     
     setPendingImportData(null)
   }
@@ -832,6 +833,8 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
         mediaType={pendingImportData?.mediaType || 'image'}
         frameCount={pendingImportData?.result?.frames?.length || 0}
         existingFrameCount={activeTab?.frames?.length || 0}
+        originalDimensions={pendingImportData?.result?.originalDimensions || { width: 64, height: 64 }}
+        targetDimensions={{ width: activeTab?.project.width || 64, height: activeTab?.project.height || 64 }}
       />
     </div>
   )

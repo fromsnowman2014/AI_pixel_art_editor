@@ -44,10 +44,16 @@ const validateCanvasSize = (size: number): boolean => {
   return Number.isInteger(size) && size >= CANVAS_SIZE_LIMITS.MIN && size <= CANVAS_SIZE_LIMITS.MAX;
 };
 
-const parseCanvasSize = (value: string | number): number => {
-  const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
-  if (isNaN(numValue)) return 0; // Allow 0 for temporary input states
-  return numValue;
+const parseCanvasSize = (value: string | number): number | string => {
+  if (typeof value === 'string') {
+    // Allow empty string for user to start fresh input
+    if (value.trim() === '') return '';
+    
+    const numValue = parseInt(value, 10);
+    if (isNaN(numValue)) return '';
+    return numValue;
+  }
+  return value;
 };
 
 const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps) {
@@ -86,9 +92,9 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   const activeTab = getActiveTab();
   const project = activeTab?.project;
 
-  // Canvas dimension state for deferred application
-  const [pendingWidth, setPendingWidth] = useState(() => project?.width || 32);
-  const [pendingHeight, setPendingHeight] = useState(() => project?.height || 32);
+  // Canvas dimension state for deferred application (allow string for empty input)
+  const [pendingWidth, setPendingWidth] = useState<number | string>(() => project?.width || 32);
+  const [pendingHeight, setPendingHeight] = useState<number | string>(() => project?.height || 32);
   const [showResizeConfirm, setShowResizeConfirm] = useState(false);
 
   // Update pending dimensions when project changes
@@ -173,19 +179,70 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   // Get canvas empty state (memoized)
   const canvasIsEmpty = useMemo(() => isCanvasEmpty(), [isCanvasEmpty]);
 
+  // Handle blur events to auto-correct values
+  const handleWidthBlur = useCallback(() => {
+    if (typeof pendingWidth === 'string' && pendingWidth.trim() === '') {
+      return; // Keep empty for user convenience
+    }
+    
+    const numValue = typeof pendingWidth === 'string' ? parseInt(pendingWidth, 10) : pendingWidth;
+    if (isNaN(numValue)) {
+      setPendingWidth(project?.width || CANVAS_SIZE_LIMITS.MIN);
+      return;
+    }
+    
+    // Auto-correct to valid range
+    const correctedValue = Math.max(CANVAS_SIZE_LIMITS.MIN, Math.min(CANVAS_SIZE_LIMITS.MAX, numValue));
+    if (correctedValue !== numValue) {
+      setPendingWidth(correctedValue);
+      toast.success(`Width adjusted to valid range: ${correctedValue}`);
+    }
+  }, [pendingWidth, project?.width]);
+
+  const handleHeightBlur = useCallback(() => {
+    if (typeof pendingHeight === 'string' && pendingHeight.trim() === '') {
+      return; // Keep empty for user convenience
+    }
+    
+    const numValue = typeof pendingHeight === 'string' ? parseInt(pendingHeight, 10) : pendingHeight;
+    if (isNaN(numValue)) {
+      setPendingHeight(project?.height || CANVAS_SIZE_LIMITS.MIN);
+      return;
+    }
+    
+    // Auto-correct to valid range
+    const correctedValue = Math.max(CANVAS_SIZE_LIMITS.MIN, Math.min(CANVAS_SIZE_LIMITS.MAX, numValue));
+    if (correctedValue !== numValue) {
+      setPendingHeight(correctedValue);
+      toast.success(`Height adjusted to valid range: ${correctedValue}`);
+    }
+  }, [pendingHeight, project?.height]);
+
   // Check if pending dimensions are valid for applying
   const arePendingDimensionsValid = useMemo(() => {
-    return validateCanvasSize(pendingWidth) && validateCanvasSize(pendingHeight);
+    const widthNum = typeof pendingWidth === 'string' ? parseInt(pendingWidth, 10) : pendingWidth;
+    const heightNum = typeof pendingHeight === 'string' ? parseInt(pendingHeight, 10) : pendingHeight;
+    return validateCanvasSize(widthNum) && validateCanvasSize(heightNum);
   }, [pendingWidth, pendingHeight]);
 
   // Check if dimensions have changed
   const haveDimensionsChanged = useMemo(() => {
-    return pendingWidth !== project?.width || pendingHeight !== project?.height;
+    const widthNum = typeof pendingWidth === 'string' ? parseInt(pendingWidth, 10) : pendingWidth;
+    const heightNum = typeof pendingHeight === 'string' ? parseInt(pendingHeight, 10) : pendingHeight;
+    return widthNum !== project?.width || heightNum !== project?.height;
   }, [pendingWidth, pendingHeight, project?.width, project?.height]);
 
   // Handle apply dimensions with content check
   const handleApplyDimensions = useCallback(() => {
     if (!project) return;
+    
+    const widthNum = typeof pendingWidth === 'string' ? parseInt(pendingWidth, 10) : pendingWidth;
+    const heightNum = typeof pendingHeight === 'string' ? parseInt(pendingHeight, 10) : pendingHeight;
+    
+    if (isNaN(widthNum) || isNaN(heightNum)) {
+      toast.error('Please enter valid numbers for width and height');
+      return;
+    }
     
     debugLog(
       '🎛️  ProjectPanel',
@@ -193,7 +250,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
       'Apply dimensions requested',
       {
         currentSize: `${project.width}x${project.height}`,
-        newSize: `${pendingWidth}x${pendingHeight}`,
+        newSize: `${widthNum}x${heightNum}`,
         activeTabId: activeTabId,
       }
     );
@@ -205,7 +262,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
         'APPLY_DIMENSIONS_DIRECT',
         'Canvas is empty, applying directly'
       );
-      handleDimensionChange(pendingWidth, pendingHeight);
+      handleDimensionChange(widthNum, heightNum);
     } else {
       // Canvas has content, show confirmation modal
       debugLog(
@@ -245,7 +302,9 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
     }
 
     // Apply new dimensions while preserving existing canvas content
-    handleDimensionChange(pendingWidth, pendingHeight);
+    const widthNum = typeof pendingWidth === 'string' ? parseInt(pendingWidth, 10) : pendingWidth;
+    const heightNum = typeof pendingHeight === 'string' ? parseInt(pendingHeight, 10) : pendingHeight;
+    handleDimensionChange(widthNum, heightNum);
     setShowResizeConfirm(false);
   }, [activeTabId, saveProject, pendingWidth, pendingHeight, handleDimensionChange]);
 
@@ -258,17 +317,20 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
     if (!activeTabId || !project) return;
 
+    const widthNum = typeof pendingWidth === 'string' ? parseInt(pendingWidth, 10) : pendingWidth;
+    const heightNum = typeof pendingHeight === 'string' ? parseInt(pendingHeight, 10) : pendingHeight;
+
     // First update project dimensions
     updateProject(activeTabId, { 
-      width: pendingWidth, 
-      height: pendingHeight 
+      width: widthNum, 
+      height: heightNum 
     });
 
     // Then clear canvas by creating empty pixel data
     const emptyCanvasData = {
-      width: pendingWidth,
-      height: pendingHeight,
-      data: new Uint8ClampedArray(pendingWidth * pendingHeight * 4) // RGBA, all transparent
+      width: widthNum,
+      height: heightNum,
+      data: new Uint8ClampedArray(widthNum * heightNum * 4) // RGBA, all transparent
     };
 
     // Update canvas with empty data
@@ -279,7 +341,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
       'RESIZE_DISCARD_SUCCESS',
       'Canvas cleared and resized',
       {
-        newSize: `${pendingWidth}x${pendingHeight}`,
+        newSize: `${widthNum}x${heightNum}`,
         dataLength: emptyCanvasData.data.length
       }
     );
@@ -767,13 +829,14 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                 </label>
                 <input
                   id='canvas-width'
-                  type='number'
+                  type='text'
                   value={pendingWidth}
                   onChange={e =>
                     setPendingWidth(parseCanvasSize(e.target.value))
                   }
+                  onBlur={handleWidthBlur}
                   className={`w-full rounded-md border px-3 py-2 text-sm ${
-                    pendingWidth === 0 || validateCanvasSize(pendingWidth)
+                    pendingWidth === '' || (typeof pendingWidth === 'number' && validateCanvasSize(pendingWidth))
                       ? 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
                       : 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50'
                   }`}
@@ -793,13 +856,14 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                 </label>
                 <input
                   id='canvas-height'
-                  type='number'
+                  type='text'
                   value={pendingHeight}
                   onChange={e =>
                     setPendingHeight(parseCanvasSize(e.target.value))
                   }
+                  onBlur={handleHeightBlur}
                   className={`w-full rounded-md border px-3 py-2 text-sm ${
-                    pendingHeight === 0 || validateCanvasSize(pendingHeight)
+                    pendingHeight === '' || (typeof pendingHeight === 'number' && validateCanvasSize(pendingHeight))
                       ? 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
                       : 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50'
                   }`}
@@ -821,7 +885,9 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                 className='w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
               >
                 {arePendingDimensionsValid ? (
-                  <>Apply Canvas Size ({pendingWidth}×{pendingHeight})</>
+                  <>
+                    Apply Canvas Size ({typeof pendingWidth === 'number' ? pendingWidth : parseInt(pendingWidth, 10)}×{typeof pendingHeight === 'number' ? pendingHeight : parseInt(pendingHeight, 10)})
+                  </>
                 ) : (
                   <>Invalid size (min: {CANVAS_SIZE_LIMITS.MIN}, max: {CANVAS_SIZE_LIMITS.MAX})</>
                 )}
@@ -1052,7 +1118,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                 </span>{' '}
                 to{' '}
                 <span className='font-medium'>
-                  {pendingWidth}×{pendingHeight}
+                  {typeof pendingWidth === 'number' ? pendingWidth : parseInt(pendingWidth, 10)}×{typeof pendingHeight === 'number' ? pendingHeight : parseInt(pendingHeight, 10)}
                 </span>
                 .
               </p>

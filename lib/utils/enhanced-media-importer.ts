@@ -6,11 +6,14 @@ import { decompressFrames, parseGIF } from 'gifuct-js'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
+export type ScalingMode = 'fit' | 'fill' | 'original' | 'smart'
+
 export interface MediaImportOptions {
   width: number
   height: number
   colorCount?: number
   maxFrames?: number
+  scalingMode?: ScalingMode
 }
 
 export interface ImportResult {
@@ -1052,7 +1055,9 @@ export class EnhancedMediaImporter {
     options: MediaImportOptions
   ): Promise<ImageData> {
     const { canvas, ctx } = this.getCanvas()
-    const { width: targetWidth, height: targetHeight } = options
+    const { width: targetWidth, height: targetHeight, scalingMode = 'fit' } = options
+    const originalWidth = img.naturalWidth || img.width
+    const originalHeight = img.naturalHeight || img.height
 
     canvas.width = targetWidth
     canvas.height = targetHeight
@@ -1063,7 +1068,129 @@ export class EnhancedMediaImporter {
     ;(ctx as any).mozImageSmoothingEnabled = false
     ;(ctx as any).msImageSmoothingEnabled = false
 
-    ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, targetWidth, targetHeight)
+
+    let drawX = 0, drawY = 0, drawWidth = 0, drawHeight = 0
+    let sourceX = 0, sourceY = 0, sourceWidth = originalWidth, sourceHeight = originalHeight
+
+    switch (scalingMode) {
+      case 'fit': {
+        // Preserve aspect ratio, fit within canvas, add transparent padding
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const scale = Math.min(scaleX, scaleY)
+        
+        drawWidth = Math.round(originalWidth * scale)
+        drawHeight = Math.round(originalHeight * scale)
+        drawX = Math.round((targetWidth - drawWidth) / 2)
+        drawY = Math.round((targetHeight - drawHeight) / 2)
+        break
+      }
+      
+      case 'fill': {
+        // Preserve aspect ratio, fill entire canvas, crop excess
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const scale = Math.max(scaleX, scaleY)
+        
+        const scaledWidth = originalWidth * scale
+        const scaledHeight = originalHeight * scale
+        
+        // Calculate source crop area to maintain aspect ratio
+        if (scaledWidth > targetWidth) {
+          // Need to crop horizontally
+          sourceWidth = targetWidth / scale
+          sourceX = (originalWidth - sourceWidth) / 2
+        }
+        if (scaledHeight > targetHeight) {
+          // Need to crop vertically  
+          sourceHeight = targetHeight / scale
+          sourceY = (originalHeight - sourceHeight) / 2
+        }
+        
+        drawX = 0
+        drawY = 0
+        drawWidth = targetWidth
+        drawHeight = targetHeight
+        break
+      }
+      
+      case 'original': {
+        // Use original size, center in canvas if smaller, or scale down if larger
+        if (originalWidth <= targetWidth && originalHeight <= targetHeight) {
+          // Original is smaller or equal - use original size and center
+          drawWidth = originalWidth
+          drawHeight = originalHeight
+          drawX = Math.round((targetWidth - drawWidth) / 2)
+          drawY = Math.round((targetHeight - drawHeight) / 2)
+        } else {
+          // Original is larger - scale down using 'fit' logic
+          const scaleX = targetWidth / originalWidth
+          const scaleY = targetHeight / originalHeight
+          const scale = Math.min(scaleX, scaleY)
+          
+          drawWidth = Math.round(originalWidth * scale)
+          drawHeight = Math.round(originalHeight * scale)
+          drawX = Math.round((targetWidth - drawWidth) / 2)
+          drawY = Math.round((targetHeight - drawHeight) / 2)
+        }
+        break
+      }
+      
+      case 'smart': {
+        // Smart integer scaling for pixel art - scale by integer factors when possible
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const minScale = Math.min(scaleX, scaleY)
+        
+        // Find the largest integer scale that fits
+        const integerScale = Math.floor(minScale)
+        
+        if (integerScale >= 1) {
+          // Use integer scaling for crisp pixel art
+          drawWidth = originalWidth * integerScale
+          drawHeight = originalHeight * integerScale
+          drawX = Math.round((targetWidth - drawWidth) / 2)
+          drawY = Math.round((targetHeight - drawHeight) / 2)
+        } else {
+          // If integer scaling would make it too small, fall back to 'fit' mode
+          const scale = minScale
+          drawWidth = Math.round(originalWidth * scale)
+          drawHeight = Math.round(originalHeight * scale)
+          drawX = Math.round((targetWidth - drawWidth) / 2)
+          drawY = Math.round((targetHeight - drawHeight) / 2)
+        }
+        break
+      }
+      
+      default: {
+        // Default to 'fit' mode for any unrecognized scaling mode
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const scale = Math.min(scaleX, scaleY)
+        
+        drawWidth = Math.round(originalWidth * scale)
+        drawHeight = Math.round(originalHeight * scale)
+        drawX = Math.round((targetWidth - drawWidth) / 2)
+        drawY = Math.round((targetHeight - drawHeight) / 2)
+        break
+      }
+    }
+
+    // Ensure minimum size to prevent Canvas API issues with 0-sized draws
+    const finalDrawWidth = Math.max(1, drawWidth)
+    const finalDrawHeight = Math.max(1, drawHeight)
+    
+    // Draw the image with calculated parameters (only if there's something to draw)
+    if (finalDrawWidth > 0 && finalDrawHeight > 0) {
+      ctx.drawImage(
+        img,
+        sourceX, sourceY, sourceWidth, sourceHeight,
+        drawX, drawY, finalDrawWidth, finalDrawHeight
+      )
+    }
+
     const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight)
 
     if (options.colorCount && options.colorCount > 0) {
