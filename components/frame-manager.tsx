@@ -20,6 +20,7 @@ import {
   RotateCcw
 } from 'lucide-react'
 import { createComponentLogger } from '@/lib/utils/smart-logger'
+import { PlaybackDebugger } from '@/lib/utils/playback-debugger'
 
 interface FrameManagerProps {
   frames: Frame[]
@@ -192,19 +193,52 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
 
   const handlePlayPause = () => {
-    if (!activeTabId) return
+    // 🔍 디버깅: Play 버튼 클릭 추적
+    PlaybackDebugger.log('PLAY_BUTTON_CLICKED', {
+      activeTabId,
+      framesLength: frames.length,
+      isCurrentlyPlaying: isPlaying,
+      playbackFrameIndex,
+      playbackFrameId,
+      hasActiveTab: !!activeTab
+    }, activeTabId)
+    
+    if (!activeTabId) {
+      PlaybackDebugger.log('ERROR_OCCURRED', 'No active tab ID', activeTabId)
+      return
+    }
     
     if (frames.length <= 1) {
+      PlaybackDebugger.log('ERROR_OCCURRED', 'Not enough frames for playback', activeTabId)
       logger.debug(() => 'Cannot play animation with only one frame', { framesLength: frames.length })
       return
     }
+    
+    // 🔍 디버깅: 현재 탭 상태 스냅샷
+    PlaybackDebugger.createStateSnapshot(activeTab)
     
     logger.debug(() => isPlaying ? 'Pausing playback' : 'Starting playback', { 
       isPlaying, 
       framesLength: frames.length 
     })
     
+    // 🔍 디버깅: togglePlayback 호출 전
+    PlaybackDebugger.log('TOGGLE_PLAYBACK_CALLED', {
+      targetTabId: activeTabId,
+      currentState: isPlaying ? 'playing' : 'stopped'
+    }, activeTabId)
+    
     togglePlayback(activeTabId)
+    
+    // 🔍 디버깅: togglePlayback 호출 후 상태 확인 (비동기적으로)
+    setTimeout(() => {
+      const updatedTab = getActiveTab()
+      PlaybackDebugger.log('TOGGLE_PLAYBACK_RESULT', {
+        newIsPlaying: updatedTab?.isPlaying,
+        newPlaybackFrameIndex: updatedTab?.playbackFrameIndex,
+        newPlaybackIntervalId: updatedTab?.playbackIntervalId
+      }, activeTabId)
+    }, 50)
   }
 
   const handleStop = () => {

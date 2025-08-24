@@ -9,6 +9,7 @@ import { useAuthStore } from './auth-store'
 
 // Import centralized debug utility
 import { storeDebug, exportDebug } from '@/lib/utils/debug'
+import { PlaybackDebugger } from '@/lib/utils/playback-debugger'
 
 // Utility function to download files
 const downloadFile = (dataURL: string, fileName: string) => {
@@ -303,14 +304,26 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Create new project tab
         createNewProject: (options) => {
-          set((state) => {
-            const tabId = `tab-${Date.now()}`
-            const projectId = `project-${Date.now()}`
-            const frameId = `frame-${Date.now()}`
-            
-            // Get current user from auth store
-            const authState = useAuthStore.getState()
-            const userId = authState.user?.id || null
+          console.log('🏗️ [ProjectStore] createNewProject called with options:', options)
+          
+          try {
+            set((state) => {
+              console.log('📊 [ProjectStore] Current state:', {
+                tabsCount: state.tabs.length,
+                activeTabId: state.activeTabId
+              })
+              
+              const tabId = `tab-${Date.now()}`
+              const projectId = `project-${Date.now()}`
+              const frameId = `frame-${Date.now()}`
+              
+              console.log('🆔 [ProjectStore] Generated IDs:', { tabId, projectId, frameId })
+              
+              // Get current user from auth store
+              const authState = useAuthStore.getState()
+              const userId = authState.user?.id || null
+              
+              console.log('👤 [ProjectStore] User ID:', userId)
             
             const project: Project = {
               id: projectId,
@@ -362,10 +375,27 @@ export const useProjectStore = create<ProjectStore>()(
               playbackAccumulatedTime: 0
             }
 
+            console.log('📁 [ProjectStore] Adding new tab to state')
             state.tabs.push(newTab)
             state.activeTabId = tabId
+            
+            console.log('✅ [ProjectStore] New project created successfully:', {
+              tabId,
+              projectId,
+              frameId,
+              width: project.width,
+              height: project.height,
+              totalTabs: state.tabs.length
+            })
           })
-        },
+          
+          console.log('✨ [ProjectStore] createNewProject completed')
+          
+        } catch (error) {
+          console.error('❌ [ProjectStore] Error in createNewProject:', error)
+          throw error
+        }
+      },
 
         // Open existing project
         openProject: (project) => {
@@ -1911,17 +1941,46 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Enhanced Playback operations with requestAnimationFrame precision
         startPlayback: (tabId) => {
+          const startTime = performance.now()
           const state = get()
           const tab = state.tabs.find(t => t.id === tabId)
-          if (!tab || tab.frames.length <= 1) return
+          
+          // 🔍 디버깅: startPlayback 입력 검증
+          PlaybackDebugger.log('START_PLAYBACK_ENTER', {
+            tabId,
+            tabExists: !!tab,
+            framesCount: tab?.frames?.length,
+            frameCanvasDataCount: tab?.frameCanvasData?.length,
+            currentIsPlaying: tab?.isPlaying,
+            currentPlaybackIntervalId: tab?.playbackIntervalId
+          }, tabId)
+          
+          if (!tab) {
+            PlaybackDebugger.log('ERROR_OCCURRED', 'Tab not found in startPlayback', tabId)
+            return
+          }
+          
+          if (tab.frames.length <= 1) {
+            PlaybackDebugger.log('ERROR_OCCURRED', `Insufficient frames: ${tab.frames.length}`, tabId)
+            return
+          }
 
           // Stop any existing playback
+          PlaybackDebugger.log('STOPPING_EXISTING_PLAYBACK', { tabId }, tabId)
           get().stopPlayback(tabId)
 
           // Initialize playback state with precise timing
+          PlaybackDebugger.log('INITIALIZING_PLAYBACK_STATE', {
+            targetFrameIndex: 0,
+            firstFrameId: tab.frames[0]?.id
+          }, tabId)
+          
           set((draft) => {
             const currentTab = draft.tabs.find(t => t.id === tabId)
-            if (!currentTab) return
+            if (!currentTab) {
+              PlaybackDebugger.log('ERROR_OCCURRED', 'Current tab not found during initialization', tabId)
+              return
+            }
 
             currentTab.isPlaying = true
             currentTab.playbackFrameIndex = 0
@@ -1940,22 +1999,56 @@ export const useProjectStore = create<ProjectStore>()(
                   height: frameData.canvasData.height,
                   data: new Uint8ClampedArray(frameData.canvasData.data)
                 }
+                PlaybackDebugger.log('FIRST_FRAME_LOADED', {
+                  frameId: firstFrame.id,
+                  canvasDataWidth: frameData.canvasData.width,
+                  canvasDataHeight: frameData.canvasData.height
+                }, tabId)
               } else {
                 // Fallback to empty data with warning
                 console.warn(`Frame data missing for frame: ${firstFrame.id}`)
+                PlaybackDebugger.log('ERROR_OCCURRED', `First frame data missing: ${firstFrame.id}`, tabId)
                 currentTab.canvasData = createEmptyPixelData(currentTab.project.width, currentTab.project.height)
               }
+            } else {
+              PlaybackDebugger.log('ERROR_OCCURRED', 'No first frame found', tabId)
             }
           })
 
           // Enhanced frame advancement with requestAnimationFrame precision
+          PlaybackDebugger.log('STARTING_FRAME_LOOP', {
+            tabId,
+            startTime: performance.now()
+          }, tabId)
+          
           let rafId: number
+          let frameLoopCount = 0
+          
           const frameLoop = (timestamp: number) => {
+            frameLoopCount++
             const currentState = get()
             const currentTab = currentState.tabs.find(t => t.id === tabId)
             
+            // 🔍 디버깅: 프레임 루프 체크 (5번마다 로깅)
+            if (frameLoopCount % 5 === 0) {
+              PlaybackDebugger.log('FRAME_LOOP_TICK', {
+                loopCount: frameLoopCount,
+                timestamp,
+                tabExists: !!currentTab,
+                isPlaying: currentTab?.isPlaying,
+                currentFrameIndex: currentTab?.playbackFrameIndex,
+                framesLength: currentTab?.frames?.length
+              }, tabId)
+            }
+            
             // Exit conditions
             if (!currentTab || !currentTab.isPlaying || currentTab.frames.length <= 1) {
+              PlaybackDebugger.log('FRAME_LOOP_EXIT', {
+                reason: !currentTab ? 'no_tab' : 
+                        !currentTab.isPlaying ? 'not_playing' : 
+                        'insufficient_frames',
+                frameLoopCount
+              }, tabId)
               return
             }
 
@@ -1969,6 +2062,17 @@ export const useProjectStore = create<ProjectStore>()(
             if (elapsedTime - currentTab.playbackAccumulatedTime >= frameDelay) {
               const nextFrameIndex = (currentTab.playbackFrameIndex + 1) % currentTab.frames.length
               const nextFrame = currentTab.frames[nextFrameIndex]
+              
+              // 🔍 디버깅: 프레임 전환 시작
+              PlaybackDebugger.log('FRAME_ADVANCED', {
+                fromIndex: currentTab.playbackFrameIndex,
+                toIndex: nextFrameIndex,
+                fromFrameId: currentTab.playbackFrameId,
+                toFrameId: nextFrame?.id,
+                elapsedTime,
+                accumulatedTime: currentTab.playbackAccumulatedTime,
+                frameDelay
+              }, tabId)
               
               if (nextFrame) {
                 // Update state atomically to prevent race conditions
@@ -1994,9 +2098,19 @@ export const useProjectStore = create<ProjectStore>()(
                         height: frameData.canvasData.height,
                         data: new Uint8ClampedArray(frameData.canvasData.data)
                       }
+                      PlaybackDebugger.log('CANVAS_UPDATED', {
+                        method: 'recreate',
+                        frameId: nextFrame.id,
+                        dimensions: `${frameData.canvasData.width}x${frameData.canvasData.height}`
+                      }, tabId)
                     } else {
                       // Reuse existing array for better performance
                       tab.canvasData.data.set(frameData.canvasData.data)
+                      PlaybackDebugger.log('CANVAS_UPDATED', {
+                        method: 'reuse',
+                        frameId: nextFrame.id,
+                        dataLength: frameData.canvasData.data.length
+                      }, tabId)
                     }
                   } else {
                     // Enhanced error handling for missing frame data
@@ -2096,11 +2210,33 @@ export const useProjectStore = create<ProjectStore>()(
         togglePlayback: (tabId) => {
           const state = get()
           const tab = state.tabs.find(t => t.id === tabId)
-          if (!tab) return
+          
+          // 🔍 디버깅: togglePlayback 호출 추적
+          PlaybackDebugger.log('TOGGLE_PLAYBACK_ENTER', {
+            tabId,
+            tabExists: !!tab,
+            currentIsPlaying: tab?.isPlaying,
+            framesCount: tab?.frames?.length,
+            frameCanvasDataCount: tab?.frameCanvasData?.length
+          }, tabId)
+          
+          if (!tab) {
+            PlaybackDebugger.log('ERROR_OCCURRED', 'Tab not found in togglePlayback', tabId)
+            return
+          }
 
           if (tab.isPlaying) {
+            PlaybackDebugger.log('CALLING_STOP_PLAYBACK', {
+              currentPlaybackFrameIndex: tab.playbackFrameIndex,
+              currentPlaybackIntervalId: tab.playbackIntervalId
+            }, tabId)
             state.stopPlayback(tabId)
           } else {
+            PlaybackDebugger.log('CALLING_START_PLAYBACK', {
+              currentPlaybackFrameIndex: tab.playbackFrameIndex,
+              hasFrames: tab.frames?.length > 0,
+              hasFrameCanvasData: tab.frameCanvasData?.length > 0
+            }, tabId)
             state.startPlayback(tabId)
           }
         },

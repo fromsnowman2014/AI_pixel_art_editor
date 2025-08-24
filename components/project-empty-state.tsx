@@ -42,16 +42,32 @@ export function ProjectEmptyState({ onCreateProject, className }: ProjectEmptySt
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
 
   const handlePresetClick = (preset: typeof QUICK_PRESETS[0]) => {
-    onCreateProject({ width: preset.width, height: preset.height })
+    console.log('🎨 [ProjectEmptyState] Preset clicked:', preset)
+    try {
+      onCreateProject({ width: preset.width, height: preset.height })
+      console.log('✅ [ProjectEmptyState] onCreateProject called successfully')
+    } catch (error) {
+      console.error('❌ [ProjectEmptyState] Error calling onCreateProject:', error)
+    }
   }
 
   const handleSizeClick = (size: typeof CANVAS_SIZES[0]) => {
+    console.log('🖥️ [ProjectEmptyState] Canvas size clicked:', size)
+    
     if (size.width === 0) {
       // Custom size - show advanced options
+      console.log('🔧 [ProjectEmptyState] Opening custom size options')
       setShowAdvanced(true)
       return
     }
-    onCreateProject({ width: size.width, height: size.height })
+    
+    try {
+      console.log('🚀 [ProjectEmptyState] Creating project with size:', size.width, 'x', size.height)
+      onCreateProject({ width: size.width, height: size.height })
+      console.log('✅ [ProjectEmptyState] onCreateProject called successfully')
+    } catch (error) {
+      console.error('❌ [ProjectEmptyState] Error calling onCreateProject:', error)
+    }
   }
 
   const handleCustomCreate = () => {
