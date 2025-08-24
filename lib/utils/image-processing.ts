@@ -12,18 +12,10 @@ export interface Color {
   a?: number;
 }
 
-export interface ColorMappingOptions {
-  mode: 'auto' | 'project' | 'custom' | 'preserve';
-  customPalette?: string[];
-  colorLimit?: number;
-  projectPalette?: string[];
-}
-
 export interface QuantizationOptions {
   colorCount: number;
   method: 'median-cut' | 'octree' | 'simple';
   enableDithering?: boolean;
-  colorMapping?: ColorMappingOptions;
 }
 
 export interface ProcessingResult {
@@ -124,7 +116,7 @@ class MedianCutQuantizer {
     return buckets.map(bucket => this.getAverageColor(bucket));
   }
 
-  getUniquePalette(): Color[] {
+  private getUniquePalette(): Color[] {
     const unique = new Map<string, Color>();
     
     for (const pixel of this.pixels) {
@@ -364,33 +356,12 @@ export async function processImageForPixelArt(
     
     console.log(`✅ RGBA conversion complete. Final data length: ${rgbaData.length}`);
     
-    // Color quantization or palette mapping
-    let palette: Color[];
-    
-    if (options.colorMapping?.mode === 'custom' && options.colorMapping?.customPalette) {
-      // Use user-specified palette
-      palette = createPaletteFromHex(options.colorMapping.customPalette);
-      console.log(`🎨 Using custom palette with ${palette.length} colors:`, options.colorMapping.customPalette);
-    } else if (options.colorMapping?.mode === 'project' && options.colorMapping?.projectPalette) {
-      // Use project palette
-      palette = createPaletteFromHex(options.colorMapping.projectPalette);
-      console.log(`📄 Using project palette with ${palette.length} colors:`, options.colorMapping.projectPalette);
-    } else if (options.colorMapping?.mode === 'preserve') {
-      // Extract unique colors from image (up to reasonable limit)
-      const quantizer = new MedianCutQuantizer(rgbaData, targetWidth, targetHeight);
-      palette = quantizer.getUniquePalette().slice(0, 256); // Limit for performance
-      console.log(`🔒 Preserving original colors: ${palette.length} unique colors found`);
-    } else {
-      // Default: Auto quantization
-      const quantizer = new MedianCutQuantizer(rgbaData, targetWidth, targetHeight);
-      const colorCount = options.colorMapping?.colorLimit || options.colorCount;
-      palette = quantizer.quantize(colorCount);
-      console.log(`🎯 Auto-quantized to ${palette.length} colors`);
-    }
+    const quantizer = new MedianCutQuantizer(rgbaData, targetWidth, targetHeight);
+    const palette = quantizer.quantize(options.colorCount);
 
-    console.log(`✅ Color processing complete: ${palette.length} colors in final palette`);
+    console.log(`🎯 Generated palette with ${palette.length} colors`);
 
-    // Step 3: Apply color mapping to image
+    // Step 3: Apply quantization to image
     const quantizedData = applyQuantization(rgbaData, targetWidth, targetHeight, palette);
 
     // Step 4: Convert back to PNG buffer
@@ -455,21 +426,4 @@ export function validateImageConstraints(
   }
 
   return { valid: true };
-}
-
-/**
- * Convert hex color palette to Color objects
- */
-export function createPaletteFromHex(hexColors: string[]): Color[] {
-  return hexColors.map(hex => {
-    // Remove # if present
-    const cleanHex = hex.replace('#', '');
-    
-    // Parse RGB values
-    const r = parseInt(cleanHex.substring(0, 2), 16);
-    const g = parseInt(cleanHex.substring(2, 4), 16);
-    const b = parseInt(cleanHex.substring(4, 6), 16);
-    
-    return { r, g, b, a: 255 };
-  });
 }
