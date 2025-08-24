@@ -193,52 +193,82 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
 
   const handlePlayPause = () => {
-    // 🔍 디버깅: Play 버튼 클릭 추적
-    PlaybackDebugger.log('PLAY_BUTTON_CLICKED', {
-      activeTabId,
-      framesLength: frames.length,
-      isCurrentlyPlaying: isPlaying,
-      playbackFrameIndex,
-      playbackFrameId,
-      hasActiveTab: !!activeTab
-    }, activeTabId)
+    console.log('🎬 [FrameManager] handlePlayPause START')
     
-    if (!activeTabId) {
-      PlaybackDebugger.log('ERROR_OCCURRED', 'No active tab ID', activeTabId)
-      return
-    }
-    
-    if (frames.length <= 1) {
-      PlaybackDebugger.log('ERROR_OCCURRED', 'Not enough frames for playback', activeTabId)
-      logger.debug(() => 'Cannot play animation with only one frame', { framesLength: frames.length })
-      return
-    }
-    
-    // 🔍 디버깅: 현재 탭 상태 스냅샷
-    PlaybackDebugger.createStateSnapshot(activeTab)
-    
-    logger.debug(() => isPlaying ? 'Pausing playback' : 'Starting playback', { 
-      isPlaying, 
-      framesLength: frames.length 
-    })
-    
-    // 🔍 디버깅: togglePlayback 호출 전
-    PlaybackDebugger.log('TOGGLE_PLAYBACK_CALLED', {
-      targetTabId: activeTabId,
-      currentState: isPlaying ? 'playing' : 'stopped'
-    }, activeTabId)
-    
-    togglePlayback(activeTabId)
-    
-    // 🔍 디버깅: togglePlayback 호출 후 상태 확인 (비동기적으로)
-    setTimeout(() => {
-      const updatedTab = getActiveTab()
-      PlaybackDebugger.log('TOGGLE_PLAYBACK_RESULT', {
-        newIsPlaying: updatedTab?.isPlaying,
-        newPlaybackFrameIndex: updatedTab?.playbackFrameIndex,
-        newPlaybackIntervalId: updatedTab?.playbackIntervalId
+    try {
+      // 🔍 디버깅: Play 버튼 클릭 추적
+      PlaybackDebugger.log('PLAY_BUTTON_CLICKED', {
+        activeTabId,
+        framesLength: frames.length,
+        isCurrentlyPlaying: isPlaying,
+        playbackFrameIndex,
+        playbackFrameId,
+        hasActiveTab: !!activeTab
       }, activeTabId)
-    }, 50)
+      
+      console.log('✅ [FrameManager] PlaybackDebugger.log PLAY_BUTTON_CLICKED completed')
+    
+      console.log('🔍 [FrameManager] Checking activeTabId:', activeTabId)
+      if (!activeTabId) {
+        console.log('❌ [FrameManager] No activeTabId - RETURN')
+        PlaybackDebugger.log('ERROR_OCCURRED', 'No active tab ID', activeTabId)
+        return
+      }
+      console.log('✅ [FrameManager] activeTabId check passed')
+      
+      console.log('🔍 [FrameManager] Checking frames.length:', frames.length)
+      if (frames.length <= 1) {
+        console.log('❌ [FrameManager] Not enough frames - RETURN')
+        PlaybackDebugger.log('ERROR_OCCURRED', 'Not enough frames for playback', activeTabId)
+        logger.debug(() => 'Cannot play animation with only one frame', { framesLength: frames.length })
+        return
+      }
+      console.log('✅ [FrameManager] frames.length check passed')
+    
+      console.log('🔍 [FrameManager] Creating state snapshot for activeTab')
+      // 🔍 디버깅: 현재 탭 상태 스냅샷
+      PlaybackDebugger.createStateSnapshot(activeTab)
+      console.log('✅ [FrameManager] State snapshot created')
+      
+      console.log('🔍 [FrameManager] Calling logger.debug')
+      logger.debug(() => isPlaying ? 'Pausing playback' : 'Starting playback', { 
+        isPlaying, 
+        framesLength: frames.length 
+      })
+      console.log('✅ [FrameManager] logger.debug completed')
+      
+      console.log('🔍 [FrameManager] About to log TOGGLE_PLAYBACK_CALLED')
+      // 🔍 디버깅: togglePlayback 호출 전
+      PlaybackDebugger.log('TOGGLE_PLAYBACK_CALLED', {
+        targetTabId: activeTabId,
+        currentState: isPlaying ? 'playing' : 'stopped'
+      }, activeTabId)
+      console.log('✅ [FrameManager] TOGGLE_PLAYBACK_CALLED logged')
+      
+      console.log('🚀 [FrameManager] About to call togglePlayback with:', activeTabId)
+      togglePlayback(activeTabId)
+      console.log('✅ [FrameManager] togglePlayback called')
+    
+      console.log('🕰️ [FrameManager] Setting timeout for result check')
+      // 🔍 디버깅: togglePlayback 호출 후 상태 확인 (비동기적으로)
+      setTimeout(() => {
+        console.log('🔍 [FrameManager] Timeout callback - checking result')
+        const updatedTab = getActiveTab()
+        PlaybackDebugger.log('TOGGLE_PLAYBACK_RESULT', {
+          newIsPlaying: updatedTab?.isPlaying,
+          newPlaybackFrameIndex: updatedTab?.playbackFrameIndex,
+          newPlaybackIntervalId: updatedTab?.playbackIntervalId
+        }, activeTabId)
+        console.log('✅ [FrameManager] Result check completed')
+      }, 50)
+      
+      console.log('🎉 [FrameManager] handlePlayPause completed successfully')
+      
+    } catch (error) {
+      console.error('❌ [FrameManager] ERROR in handlePlayPause:', error)
+      console.error('❌ [FrameManager] Error stack:', error instanceof Error ? error.stack : 'No stack')
+      PlaybackDebugger.log('ERROR_OCCURRED', `handlePlayPause error: ${error instanceof Error ? error.message : 'Unknown error'}`, activeTabId)
+    }
   }
 
   const handleStop = () => {

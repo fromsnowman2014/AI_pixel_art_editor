@@ -23,25 +23,30 @@ export class PlaybackDebugger {
    * 디버그 로그 기록
    */
   static log(event: string, data: any, tabId?: string) {
-    if (!this.isEnabled) return
+    try {
+      if (!this.isEnabled) return
 
-    const debugInfo: PlaybackDebugInfo = {
-      timestamp: performance.now(),
-      event,
-      data: JSON.parse(JSON.stringify(data)), // Deep clone
-      tabId
-    }
+      const debugInfo: PlaybackDebugInfo = {
+        timestamp: performance.now(),
+        event,
+        data: JSON.parse(JSON.stringify(data)), // Deep clone
+        tabId
+      }
 
-    this.logs.unshift(debugInfo)
-    
-    // 로그 제한
-    if (this.logs.length > this.maxLogs) {
-      this.logs = this.logs.slice(0, this.maxLogs)
-    }
+      this.logs.unshift(debugInfo)
+      
+      // 로그 제한
+      if (this.logs.length > this.maxLogs) {
+        this.logs = this.logs.slice(0, this.maxLogs)
+      }
 
-    // 콘솔에도 출력 (중요한 이벤트만)
-    if (this.isImportantEvent(event)) {
-      console.log(`🎬 [PlaybackDebug] ${event}:`, data)
+      // 콘솔에도 출력 (중요한 이벤트만)
+      if (this.isImportantEvent(event)) {
+        console.log(`🎬 [PlaybackDebug] ${event}:`, data)
+      }
+    } catch (error) {
+      console.error('❌ [PlaybackDebugger] Error in log function:', error)
+      console.error('❌ [PlaybackDebugger] Event:', event, 'Data:', data)
     }
   }
 
@@ -101,18 +106,26 @@ export class PlaybackDebugger {
    * 현재 상태 스냅샷 생성
    */
   static createStateSnapshot(tabState: any): void {
-    this.log('STATE_SNAPSHOT', {
-      isPlaying: tabState?.isPlaying,
-      playbackFrameIndex: tabState?.playbackFrameIndex,
-      playbackFrameId: tabState?.playbackFrameId,
-      playbackIntervalId: tabState?.playbackIntervalId,
-      playbackSpeed: tabState?.playbackSpeed,
-      playbackStartTime: tabState?.playbackStartTime,
-      playbackAccumulatedTime: tabState?.playbackAccumulatedTime,
-      framesCount: tabState?.frames?.length,
-      hasCanvasData: !!tabState?.canvasData,
-      frameCanvasDataCount: tabState?.frameCanvasData?.length
-    }, tabState?.id)
+    try {
+      console.log('📸 [PlaybackDebugger] Creating state snapshot for tab:', tabState?.id)
+      
+      this.log('STATE_SNAPSHOT', {
+        isPlaying: tabState?.isPlaying,
+        playbackFrameIndex: tabState?.playbackFrameIndex,
+        playbackFrameId: tabState?.playbackFrameId,
+        playbackIntervalId: tabState?.playbackIntervalId,
+        playbackSpeed: tabState?.playbackSpeed,
+        playbackStartTime: tabState?.playbackStartTime,
+        playbackAccumulatedTime: tabState?.playbackAccumulatedTime,
+        framesCount: tabState?.frames?.length,
+        hasCanvasData: !!tabState?.canvasData,
+        frameCanvasDataCount: tabState?.frameCanvasData?.length
+      }, tabState?.id)
+      
+      console.log('✅ [PlaybackDebugger] State snapshot created successfully')
+    } catch (error) {
+      console.error('❌ [PlaybackDebugger] Error creating state snapshot:', error)
+    }
   }
 
   /**
