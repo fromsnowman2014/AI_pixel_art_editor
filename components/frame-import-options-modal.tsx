@@ -3,13 +3,20 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { X, Plus, RotateCcw, AlertCircle, Layers, FileImage, Film, Square, MousePointer, Hash, Crop } from 'lucide-react'
-import type { ScalingMode } from '@/lib/utils/enhanced-media-importer'
+import { X, Plus, RotateCcw, AlertCircle, Layers, FileImage, Film, Square, MousePointer, Hash, Crop, ArrowUp, Target, Zap } from 'lucide-react'
+import { 
+  analyzeSizeRelationship, 
+  getAvailableScalingModes,
+  type ScalingMode,
+  type ExtendedScalingMode,
+  type SizeAnalysis,
+  type ScalingModeConfig
+} from '@/lib/utils/enhanced-media-importer'
 
 interface FrameImportOptionsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelectOption: (option: 'add' | 'replace', scalingMode: ScalingMode) => void
+  onSelectOption: (option: 'add' | 'replace', scalingMode: ScalingMode | ExtendedScalingMode) => void
   mediaType: 'image' | 'gif' | 'video'
   frameCount: number
   existingFrameCount: number
@@ -28,15 +35,28 @@ export function FrameImportOptionsModal({
   targetDimensions
 }: FrameImportOptionsModalProps) {
   
-  const [selectedScalingMode, setSelectedScalingMode] = React.useState<ScalingMode>('fit')
+  // Analyze size relationship and get intelligent recommendations
+  const sizeAnalysis = React.useMemo(() => 
+    analyzeSizeRelationship(originalDimensions, targetDimensions), 
+    [originalDimensions, targetDimensions]
+  )
+  
+  const availableScalingModes = React.useMemo(() => 
+    getAvailableScalingModes(sizeAnalysis), 
+    [sizeAnalysis]
+  )
+  
+  const [selectedScalingMode, setSelectedScalingMode] = React.useState<ExtendedScalingMode>(() => 
+    sizeAnalysis.recommendation
+  )
   
   if (!open) return null
 
   const mediaIcon = mediaType === 'gif' || mediaType === 'video' ? Film : FileImage
   const MediaIcon = mediaIcon
 
-  // Calculate scaling results for preview
-  const calculateScalingResult = (mode: ScalingMode) => {
+  // Enhanced scaling result calculation with extended mode support
+  const calculateScalingResult = (mode: ExtendedScalingMode) => {
     const { width: originalWidth, height: originalHeight } = originalDimensions
     const { width: targetWidth, height: targetHeight } = targetDimensions
 
@@ -114,6 +134,56 @@ export function FrameImportOptionsModal({
           }
         }
       }
+      
+      // Extended modes for small-to-large scenarios
+      case 'fit-upscale': {
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const scale = Math.min(scaleX, scaleY)
+        return {
+          width: Math.round(originalWidth * scale),
+          height: Math.round(originalHeight * scale),
+          description: 'Scale up proportionally to fit canvas',
+          icon: ArrowUp,
+          color: 'teal',
+          recommendation: sizeAnalysis.recommendation === 'fit-upscale' ? `${Math.round(scale)}× upscaling` : null
+        }
+      }
+      
+      case 'smart-upscale': {
+        const optimalScale = sizeAnalysis.optimalIntegerScale || 2
+        return {
+          width: originalWidth * optimalScale,
+          height: originalHeight * optimalScale,
+          description: `Perfect ${optimalScale}× integer scaling for crisp pixels`,
+          icon: Zap,
+          color: 'pink',
+          recommendation: sizeAnalysis.recommendation === 'smart-upscale' ? 'Pixel-perfect quality' : null
+        }
+      }
+      
+      case 'original-center': {
+        return {
+          width: originalWidth,
+          height: originalHeight,
+          description: 'Keep original size, center on canvas',
+          icon: Target,
+          color: 'green',
+          recommendation: originalWidth < targetWidth && originalHeight < targetHeight ? 'Shows exact original size' : null
+        }
+      }
+      
+      default: {
+        // Fallback for unknown modes
+        return {
+          width: originalWidth,
+          height: originalHeight,
+          description: 'Unknown scaling mode',
+          icon: Square,
+          color: 'blue' as const,
+          recommendation: null
+        }
+      }
     }
   }
 
@@ -171,6 +241,47 @@ export function FrameImportOptionsModal({
             </div>
           </div>
 
+          {/* Size Analysis Section - New for Small-to-Large Detection */}
+          {sizeAnalysis.relationship === 'small-to-large' && (
+            <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <ArrowUp className="h-4 w-4 text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-emerald-900">Small to Large Canvas Detected</h3>
+                  <p className="text-xs text-emerald-700">Your image is significantly smaller than the target canvas</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/80 rounded-lg p-3">
+                  <div className="text-xs text-emerald-600 font-medium uppercase tracking-wide mb-1">Size Difference</div>
+                  <div className="text-sm font-bold text-gray-900">
+                    {Math.round(Math.min(sizeAnalysis.scaleFactorX, sizeAnalysis.scaleFactorY))}× smaller
+                  </div>
+                </div>
+                
+                {sizeAnalysis.optimalIntegerScale && (
+                  <div className="bg-white/80 rounded-lg p-3">
+                    <div className="text-xs text-emerald-600 font-medium uppercase tracking-wide mb-1">Perfect Scale</div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {sizeAnalysis.optimalIntegerScale}× upscaling available
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-4 flex flex-wrap gap-1">
+                {sizeAnalysis.reasons.map((reason, index) => (
+                  <span key={index} className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
+                    {reason}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Scaling Options - Professional Redesign */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -180,11 +291,11 @@ export function FrameImportOptionsModal({
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-3">
-              {(['fit', 'fill', 'original', 'smart'] as ScalingMode[]).map((mode) => {
-                const result = calculateScalingResult(mode)
+            <div className={`grid gap-3 ${availableScalingModes.length > 4 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
+              {availableScalingModes.map((modeConfig) => {
+                const result = calculateScalingResult(modeConfig.mode)
                 const Icon = result.icon
-                const isSelected = selectedScalingMode === mode
+                const isSelected = selectedScalingMode === modeConfig.mode
                 const colorClassesMap = {
                   blue: {
                     border: isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300',
@@ -209,6 +320,18 @@ export function FrameImportOptionsModal({
                     icon: 'text-purple-600',
                     result: 'text-purple-600',
                     badge: 'bg-purple-100 text-purple-700'
+                  },
+                  teal: {
+                    border: isSelected ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-teal-300',
+                    icon: 'text-teal-600',
+                    result: 'text-teal-600',
+                    badge: 'bg-teal-100 text-teal-700'
+                  },
+                  pink: {
+                    border: isSelected ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white hover:border-pink-300',
+                    icon: 'text-pink-600',
+                    result: 'text-pink-600',
+                    badge: 'bg-pink-100 text-pink-700'
                   }
                 } as const
                 
@@ -216,8 +339,8 @@ export function FrameImportOptionsModal({
                 
                 return (
                   <button
-                    key={mode}
-                    onClick={() => setSelectedScalingMode(mode)}
+                    key={modeConfig.mode}
+                    onClick={() => setSelectedScalingMode(modeConfig.mode)}
                     className={cn(
                       "relative p-4 rounded-xl border-2 text-left transition-all duration-200 transform hover:scale-[1.02]",
                       colorClasses.border,
@@ -227,9 +350,14 @@ export function FrameImportOptionsModal({
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Icon className={cn("h-5 w-5", colorClasses.icon)} />
-                        <span className="font-semibold text-gray-900 text-sm capitalize">
-                          {mode === 'fit' ? 'Fit' : mode === 'fill' ? 'Fill' : mode === 'original' ? 'Original' : 'Smart'}
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {modeConfig.displayName}
                         </span>
+                        {modeConfig.isUpscaling && (
+                          <div className="flex items-center" title="Upscaling mode">
+                            <ArrowUp className="h-3 w-3 text-emerald-500" />
+                          </div>
+                        )}
                       </div>
                       
                       <div className="space-y-2">
@@ -247,6 +375,12 @@ export function FrameImportOptionsModal({
                             colorClasses.badge
                           )}>
                             {result.recommendation}
+                          </div>
+                        )}
+                        
+                        {modeConfig.recommendation && (
+                          <div className="text-xs px-2 py-1 rounded-full font-bold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200">
+                            ⭐ Recommended
                           </div>
                         )}
                       </div>

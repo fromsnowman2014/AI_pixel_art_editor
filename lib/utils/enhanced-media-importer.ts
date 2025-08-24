@@ -8,12 +8,185 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 export type ScalingMode = 'fit' | 'fill' | 'original' | 'smart'
 
+// Extended scaling modes for small-to-large scenarios
+export type ExtendedScalingMode = ScalingMode | 'fit-upscale' | 'smart-upscale' | 'original-center'
+
+export type SizeRelationship = 'small-to-large' | 'large-to-small' | 'similar-size'
+
+export interface SizeAnalysis {
+  relationship: SizeRelationship
+  scaleFactorX: number
+  scaleFactorY: number
+  optimalIntegerScale?: number // 2, 3, 4, etc.
+  recommendation: ExtendedScalingMode
+  reasons: string[]
+  isUpscalingBeneficial: boolean
+}
+
+export interface ScalingModeConfig {
+  mode: ExtendedScalingMode
+  displayName: string
+  description: string
+  color: 'blue' | 'orange' | 'green' | 'purple' | 'teal' | 'pink'
+  isUpscaling?: boolean
+  integerScale?: number
+  recommendation?: boolean
+}
+
 export interface MediaImportOptions {
   width: number
   height: number
   colorCount?: number
   maxFrames?: number
-  scalingMode?: ScalingMode
+  scalingMode?: ScalingMode | ExtendedScalingMode
+}
+
+/**
+ * Analyze the size relationship between original and target dimensions
+ * to provide intelligent scaling recommendations
+ */
+export function analyzeSizeRelationship(
+  original: { width: number; height: number },
+  target: { width: number; height: number }
+): SizeAnalysis {
+  const scaleFactorX = target.width / original.width
+  const scaleFactorY = target.height / original.height
+  const minScale = Math.min(scaleFactorX, scaleFactorY)
+  const maxScale = Math.max(scaleFactorX, scaleFactorY)
+  
+  // Determine size relationship
+  let relationship: SizeRelationship
+  if (minScale >= 2) {
+    relationship = 'small-to-large'
+  } else if (maxScale < 0.8) {
+    relationship = 'large-to-small'
+  } else {
+    relationship = 'similar-size'
+  }
+  
+  // Find optimal integer scale for pixel art
+  let optimalIntegerScale: number | undefined
+  if (relationship === 'small-to-large') {
+    const possibleScales = [2, 3, 4, 5, 6, 8, 10]
+    for (const scale of possibleScales) {
+      const scaledWidth = original.width * scale
+      const scaledHeight = original.height * scale
+      
+      if (scaledWidth <= target.width && scaledHeight <= target.height) {
+        optimalIntegerScale = scale
+      } else {
+        break
+      }
+    }
+  }
+  
+  // Generate recommendation and reasons
+  let recommendation: ExtendedScalingMode
+  const reasons: string[] = []
+  let isUpscalingBeneficial = false
+  
+  if (relationship === 'small-to-large') {
+    isUpscalingBeneficial = true
+    
+    if (optimalIntegerScale && optimalIntegerScale >= 2) {
+      recommendation = 'smart-upscale'
+      reasons.push(`Perfect ${optimalIntegerScale}× scaling available`)
+      reasons.push('Maintains pixel-perfect quality')
+    } else {
+      recommendation = 'fit-upscale'
+      reasons.push('Proportional upscaling recommended')
+    }
+    
+    if (minScale >= 4) {
+      reasons.push('Large size difference detected')
+    }
+  } else if (relationship === 'large-to-small') {
+    recommendation = 'fit'
+    reasons.push('Downscaling to preserve details')
+  } else {
+    recommendation = 'original'
+    reasons.push('Similar sizes - keep original')
+  }
+  
+  return {
+    relationship,
+    scaleFactorX,
+    scaleFactorY,
+    optimalIntegerScale,
+    recommendation,
+    reasons,
+    isUpscalingBeneficial
+  }
+}
+
+/**
+ * Get available scaling modes based on size analysis
+ */
+export function getAvailableScalingModes(analysis: SizeAnalysis): ScalingModeConfig[] {
+  const baseModes: ScalingModeConfig[] = [
+    {
+      mode: 'fit',
+      displayName: 'Fit',
+      description: 'Scale proportionally to fit canvas',
+      color: 'blue'
+    },
+    {
+      mode: 'fill', 
+      displayName: 'Fill',
+      description: 'Fill entire canvas, may crop edges',
+      color: 'orange'
+    },
+    {
+      mode: 'original',
+      displayName: 'Original Size',
+      description: 'Keep original size, center if smaller',
+      color: 'green'
+    },
+    {
+      mode: 'smart',
+      displayName: 'Smart Scale',
+      description: 'Integer scaling when possible',
+      color: 'purple'
+    }
+  ]
+  
+  // Add extended modes for small-to-large scenarios
+  if (analysis.relationship === 'small-to-large') {
+    const extendedModes: ScalingModeConfig[] = [
+      {
+        mode: 'fit-upscale',
+        displayName: 'Fit Upscale',
+        description: 'Scale up proportionally to fit canvas',
+        color: 'teal',
+        isUpscaling: true,
+        recommendation: analysis.recommendation === 'fit-upscale'
+      },
+      {
+        mode: 'smart-upscale',
+        displayName: analysis.optimalIntegerScale ? 
+          `Smart ${analysis.optimalIntegerScale}× Upscale` : 
+          'Smart Upscale',
+        description: analysis.optimalIntegerScale ?
+          `Perfect ${analysis.optimalIntegerScale}× integer scaling for crisp pixels` :
+          'Intelligent upscaling for pixel art',
+        color: 'pink',
+        isUpscaling: true,
+        integerScale: analysis.optimalIntegerScale,
+        recommendation: analysis.recommendation === 'smart-upscale'
+      },
+      {
+        mode: 'original-center',
+        displayName: 'Original (Centered)',
+        description: 'Keep original size, center on canvas',
+        color: 'green',
+        isUpscaling: false
+      }
+    ]
+    
+    return [...extendedModes, ...baseModes]
+  }
+  
+  return baseModes
 }
 
 export interface ImportResult {
@@ -1164,6 +1337,61 @@ export class EnhancedMediaImporter {
         break
       }
       
+      // Extended modes for small-to-large scenarios
+      case 'fit-upscale': {
+        // Scale up proportionally to fit canvas (similar to fit but intended for upscaling)
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const scale = Math.min(scaleX, scaleY)
+        
+        drawWidth = Math.round(originalWidth * scale)
+        drawHeight = Math.round(originalHeight * scale)
+        drawX = Math.round((targetWidth - drawWidth) / 2)
+        drawY = Math.round((targetHeight - drawHeight) / 2)
+        break
+      }
+      
+      case 'smart-upscale': {
+        // Use intelligent upscaling with integer scaling when possible
+        const scaleX = targetWidth / originalWidth
+        const scaleY = targetHeight / originalHeight
+        const minScale = Math.min(scaleX, scaleY)
+        
+        // Find the largest integer scale that fits
+        const possibleScales = [2, 3, 4, 5, 6, 8, 10]
+        let integerScale = 1
+        
+        for (const scale of possibleScales) {
+          if (originalWidth * scale <= targetWidth && originalHeight * scale <= targetHeight) {
+            integerScale = scale
+          } else {
+            break
+          }
+        }
+        
+        // Use integer scale if beneficial, otherwise use proportional scaling
+        if (integerScale >= 2) {
+          drawWidth = originalWidth * integerScale
+          drawHeight = originalHeight * integerScale
+        } else {
+          drawWidth = Math.round(originalWidth * minScale)
+          drawHeight = Math.round(originalHeight * minScale)
+        }
+        
+        drawX = Math.round((targetWidth - drawWidth) / 2)
+        drawY = Math.round((targetHeight - drawHeight) / 2)
+        break
+      }
+      
+      case 'original-center': {
+        // Keep original size and center on canvas
+        drawWidth = originalWidth
+        drawHeight = originalHeight
+        drawX = Math.round((targetWidth - drawWidth) / 2)
+        drawY = Math.round((targetHeight - drawHeight) / 2)
+        break
+      }
+
       default: {
         // Default to 'fit' mode for any unrecognized scaling mode
         const scaleX = targetWidth / originalWidth

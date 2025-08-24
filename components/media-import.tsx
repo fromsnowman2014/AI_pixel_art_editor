@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback, type ScalingMode } from '@/lib/utils/enhanced-media-importer'
+import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback, type ScalingMode, type ExtendedScalingMode } from '@/lib/utils/enhanced-media-importer'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { FrameImportOptionsModal } from './frame-import-options-modal'
 import { getVideoFrameLimit, getGifFrameLimit, getCurrentUserTier } from '@/lib/types/user'
@@ -218,7 +218,7 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
   }
 
   // Process the actual import after option selection
-  const processImport = async (result: any, importOption: 'add' | 'replace', scalingMode: ScalingMode = 'fit') => {
+  const processImport = async (result: any, importOption: 'add' | 'replace', scalingMode: ScalingMode | ExtendedScalingMode = 'fit') => {
     try {
       const mediaType = result.mediaType
       const frameCount = result.frames.length
@@ -462,7 +462,7 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
   }
 
   // Handle import option selection from modal
-  const handleImportOptionSelected = async (option: 'add' | 'replace', scalingMode: ScalingMode) => {
+  const handleImportOptionSelected = async (option: 'add' | 'replace', scalingMode: ScalingMode | ExtendedScalingMode) => {
     if (!pendingImportData) return
 
     setShowImportOptionsModal(false)
