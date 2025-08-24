@@ -15,7 +15,9 @@ import {
   Eye,
   EyeOff,
   SkipBack,
-  SkipForward
+  SkipForward,
+  Gauge,
+  RotateCcw
 } from 'lucide-react'
 import { createComponentLogger } from '@/lib/utils/smart-logger'
 
@@ -39,14 +41,17 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     stopPlayback,
     togglePlayback,
     setPlaybackFrame,
+    setPlaybackSpeed,
+    resetPlaybackToStart,
     getActiveTab,
   } = useProjectStore()
 
-  // Get playback state from store
+  // Get enhanced playback state from store
   const activeTab = getActiveTab()
   const isPlaying = activeTab?.isPlaying || false
   const playbackFrameIndex = activeTab?.playbackFrameIndex || 0
   const playbackFrameId = activeTab?.playbackFrameId
+  const playbackSpeed = activeTab?.playbackSpeed || 1.0
   
   const logger = createComponentLogger('FrameManager')
   
@@ -364,6 +369,47 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
           >
             <Square className="h-4 w-4 mr-2" />
             Stop
+          </Button>
+
+          {/* Speed Control */}
+          <div className="flex items-center space-x-2 ml-2">
+            <Gauge className="h-4 w-4 text-gray-500" />
+            <select
+              value={playbackSpeed}
+              onChange={(e) => {
+                if (activeTabId) {
+                  const newSpeed = parseFloat(e.target.value)
+                  setPlaybackSpeed(activeTabId, newSpeed)
+                }
+              }}
+              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={!activeTabId || frames.length <= 1}
+            >
+              <option value={0.25}>0.25×</option>
+              <option value={0.5}>0.5×</option>
+              <option value={0.75}>0.75×</option>
+              <option value={1.0}>1.0×</option>
+              <option value={1.25}>1.25×</option>
+              <option value={1.5}>1.5×</option>
+              <option value={2.0}>2.0×</option>
+              <option value={3.0}>3.0×</option>
+            </select>
+          </div>
+
+          {/* Reset to Start Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (activeTabId) {
+                resetPlaybackToStart(activeTabId)
+              }
+            }}
+            disabled={frames.length <= 1 || playbackFrameIndex === 0}
+            className="px-2 ml-2"
+            title="Reset to first frame"
+          >
+            <RotateCcw className="h-4 w-4" />
           </Button>
 
           <div className="flex items-center space-x-1">

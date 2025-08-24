@@ -108,11 +108,14 @@ export interface ProjectTab {
   isDirty: boolean
   frameCanvasData: FrameCanvasData[] // Store canvas data for each frame
   
-  // Playback state
+  // Enhanced Playback state
   isPlaying: boolean
   playbackFrameIndex: number
   playbackFrameId: string | null
   playbackIntervalId: number | null
+  playbackSpeed: number // 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
+  playbackStartTime: number | null // For precise timing with requestAnimationFrame
+  playbackAccumulatedTime: number // Accumulated time for frame switching
 }
 
 interface ProjectStore {
@@ -156,11 +159,13 @@ interface ProjectStore {
   regenerateAllThumbnails: () => void
   regenerateFrameThumbnail: (tabId: string, frameId: string) => void
 
-  // Playback operations
+  // Enhanced Playback operations
   startPlayback: (tabId: string) => void
   stopPlayback: (tabId: string) => void
   togglePlayback: (tabId: string) => void
   setPlaybackFrame: (tabId: string, frameIndex: number) => void
+  setPlaybackSpeed: (tabId: string, speed: number) => void
+  resetPlaybackToStart: (tabId: string) => void
 
   // Utility functions
   getActiveTab: () => ProjectTab | null
@@ -347,11 +352,14 @@ export const useProjectStore = create<ProjectStore>()(
                 thumbnail: null // Will be generated when first drawn
               }],
               
-              // Playback state
+              // Enhanced Playback state
               isPlaying: false,
               playbackFrameIndex: 0,
               playbackFrameId: null,
-              playbackIntervalId: null
+              playbackIntervalId: null,
+              playbackSpeed: 1.0,
+              playbackStartTime: null,
+              playbackAccumulatedTime: 0
             }
 
             state.tabs.push(newTab)
@@ -390,11 +398,14 @@ export const useProjectStore = create<ProjectStore>()(
               isDirty: false,
               frameCanvasData: [], // Will be populated when frames are loaded
               
-              // Playback state
+              // Enhanced Playback state
               isPlaying: false,
               playbackFrameIndex: 0,
               playbackFrameId: null,
-              playbackIntervalId: null
+              playbackIntervalId: null,
+              playbackSpeed: 1.0,
+              playbackStartTime: null,
+              playbackAccumulatedTime: 0
             }
 
             state.tabs.push(newTab)
@@ -1898,7 +1909,7 @@ export const useProjectStore = create<ProjectStore>()(
           })
         },
 
-        // Playback operations
+        // Enhanced Playback operations with requestAnimationFrame precision
         startPlayback: (tabId) => {
           const state = get()
           const tab = state.tabs.find(t => t.id === tabId)
@@ -1907,7 +1918,7 @@ export const useProjectStore = create<ProjectStore>()(
           // Stop any existing playback
           get().stopPlayback(tabId)
 
-          // Start playback
+          // Initialize playback state with precise timing
           set((draft) => {
             const currentTab = draft.tabs.find(t => t.id === tabId)
             if (!currentTab) return
@@ -1915,66 +1926,112 @@ export const useProjectStore = create<ProjectStore>()(
             currentTab.isPlaying = true
             currentTab.playbackFrameIndex = 0
             currentTab.playbackFrameId = currentTab.frames[0]?.id || null
+            currentTab.playbackStartTime = performance.now()
+            currentTab.playbackAccumulatedTime = 0
+            
+            // Load first frame immediately
+            const firstFrame = currentTab.frames[0]
+            if (firstFrame) {
+              const frameData = currentTab.frameCanvasData.find(f => f.frameId === firstFrame.id)
+              if (frameData?.canvasData) {
+                // Use shared ArrayBuffer for memory efficiency
+                currentTab.canvasData = {
+                  width: frameData.canvasData.width,
+                  height: frameData.canvasData.height,
+                  data: new Uint8ClampedArray(frameData.canvasData.data)
+                }
+              } else {
+                // Fallback to empty data with warning
+                console.warn(`Frame data missing for frame: ${firstFrame.id}`)
+                currentTab.canvasData = createEmptyPixelData(currentTab.project.width, currentTab.project.height)
+              }
+            }
           })
 
-          // Create a recursive function for frame advancement
-          const advanceFrame = () => {
+          // Enhanced frame advancement with requestAnimationFrame precision
+          let rafId: number
+          const frameLoop = (timestamp: number) => {
             const currentState = get()
             const currentTab = currentState.tabs.find(t => t.id === tabId)
             
+            // Exit conditions
             if (!currentTab || !currentTab.isPlaying || currentTab.frames.length <= 1) {
               return
             }
 
-            const nextFrameIndex = (currentTab.playbackFrameIndex + 1) % currentTab.frames.length
-            const nextFrame = currentTab.frames[nextFrameIndex]
+            // Calculate precise timing with playback speed
+            const startTime = currentTab.playbackStartTime!
+            const elapsedTime = (timestamp - startTime) * currentTab.playbackSpeed
+            const currentFrame = currentTab.frames[currentTab.playbackFrameIndex]
+            const frameDelay = currentFrame?.delayMs || 500
             
-            if (nextFrame) {
-              // Update playback state
-              set((draft) => {
-                const tab = draft.tabs.find(t => t.id === tabId)
-                if (!tab) return
-                
-                tab.playbackFrameIndex = nextFrameIndex
-                tab.playbackFrameId = nextFrame.id
-
-                // Load frame canvas data and update canvas with proper synchronization
-                const frameData = tab.frameCanvasData.find(f => f.frameId === nextFrame.id)
-                if (frameData && frameData.canvasData) {
-                  // PLAYBACK FIX: Create clean canvas data copy for smooth transitions
-                  tab.canvasData = { 
-                    width: frameData.canvasData.width,
-                    height: frameData.canvasData.height,
-                    data: new Uint8ClampedArray(frameData.canvasData.data) 
-                  }
-                } else {
-                  // PLAYBACK FIX: Handle missing frame data gracefully
-                  tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
-                }
-              })
-
-              // Schedule next frame
-              const delay = nextFrame.delayMs || 500
-              const timeoutId = setTimeout(advanceFrame, delay)
+            // Check if it's time to advance to next frame
+            if (elapsedTime - currentTab.playbackAccumulatedTime >= frameDelay) {
+              const nextFrameIndex = (currentTab.playbackFrameIndex + 1) % currentTab.frames.length
+              const nextFrame = currentTab.frames[nextFrameIndex]
               
-              // Store timeout ID
-              set((draft) => {
-                const tab = draft.tabs.find(t => t.id === tabId)
-                if (tab) {
-                  tab.playbackIntervalId = timeoutId as unknown as number
-                }
-              })
+              if (nextFrame) {
+                // Update state atomically to prevent race conditions
+                set((draft) => {
+                  const tab = draft.tabs.find(t => t.id === tabId)
+                  if (!tab || !tab.isPlaying) return // Double-check state
+                  
+                  // Update frame index and accumulate time
+                  tab.playbackFrameIndex = nextFrameIndex
+                  tab.playbackFrameId = nextFrame.id
+                  tab.playbackAccumulatedTime += frameDelay
+                  
+                  // Efficiently update canvas data
+                  const frameData = tab.frameCanvasData.find(f => f.frameId === nextFrame.id)
+                  if (frameData?.canvasData) {
+                    // Memory-efficient canvas update
+                    if (!tab.canvasData || 
+                        tab.canvasData.width !== frameData.canvasData.width || 
+                        tab.canvasData.height !== frameData.canvasData.height) {
+                      // Recreate if dimensions changed
+                      tab.canvasData = {
+                        width: frameData.canvasData.width,
+                        height: frameData.canvasData.height,
+                        data: new Uint8ClampedArray(frameData.canvasData.data)
+                      }
+                    } else {
+                      // Reuse existing array for better performance
+                      tab.canvasData.data.set(frameData.canvasData.data)
+                    }
+                  } else {
+                    // Enhanced error handling for missing frame data
+                    console.warn(`Missing frame data for frame ${nextFrame.id}, index ${nextFrameIndex}`)
+                    // Try to use previous frame data instead of empty
+                    if (tab.canvasData) {
+                      // Keep previous frame instead of showing empty
+                      console.info('Keeping previous frame data due to missing frame')
+                    } else {
+                      tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+                    }
+                  }
+                })
+              }
             }
-          }
 
-          // Start the first frame advancement
-          const initialDelay = tab.frames[0]?.delayMs || 500
-          const timeoutId = setTimeout(advanceFrame, initialDelay)
+            // Continue the animation loop
+            rafId = requestAnimationFrame(frameLoop)
+            
+            // Store RAF ID for cleanup
+            set((draft) => {
+              const tab = draft.tabs.find(t => t.id === tabId)
+              if (tab && tab.isPlaying) {
+                tab.playbackIntervalId = rafId
+              }
+            })
+          }
+          
+          // Start the frame loop
+          rafId = requestAnimationFrame(frameLoop)
           
           set((draft) => {
             const currentTab = draft.tabs.find(t => t.id === tabId)
             if (currentTab) {
-              currentTab.playbackIntervalId = timeoutId as unknown as number
+              currentTab.playbackIntervalId = rafId
             }
           })
         },
@@ -1984,28 +2041,52 @@ export const useProjectStore = create<ProjectStore>()(
             const tab = draft.tabs.find(t => t.id === tabId)
             if (!tab) return
 
+            // Stop playback immediately
             tab.isPlaying = false
             tab.playbackFrameId = null
+            tab.playbackStartTime = null
+            tab.playbackAccumulatedTime = 0
             
+            // Cancel requestAnimationFrame instead of setTimeout
             if (tab.playbackIntervalId) {
-              clearTimeout(tab.playbackIntervalId) // Changed from clearInterval to clearTimeout
+              cancelAnimationFrame(tab.playbackIntervalId)
               tab.playbackIntervalId = null
             }
 
-            // PLAYBACK FIX: Properly restore the active frame with clean canvas data
+            // Enhanced frame restoration: restore to currently selected frame
             if (tab.project.activeFrameId) {
               const activeFrame = tab.frames.find(f => f.id === tab.project.activeFrameId)
               if (activeFrame) {
                 const frameData = tab.frameCanvasData.find(f => f.frameId === activeFrame.id)
-                if (frameData && frameData.canvasData) {
-                  tab.canvasData = { 
-                    width: frameData.canvasData.width,
-                    height: frameData.canvasData.height,
-                    data: new Uint8ClampedArray(frameData.canvasData.data) 
+                if (frameData?.canvasData) {
+                  // Efficiently restore active frame
+                  if (!tab.canvasData || 
+                      tab.canvasData.width !== frameData.canvasData.width || 
+                      tab.canvasData.height !== frameData.canvasData.height) {
+                    tab.canvasData = {
+                      width: frameData.canvasData.width,
+                      height: frameData.canvasData.height,
+                      data: new Uint8ClampedArray(frameData.canvasData.data)
+                    }
+                  } else {
+                    tab.canvasData.data.set(frameData.canvasData.data)
                   }
                 } else {
-                  // Restore to empty state if no frame data exists
+                  console.warn(`Missing frame data for active frame: ${activeFrame.id}`)
                   tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+                }
+              }
+            } else {
+              // No active frame, restore to first frame
+              const firstFrame = tab.frames[0]
+              if (firstFrame) {
+                const frameData = tab.frameCanvasData.find(f => f.frameId === firstFrame.id)
+                if (frameData?.canvasData) {
+                  tab.canvasData = {
+                    width: frameData.canvasData.width,
+                    height: frameData.canvasData.height,
+                    data: new Uint8ClampedArray(frameData.canvasData.data)
+                  }
                 }
               }
             }
@@ -2034,18 +2115,85 @@ export const useProjectStore = create<ProjectStore>()(
             if (frame) {
               tab.playbackFrameId = frame.id
               
-              // If not playing, update canvas immediately with clean data
-              if (!tab.isPlaying) {
-                const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
-                if (frameData && frameData.canvasData) {
-                  tab.canvasData = { 
+              // Reset accumulated time when manually setting frame
+              if (tab.isPlaying) {
+                tab.playbackAccumulatedTime = frameIndex * (frame.delayMs || 500)
+                tab.playbackStartTime = performance.now() - tab.playbackAccumulatedTime / tab.playbackSpeed
+              }
+              
+              // Update canvas immediately for both playing and non-playing states
+              const frameData = tab.frameCanvasData.find(f => f.frameId === frame.id)
+              if (frameData?.canvasData) {
+                if (!tab.canvasData || 
+                    tab.canvasData.width !== frameData.canvasData.width || 
+                    tab.canvasData.height !== frameData.canvasData.height) {
+                  tab.canvasData = {
                     width: frameData.canvasData.width,
                     height: frameData.canvasData.height,
-                    data: new Uint8ClampedArray(frameData.canvasData.data) 
+                    data: new Uint8ClampedArray(frameData.canvasData.data)
                   }
                 } else {
-                  // PLAYBACK FIX: Handle missing frame data
-                  tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+                  tab.canvasData.data.set(frameData.canvasData.data)
+                }
+              } else {
+                console.warn(`Missing frame data for frame: ${frame.id}`)
+                tab.canvasData = createEmptyPixelData(tab.project.width, tab.project.height)
+              }
+            }
+          })
+        },
+
+        // New enhanced playback functions
+        setPlaybackSpeed: (tabId, speed) => {
+          set((draft) => {
+            const tab = draft.tabs.find(t => t.id === tabId)
+            if (!tab || speed <= 0 || speed > 10) return // Reasonable speed limits
+            
+            const oldSpeed = tab.playbackSpeed
+            tab.playbackSpeed = speed
+            
+            // Adjust timing if currently playing
+            if (tab.isPlaying && tab.playbackStartTime) {
+              const now = performance.now()
+              const elapsedRealTime = now - tab.playbackStartTime
+              const elapsedPlaybackTime = elapsedRealTime * oldSpeed
+              
+              // Recalculate start time based on new speed
+              tab.playbackStartTime = now - elapsedPlaybackTime / speed
+            }
+          })
+        },
+
+        resetPlaybackToStart: (tabId) => {
+          set((draft) => {
+            const tab = draft.tabs.find(t => t.id === tabId)
+            if (!tab) return
+            
+            tab.playbackFrameIndex = 0
+            tab.playbackAccumulatedTime = 0
+            
+            const firstFrame = tab.frames[0]
+            if (firstFrame) {
+              tab.playbackFrameId = firstFrame.id
+              
+              // Reset timing if playing
+              if (tab.isPlaying) {
+                tab.playbackStartTime = performance.now()
+              }
+              
+              // Load first frame
+              const frameData = tab.frameCanvasData.find(f => f.frameId === firstFrame.id)
+              if (frameData?.canvasData) {
+                if (!tab.canvasData ||
+                    tab.canvasData.width !== frameData.canvasData.width ||
+                    tab.canvasData.height !== frameData.canvasData.height) {
+                  tab.canvasData = {
+                    width: frameData.canvasData.width,
+                    height: frameData.canvasData.height,
+                    data: new Uint8ClampedArray(frameData.canvasData.data)
+                  }
+                } else {
+                  tab.canvasData.data.set(frameData.canvasData.data)
                 }
               }
             }
