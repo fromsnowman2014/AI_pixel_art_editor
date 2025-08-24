@@ -4,6 +4,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = request.nextUrl.searchParams.get('url')
     const validate = request.nextUrl.searchParams.get('validate') === 'true'
+    const rangeHeader = request.headers.get('range')
     
     if (!url) {
       return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 })
@@ -36,12 +37,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access to private networks is not allowed' }, { status: 403 })
     }
 
+    // Prepare fetch headers with Range support
+    const fetchHeaders: Record<string, string> = {
+      'User-Agent': 'PixelBuddy-MediaImporter/1.0',
+      'Accept': validate ? '*/*' : 'image/*, video/*, application/octet-stream',
+    }
+    
+    // Add Range header for partial content requests
+    if (rangeHeader && !validate) {
+      fetchHeaders['Range'] = rangeHeader
+    }
+
     const fetchOptions: RequestInit = {
       method: validate ? 'HEAD' : 'GET',
-      headers: {
-        'User-Agent': 'PixelBuddy-MediaImporter/1.0',
-        'Accept': validate ? '*/*' : 'image/*, video/*, application/octet-stream',
-      },
+      headers: fetchHeaders,
       // Set reasonable timeout
       signal: AbortSignal.timeout(30000) // 30 seconds
     }
@@ -76,18 +85,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'File too large (max 50MB)' }, { status: 413 })
     }
 
-    // Stream the response back with proper CORS headers
+    // Stream the response back with proper CORS and Range headers
     const responseHeaders = new Headers()
     responseHeaders.set('Content-Type', contentType)
     responseHeaders.set('Access-Control-Allow-Origin', '*')
     responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
-    responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type')
+    responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Range')
+    responseHeaders.set('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range, Content-Length')
     responseHeaders.set('Cache-Control', 'public, max-age=3600') // Cache for 1 hour
-
-    return new NextResponse(response.body, {
-      status: 200,
-      headers: responseHeaders,
-    })
+    
+    // Handle Range request responses
+    if (response.status === 206) {
+      // Partial content response
+      const contentRange = response.headers.get('Content-Range')
+      const contentLength = response.headers.get('Content-Length')
+      const acceptRanges = response.headers.get('Accept-Ranges')
+      
+      if (contentRange) responseHeaders.set('Content-Range', contentRange)
+      if (contentLength) responseHeaders.set('Content-Length', contentLength)
+      if (acceptRanges) responseHeaders.set('Accept-Ranges', acceptRanges)
+      
+      return new NextResponse(response.body, {
+        status: 206, // Partial Content
+        headers: responseHeaders,
+      })
+    } else {
+      // Full content response
+      const acceptRanges = response.headers.get('Accept-Ranges')
+      if (acceptRanges) responseHeaders.set('Accept-Ranges', acceptRanges)
+      
+      if (contentLength) responseHeaders.set('Content-Length', contentLength)
+      
+      return new NextResponse(response.body, {
+        status: 200,
+        headers: responseHeaders,
+      })
+    }
 
   } catch (error) {
     console.error('Proxy media error:', error)

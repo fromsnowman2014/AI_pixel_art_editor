@@ -5,6 +5,7 @@ import { getVideoFrameLimit, getGifFrameLimit } from '@/lib/types/user'
 import { decompressFrames, parseGIF } from 'gifuct-js'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { FastVideoProcessor } from './fast-video-processor'
 
 export type ScalingMode = 'fit' | 'fill' | 'original' | 'smart'
 
@@ -924,44 +925,69 @@ export class EnhancedMediaImporter {
   }
 
   /**
-   * Process video with frame extraction using FFmpeg
+   * Enhanced video processing with fast loading optimizations
    */
   private static async processVideoFromUrl(
     url: string, 
     options: MediaImportOptions,
     onProgress?: ProgressCallback
   ): Promise<ImportResult> {
-    onProgress?.(20, 'Fetching video data...')
+    onProgress?.(10, 'Initializing fast video processor...')
     
-    const proxyUrl = `/api/proxy-media?url=${encodeURIComponent(url)}`
-    const response = await fetch(proxyUrl)
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`)
-    }
+    try {
+      // Try fast video processing first (HTML5 + Range loading)
+      console.log('🚀 Using FastVideoProcessor for optimized video loading')
+      
+      const proxyUrl = `/api/proxy-media?url=${encodeURIComponent(url)}`
+      return await FastVideoProcessor.processVideoFast(proxyUrl, options, onProgress)
+      
+    } catch (fastError) {
+      console.warn('⚠️ Fast video processing failed, falling back to FFmpeg:', fastError)
+      onProgress?.(20, 'Fast processing failed, using FFmpeg fallback...')
+      
+      // Fallback to original FFmpeg method
+      const proxyUrl = `/api/proxy-media?url=${encodeURIComponent(url)}`
+      const response = await fetch(proxyUrl)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`)
+      }
 
-    const arrayBuffer = await response.arrayBuffer()
-    return await this.processVideoData(arrayBuffer, 'video.mp4', options, onProgress)
+      const arrayBuffer = await response.arrayBuffer()
+      return await this.processVideoDataWithFFmpeg(arrayBuffer, 'video.mp4', options, onProgress)
+    }
   }
 
   /**
-   * Process video from local file
+   * Enhanced video processing from local file with fast extraction
    */
   private static async processVideoFromFile(
     file: File, 
     options: MediaImportOptions,
     onProgress?: ProgressCallback
   ): Promise<ImportResult> {
-    onProgress?.(20, 'Reading video file...')
+    onProgress?.(10, 'Starting fast video file processing...')
     
-    const arrayBuffer = await file.arrayBuffer()
-    return await this.processVideoData(arrayBuffer, file.name, options, onProgress)
+    try {
+      // Try fast video processing first (HTML5 native)
+      console.log(`🚀 Processing video file: ${file.name} (${Math.round(file.size / 1024 / 1024)}MB) with FastVideoProcessor`)
+      
+      return await FastVideoProcessor.processVideoFast(file, options, onProgress)
+      
+    } catch (fastError) {
+      console.warn('⚠️ Fast video file processing failed, falling back to FFmpeg:', fastError)
+      onProgress?.(20, 'Fast processing failed, using FFmpeg fallback...')
+      
+      // Fallback to original FFmpeg method
+      const arrayBuffer = await file.arrayBuffer()
+      return await this.processVideoDataWithFFmpeg(arrayBuffer, file.name, options, onProgress)
+    }
   }
 
   /**
-   * Core video processing logic with FFmpeg
+   * Legacy FFmpeg-based video processing (fallback method)
    */
-  private static async processVideoData(
+  private static async processVideoDataWithFFmpeg(
     arrayBuffer: ArrayBuffer,
     filename: string,
     options: MediaImportOptions,
