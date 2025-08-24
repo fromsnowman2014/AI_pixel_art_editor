@@ -92,21 +92,25 @@ export function PixelEditor({ className }: PixelEditorProps) {
       {/* Top Toolbar - Primary Actions */}
       <TopToolbar />
 
-      {/* Main editor area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar - Tools and Colors with Full Scroll */}
-        <div className="w-64 border-r border-gray-200 bg-white overflow-y-auto">
+      {/* Main editor area with responsive grid layout */}
+      <div className="grid grid-cols-[minmax(280px,320px)_1fr_minmax(350px,400px)] flex-1 overflow-hidden">
+        {/* Left sidebar - Tools and Colors with minimum width */}
+        <div className="border-r border-gray-200 bg-white overflow-y-auto min-w-[280px]">
           <div className="p-4 space-y-6">
             {/* Tools Section - Top Priority */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-800 mb-3">Tools</h3>
-              <Toolbar />
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-gray-800 mb-3 truncate">Tools</h3>
+              <div className="min-w-0">
+                <Toolbar />
+              </div>
             </div>
             
             {/* Colors Section - Below Tools */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-800 mb-3">Colors</h3>
-              <ColorPalette />
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-gray-800 mb-3 truncate">Colors</h3>
+              <div className="min-w-0">
+                <ColorPalette />
+              </div>
             </div>
           </div>
         </div>
@@ -134,8 +138,8 @@ export function PixelEditor({ className }: PixelEditorProps) {
           )}
         </div>
 
-        {/* Right sidebar - Project Panel */}
-        <div className="w-80 border-l border-gray-200 bg-white">
+        {/* Right sidebar - Project Panel with responsive width */}
+        <div className="border-l border-gray-200 bg-white">
           <ProjectPanel />
         </div>
       </div>

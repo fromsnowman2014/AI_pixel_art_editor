@@ -58,6 +58,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   
   // Focus management for keyboard navigation
   const timelineRef = useRef<HTMLDivElement>(null)
+  const timelineScrollRef = useRef<HTMLDivElement>(null)
+  const frameRefs = useRef<(HTMLDivElement | null)[]>([])
   const [isFocused, setIsFocused] = useState(false)
 
   // Enhanced keyboard navigation with safety checks
@@ -186,13 +188,80 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }, [activeTabId, activeTab?.playbackIntervalId, stopPlayback])
 
   // Early return after all hooks are defined
+  const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
+
+  // Enhanced auto-play function with 300ms interval and right arrow simulation
+  const startEnhancedAutoPlay = useCallback(() => {
+    if (!activeTabId) return
+    
+    // Start playback in store
+    startPlayback(activeTabId)
+    
+    logger.debug(() => 'Started enhanced auto-play', { 
+      frameCount: frames.length,
+      currentFrame: playbackFrameId 
+    })
+  }, [activeTabId, frames.length, playbackFrameId, startPlayback, logger])
+
+  // User interaction detection for auto-stop
+  const handleUserInteraction = useCallback((e: Event) => {
+    if (activeTabId && isPlaying) {
+      // Check if click is outside frame manager area
+      const target = e.target as HTMLElement
+      const frameManagerArea = target.closest('[data-frame-manager]')
+      
+      if (!frameManagerArea) {
+        // Click is outside frame manager, stop playback
+        stopPlayback(activeTabId)
+        logger.debug(() => 'Playback stopped due to user interaction outside frame manager', {
+          eventType: e.type,
+          target: target.tagName
+        })
+      }
+    }
+  }, [activeTabId, isPlaying, stopPlayback, logger])
+
+  // Auto-scroll timeline to active frame
+  const scrollToFrame = useCallback((frameIndex: number) => {
+    const frameElement = frameRefs.current[frameIndex]
+    if (frameElement && timelineScrollRef.current) {
+      frameElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest',
+        inline: 'center'
+      })
+    }
+  }, [])
+
+  // Set up global event listeners for user interaction
+  useEffect(() => {
+    if (isPlaying) {
+      document.addEventListener('click', handleUserInteraction)
+      document.addEventListener('keydown', handleUserInteraction)
+      
+      return () => {
+        document.removeEventListener('click', handleUserInteraction)
+        document.removeEventListener('keydown', handleUserInteraction)
+      }
+    }
+    
+    // Return empty cleanup function when not playing
+    return () => {}
+  }, [isPlaying, handleUserInteraction])
+
+  // Auto-scroll to active frame when it changes
+  useEffect(() => {
+    if (isPlaying && playbackFrameIndex >= 0) {
+      scrollToFrame(playbackFrameIndex)
+    }
+  }, [isPlaying, playbackFrameIndex, scrollToFrame])
+
+  // Early return after all hooks are defined
   if (!activeTabId) {
     return null
   }
 
-  const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
-
-  const handlePlayPause = () => {
+  const handlePlayPause = (): void => {
     console.log('🎬 [FrameManager] handlePlayPause START')
     
     try {
@@ -263,15 +332,17 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       }, 50)
       
       console.log('🎉 [FrameManager] handlePlayPause completed successfully')
+      return
       
     } catch (error) {
       console.error('❌ [FrameManager] ERROR in handlePlayPause:', error)
       console.error('❌ [FrameManager] Error stack:', error instanceof Error ? error.stack : 'No stack')
       PlaybackDebugger.log('ERROR_OCCURRED', `handlePlayPause error: ${error instanceof Error ? error.message : 'Unknown error'}`, activeTabId)
+      return
     }
   }
 
-  const handleStop = () => {
+  const handleStop = (): void => {
     if (!activeTabId) return
     
     logger.debug(() => 'Stopping playback and resetting to first frame', { 
@@ -292,7 +363,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handleAddFrame = () => {
+  const handleAddFrame = (): void => {
     addFrame(activeTabId)
   }
 
@@ -357,7 +428,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handleNextFrame = () => {
+  const handleNextFrame = (): void => {
     if (!activeTabId) return
     
     if (isPlaying) {
@@ -375,7 +446,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handlePrevFrame = () => {
+  const handlePrevFrame = (): void => {
     if (!activeTabId) return
     
     if (isPlaying) {
@@ -398,41 +469,28 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       {/* Animation Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
+          {/* Enhanced Unified Play/Stop Button */}
           <Button
             variant={isPlaying ? 'secondary' : 'default'}
             size="sm"
-            onClick={() => {
-              if (!isPlaying) {
-                handlePlayPause()
-              }
-            }}
-            disabled={frames.length <= 1 || isPlaying}
-            className="px-3"
+            onClick={isPlaying ? handleStop : handlePlayPause}
+            disabled={frames.length <= 1}
+            className={cn(
+              "px-3 transition-all duration-200",
+              isPlaying && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+            )}
           >
-            <Play className="h-4 w-4 mr-2" />
-            Play
-          </Button>
-          
-          <Button
-            variant={isPlaying ? 'default' : 'secondary'}
-            size="sm"
-            onClick={handlePlayPause}
-            disabled={frames.length <= 1 || !isPlaying}
-            className="px-3"
-          >
-            <Pause className="h-4 w-4 mr-2" />
-            Pause
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleStop}
-            disabled={frames.length <= 1 || (!isPlaying && playbackFrameIndex === 0)}
-            className="px-3"
-          >
-            <Square className="h-4 w-4 mr-2" />
-            Stop
+            {isPlaying ? (
+              <>
+                <Square className="h-4 w-4 mr-2 animate-pulse" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Play
+              </>
+            )}
           </Button>
 
           {/* Speed Control */}
@@ -557,17 +615,27 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
           </span>
         </div>
 
-        <div className="flex space-x-2 overflow-x-auto pb-2">
+        {/* Timeline container with dynamic minimum width */}
+        <div 
+          ref={timelineScrollRef}
+          className="overflow-x-auto pb-2"
+          style={{
+            minWidth: Math.max(frames.length * 80, 400) + 'px'
+          }}
+        >
+          <div className="flex space-x-2 w-max">
           {frames.map((frame, index) => (
             <div
               key={frame.id}
+              ref={el => { frameRefs.current[index] = el }}
               className={cn(
-                'group relative flex-shrink-0 cursor-pointer rounded border-2 p-2 transition-all',
+                'group relative flex-shrink-0 cursor-pointer rounded border-2 p-2 transition-all duration-200',
                 activeFrameId === frame.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 bg-white hover:border-gray-300',
-                isPlaying && playbackFrameIndex === index && 'ring-2 ring-green-400',
-                playbackFrameId === frame.id && isPlaying && 'bg-green-50 border-green-400'
+                // Enhanced playing frame animation
+                isPlaying && playbackFrameIndex === index && 'ring-2 ring-green-400 scale-105 shadow-lg bg-green-50 border-green-400',
+                playbackFrameId === frame.id && isPlaying && 'animate-pulse'
               )}
               role="tab"
               aria-selected={activeFrameId === frame.id}
@@ -685,6 +753,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
               )}
             </div>
           ))}
+          </div>
         </div>
 
       </div>
