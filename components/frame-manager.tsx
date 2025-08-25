@@ -192,10 +192,28 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
 
   // Enhanced auto-play function with 300ms interval and right arrow simulation
   const startEnhancedAutoPlay = useCallback(() => {
-    if (!activeTabId) return
+    console.log('🚀 [startEnhancedAutoPlay] Function called', { 
+      activeTabId, 
+      framesLength: frames.length,
+      currentPlaybackFrameId: playbackFrameId 
+    })
+    
+    if (!activeTabId) {
+      console.log('❌ [startEnhancedAutoPlay] No activeTabId - RETURN')
+      return
+    }
+    
+    if (frames.length <= 1) {
+      console.log('❌ [startEnhancedAutoPlay] Not enough frames - RETURN', { framesLength: frames.length })
+      return
+    }
+    
+    console.log('✅ [startEnhancedAutoPlay] Pre-conditions passed, calling startPlayback')
     
     // Start playback in store
     startPlayback(activeTabId)
+    
+    console.log('✅ [startEnhancedAutoPlay] startPlayback called successfully')
     
     logger.debug(() => 'Started enhanced auto-play', { 
       frameCount: frames.length,
@@ -314,9 +332,13 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       }, activeTabId)
       console.log('✅ [FrameManager] TOGGLE_PLAYBACK_CALLED logged')
       
-      console.log('🚀 [FrameManager] About to call togglePlayback with:', activeTabId)
-      togglePlayback(activeTabId)
-      console.log('✅ [FrameManager] togglePlayback called')
+      if (isPlaying) {
+        console.log('🛑 [FrameManager] Stopping playback')
+        stopPlayback(activeTabId)
+      } else {
+        console.log('🚀 [FrameManager] Starting enhanced auto-play')
+        startEnhancedAutoPlay()
+      }
     
       console.log('🕰️ [FrameManager] Setting timeout for result check')
       // 🔍 디버깅: togglePlayback 호출 후 상태 확인 (비동기적으로)
@@ -469,29 +491,39 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       {/* Animation Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          {/* Enhanced Unified Play/Stop Button */}
-          <Button
-            variant={isPlaying ? 'secondary' : 'default'}
-            size="sm"
-            onClick={isPlaying ? handleStop : handlePlayPause}
-            disabled={frames.length <= 1}
-            className={cn(
-              "px-3 transition-all duration-200",
-              isPlaying && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+          {/* Enhanced Unified Play/Stop Button with Tooltip */}
+          <div className="relative group">
+            <Button
+              variant={isPlaying ? 'secondary' : 'default'}
+              size="sm"
+              onClick={isPlaying ? handleStop : handlePlayPause}
+              disabled={frames.length <= 1}
+              className={cn(
+                "px-3 transition-all duration-200",
+                isPlaying && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+              )}
+            >
+              {isPlaying ? (
+                <>
+                  <Square className="h-4 w-4 mr-2 animate-pulse" />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Play
+                </>
+              )}
+            </Button>
+            
+            {/* Tooltip for disabled state */}
+            {frames.length <= 1 && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                애니메이션을 재생하려면 최소 2개 프레임이 필요합니다
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+              </div>
             )}
-          >
-            {isPlaying ? (
-              <>
-                <Square className="h-4 w-4 mr-2 animate-pulse" />
-                Stop
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Play
-              </>
-            )}
-          </Button>
+          </div>
 
           {/* Speed Control */}
           <div className="flex items-center space-x-2 ml-2">
@@ -569,13 +601,19 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         </div>
 
         <Button
-          variant="outline"
+          variant={frames.length <= 1 ? "default" : "outline"}
           size="sm"
           onClick={handleAddFrame}
-          className="px-3"
+          className={cn(
+            "px-3 transition-all duration-200",
+            frames.length <= 1 && "animate-pulse bg-blue-500 text-white hover:bg-blue-600"
+          )}
         >
           <Plus className="h-4 w-4 mr-2" />
           Add Frame
+          {frames.length <= 1 && (
+            <span className="ml-2 text-xs">← 애니메이션 시작</span>
+          )}
         </Button>
       </div>
 

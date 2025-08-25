@@ -213,7 +213,7 @@ const createDefaultProject = (options?: {
 const createDefaultFrame = (): Omit<Frame, 'id' | 'createdAt' | 'updatedAt'> => ({
   projectId: '',
   index: 0,
-  delayMs: 500,
+  delayMs: 300,
   included: true,
   layers: [],
   flattenedPngUrl: null,
@@ -1260,7 +1260,7 @@ export const useProjectStore = create<ProjectStore>()(
         },
 
         // Add frame with imported data
-        addFrameWithData: async (tabId, imageData, delayMs = 500) => {
+        addFrameWithData: async (tabId, imageData, delayMs = 300) => {
           storeDebug('ADD_FRAME_WITH_DATA_START', `Adding frame with imported data to tab ${tabId}`)
 
           // CRITICAL: Save current canvas data before switching
@@ -2056,7 +2056,7 @@ export const useProjectStore = create<ProjectStore>()(
             const startTime = currentTab.playbackStartTime!
             const elapsedTime = (timestamp - startTime) * currentTab.playbackSpeed
             const currentFrame = currentTab.frames[currentTab.playbackFrameIndex]
-            const frameDelay = currentFrame?.delayMs || 500
+            const frameDelay = currentFrame?.delayMs || 300
             
             // Check if it's time to advance to next frame
             if (elapsedTime - currentTab.playbackAccumulatedTime >= frameDelay) {
@@ -2253,7 +2253,7 @@ export const useProjectStore = create<ProjectStore>()(
               
               // Reset accumulated time when manually setting frame
               if (tab.isPlaying) {
-                tab.playbackAccumulatedTime = frameIndex * (frame.delayMs || 500)
+                tab.playbackAccumulatedTime = frameIndex * (frame.delayMs || 300)
                 tab.playbackStartTime = performance.now() - tab.playbackAccumulatedTime / tab.playbackSpeed
               }
               
