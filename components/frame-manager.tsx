@@ -440,8 +440,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         console.log('🛑 [FrameManager] Stopping playback')
         stopPlayback(activeTabId)
       } else {
-        console.log('🚀 [FrameManager] Starting enhanced auto-play')
-        startSimpleAutoPlay()
+        console.log('🚀 [FrameManager] Starting RAF-based playback directly')
+        startPlayback(activeTabId)
       }
     
       console.log('🕰️ [FrameManager] Setting timeout for result check')
