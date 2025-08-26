@@ -61,6 +61,19 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const timelineScrollRef = useRef<HTMLDivElement>(null)
   const frameRefs = useRef<(HTMLDivElement | null)[]>([])
   const [isFocused, setIsFocused] = useState(false)
+  
+  // Simple interval-based playback
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [])
 
   // Enhanced keyboard navigation with safety checks
   const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
@@ -178,48 +191,134 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }, [])
 
-  // Clean up intervals on component unmount
+  // Clean up intervals ONLY on component unmount (not on every re-render)
   React.useEffect(() => {
+    // Capture current values at effect creation time
+    const capturedActiveTabId = activeTabId
+    
     return () => {
-      if (activeTabId && activeTab?.playbackIntervalId) {
-        stopPlayback(activeTabId)
+      // 🚨 PROBLEM WAS HERE: This was running on every dependency change!
+      // Only cleanup on actual component unmount
+      console.log('🧹 [FrameManager] Component unmount cleanup - checking playback')
+      if (capturedActiveTabId) {
+        const currentState = useProjectStore.getState()
+        const currentTab = currentState.tabs.find(t => t.id === capturedActiveTabId)
+        if (currentTab?.isPlaying && currentTab?.playbackIntervalId) {
+          console.log('🧹 [FrameManager] Stopping playback on unmount')
+          stopPlayback(capturedActiveTabId)
+        }
       }
     }
-  }, [activeTabId, activeTab?.playbackIntervalId, stopPlayback])
+  }, []) // 🚨 CRITICAL: Empty dependency array to only run on unmount!
 
   // Early return after all hooks are defined
   const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
 
-  // Enhanced auto-play function with 300ms interval and right arrow simulation
-  const startEnhancedAutoPlay = useCallback(() => {
-    console.log('🚀 [startEnhancedAutoPlay] Function called', { 
+  // Simple interval-based auto-advance (arrow key simulation)
+  const startSimpleAutoPlay = useCallback(() => {
+    console.log('🚀 [startSimpleAutoPlay] Starting simple auto-advance', { 
       activeTabId, 
       framesLength: frames.length,
       currentPlaybackFrameId: playbackFrameId 
     })
     
     if (!activeTabId) {
-      console.log('❌ [startEnhancedAutoPlay] No activeTabId - RETURN')
+      console.log('❌ [startSimpleAutoPlay] No activeTabId - RETURN')
       return
     }
     
     if (frames.length <= 1) {
-      console.log('❌ [startEnhancedAutoPlay] Not enough frames - RETURN', { framesLength: frames.length })
+      console.log('❌ [startSimpleAutoPlay] Not enough frames - RETURN', { framesLength: frames.length })
       return
     }
     
-    console.log('✅ [startEnhancedAutoPlay] Pre-conditions passed, calling startPlayback')
+    // Clear any existing interval and stop any running frameLoop
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
     
-    // Start playback in store
-    startPlayback(activeTabId)
+    // Stop any existing frameLoop system first
+    if (activeTabId && isPlaying) {
+      stopPlayback(activeTabId)
+    }
     
-    console.log('✅ [startEnhancedAutoPlay] startPlayback called successfully')
+    // Set playback state to true without frameLoop
+    if (activeTabId && !isPlaying) {
+      // Directly set playing state using Zustand setState
+      useProjectStore.setState((state) => {
+        const tab = state.tabs.find(t => t.id === activeTabId)
+        if (tab) {
+          tab.isPlaying = true
+          tab.playbackFrameIndex = 0
+        }
+      })
+    }
     
-    logger.debug(() => 'Started enhanced auto-play', { 
-      frameCount: frames.length,
-      currentFrame: playbackFrameId 
-    })
-  }, [activeTabId, frames.length, playbackFrameId, startPlayback, logger])
+    // Start interval to advance frames every 500ms
+    console.log('🔧 [startSimpleAutoPlay] About to create setInterval')
+    
+    // Immediate test to verify interval will work
+    console.log('🧪 [startSimpleAutoPlay] Testing handleNextFrame before interval')
+    try {
+      const testResult = handleNextFrame()
+      console.log('✅ [startSimpleAutoPlay] Test handleNextFrame succeeded:', testResult)
+    } catch (error) {
+      console.error('❌ [startSimpleAutoPlay] Test handleNextFrame failed:', error)
+      return // Don't start interval if handleNextFrame is broken
+    }
+    
+    intervalRef.current = setInterval(() => {
+      const timestamp = Date.now()
+      const currentFramesBefore = frames.length
+      const currentIndexBefore = playbackFrameIndex
+      
+      console.log('⏰ [AutoAdvance] Interval executing at', timestamp, {
+        framesBefore: currentFramesBefore,
+        indexBefore: currentIndexBefore,
+        activeTab: activeTabId
+      })
+      
+      try {
+        const result = handleNextFrame()
+        console.log('✅ [AutoAdvance] Frame advanced successfully', {
+          result,
+          from: currentIndexBefore,
+          to: playbackFrameIndex,
+          totalFrames: currentFramesBefore,
+          timestamp
+        })
+      } catch (error) {
+        console.error('❌ [AutoAdvance] Critical error in handleNextFrame:', error)
+        console.error('🛑 [AutoAdvance] Stopping interval due to error')
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+      }
+    }, 500)
+    console.log('🔧 [startSimpleAutoPlay] setInterval created with ID:', intervalRef.current)
+    
+    console.log('✅ [startSimpleAutoPlay] Auto-advance started with interval:', intervalRef.current)
+    logger.debug('Started simple auto-play with interval')
+  }, [activeTabId, frames.length, playbackFrameId, isPlaying, startPlayback, handleNextFrame, logger])
+  
+  // Stop auto-advance
+  const stopSimpleAutoPlay = useCallback(() => {
+    console.log('⏹️ [stopSimpleAutoPlay] Stopping auto-advance')
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+      console.log('✅ [stopSimpleAutoPlay] Interval cleared')
+    }
+    
+    if (activeTabId && isPlaying) {
+      stopPlayback(activeTabId)
+      console.log('✅ [stopSimpleAutoPlay] Playback stopped')
+    }
+    
+    logger.debug('Stopped simple auto-play')
+  }, [activeTabId, isPlaying, stopPlayback, logger])
 
   // User interaction detection for auto-stop
   const handleUserInteraction = useCallback((e: Event) => {
@@ -230,6 +329,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       
       if (!frameManagerArea) {
         // Click is outside frame manager, stop playback
+        stopSimpleAutoPlay()
         stopPlayback(activeTabId)
         logger.debug(() => 'Playback stopped due to user interaction outside frame manager', {
           eventType: e.type,
@@ -237,7 +337,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         })
       }
     }
-  }, [activeTabId, isPlaying, stopPlayback, logger])
+  }, [activeTabId, isPlaying, stopPlayback, stopSimpleAutoPlay, logger])
 
   // Auto-scroll timeline to active frame
   const scrollToFrame = useCallback((frameIndex: number) => {
@@ -279,8 +379,12 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     return null
   }
 
-  const handlePlayPause = (): void => {
+  const handlePlayPause = (e: React.MouseEvent): void => {
     console.log('🎬 [FrameManager] handlePlayPause START')
+    
+    // 🚨 CRITICAL: Stop event bubbling to prevent handleGlobalClick from stopping playback
+    e.stopPropagation()
+    console.log('🛡️ [FrameManager] Event propagation stopped to prevent global click handler')
     
     try {
       // 🔍 디버깅: Play 버튼 클릭 추적
@@ -337,7 +441,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         stopPlayback(activeTabId)
       } else {
         console.log('🚀 [FrameManager] Starting enhanced auto-play')
-        startEnhancedAutoPlay()
+        startSimpleAutoPlay()
       }
     
       console.log('🕰️ [FrameManager] Setting timeout for result check')
@@ -364,8 +468,17 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handleStop = (): void => {
+  const handleStop = (e: React.MouseEvent): void => {
+    e.stopPropagation() // Prevent event bubbling
+    console.log('🛡️ [FrameManager] handleStop - Event propagation stopped')
+    
     if (!activeTabId) return
+    
+    // Prevent duplicate stop calls - check if already stopping
+    if (!isPlaying && !intervalRef.current) {
+      console.log('🚫 [handleStop] Already stopped - ignoring duplicate call')
+      return
+    }
     
     logger.debug(() => 'Stopping playback and resetting to first frame', { 
       isPlaying, 
@@ -373,8 +486,13 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       totalFrames: frames.length 
     })
     
-    // Stop playback
-    stopPlayback(activeTabId)
+    // Stop simple auto-play interval first
+    stopSimpleAutoPlay()
+    
+    // Only call stopPlayback if currently playing
+    if (isPlaying) {
+      stopPlayback(activeTabId)
+    }
     
     // Reset to first frame
     setPlaybackFrame(activeTabId, 0)
@@ -450,12 +568,13 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handleNextFrame = (): void => {
+  const handleNextFrame = (e?: React.MouseEvent): void => {
+    e?.stopPropagation() // Prevent event bubbling when called from onClick
     if (!activeTabId) return
     
     if (isPlaying) {
-      // During playback, just advance playback frame
-      const nextIndex = Math.min(playbackFrameIndex + 1, frames.length - 1)
+      // During playback, advance with looping (cycle back to first frame after last)
+      const nextIndex = (playbackFrameIndex + 1) % frames.length
       setPlaybackFrame(activeTabId, nextIndex)
     } else {
       // Normal navigation
@@ -468,7 +587,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     }
   }
 
-  const handlePrevFrame = (): void => {
+  const handlePrevFrame = (e?: React.MouseEvent): void => {
+    e?.stopPropagation() // Prevent event bubbling when called from onClick
     if (!activeTabId) return
     
     if (isPlaying) {

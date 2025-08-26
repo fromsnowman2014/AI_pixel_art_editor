@@ -1693,13 +1693,14 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Set active frame with canvas data loading - CRITICAL FIX: Single atomic operation
         setActiveFrame: (tabId, frameId) => {
-          storeDebug('SET_ACTIVE_FRAME_START', `Switching to frame ${frameId}`, {
-            tabId,
-            frameId
-          })
+          try {
+            storeDebug('SET_ACTIVE_FRAME_START', `Switching to frame ${frameId}`, {
+              tabId,
+              frameId
+            })
 
-          // ATOMIC OPERATION: Single set() call for data integrity
-          set((state) => {
+            // ATOMIC OPERATION: Single set() call for data integrity
+            set((state) => {
             const tab = state.tabs.find(t => t.id === tabId)
             const targetFrame = tab?.frames.find(f => f.id === frameId)
             
@@ -1798,11 +1799,41 @@ export const useProjectStore = create<ProjectStore>()(
               frameCanvasDataIds: tab.frameCanvasData.map(f => f.frameId)
             })
 
-            // STEP 5: Add history entry (separate call to avoid circular dependencies)
-            setTimeout(() => {
-              get().addHistoryEntry(tabId, 'frame_switch', tab.canvasData!)
-            }, 0)
+            // STEP 5: Add history entry (synchronous, inside the draft context)
+            try {
+              if (tab.canvasData) {
+                // Call addHistoryEntry directly on the draft state
+                const historyEntry = {
+                  id: `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  timestamp: Date.now(),
+                  action: 'frame_switch' as const,
+                  canvasData: new Uint8ClampedArray(tab.canvasData),
+                  frameId: frameId
+                }
+                
+                if (!draft.tabs) draft.tabs = []
+                const draftTab = draft.tabs.find(t => t.id === tabId)
+                if (draftTab) {
+                  if (!draftTab.history) draftTab.history = []
+                  draftTab.history.push(historyEntry)
+                  
+                  // Keep history size manageable
+                  if (draftTab.history.length > 50) {
+                    draftTab.history = draftTab.history.slice(-50)
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ [ProjectStore] Failed to add history entry after frame switch:', error)
+            }
           })
+        } catch (error) {
+            console.error('❌ [ProjectStore] setActiveFrame failed:', error, {
+              tabId,
+              frameId,
+              stack: error instanceof Error ? error.stack : 'No stack available'
+            })
+          }
         },
 
         // Reorder frames
@@ -1941,11 +1972,22 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Enhanced Playback operations with requestAnimationFrame precision
         startPlayback: (tabId) => {
+          console.log('🎯 [ProjectStore] startPlayback ENTRY POINT called with tabId:', tabId)
+          console.log('🎯 [ProjectStore] startPlayback call stack:', new Error().stack)
           const startTime = performance.now()
           const state = get()
           const tab = state.tabs.find(t => t.id === tabId)
           
-          // 🔍 디버깅: startPlayback 입력 검증
+          // 🔍 디버깅: startPlayback 입력 검증 (enhanced)
+          console.log('🔍 [ProjectStore] startPlayback validation:', {
+            tabId,
+            tabExists: !!tab,
+            framesCount: tab?.frames?.length,
+            frameCanvasDataCount: tab?.frameCanvasData?.length,
+            currentIsPlaying: tab?.isPlaying,
+            currentPlaybackIntervalId: tab?.playbackIntervalId
+          })
+          
           PlaybackDebugger.log('START_PLAYBACK_ENTER', {
             tabId,
             tabExists: !!tab,
@@ -1965,9 +2007,17 @@ export const useProjectStore = create<ProjectStore>()(
             return
           }
 
-          // Stop any existing playback
+          // Stop any existing playback (but don't call stopPlayback since we're about to start)
+          console.log('🛑 [ProjectStore] Checking for existing playback to stop for tabId:', tabId)
           PlaybackDebugger.log('STOPPING_EXISTING_PLAYBACK', { tabId }, tabId)
-          get().stopPlayback(tabId)
+          
+          // Manually clean up existing playback without calling stopPlayback
+          if (tab.playbackIntervalId) {
+            console.log('🛑 [ProjectStore] Canceling existing RAF:', tab.playbackIntervalId)
+            cancelAnimationFrame(tab.playbackIntervalId)
+          }
+          
+          console.log('🛑 [ProjectStore] Existing playback cleanup completed')
 
           // Initialize playback state with precise timing
           PlaybackDebugger.log('INITIALIZING_PLAYBACK_STATE', {
@@ -1975,18 +2025,34 @@ export const useProjectStore = create<ProjectStore>()(
             firstFrameId: tab.frames[0]?.id
           }, tabId)
           
+          console.log('🔧 [ProjectStore] About to set playback state for tabId:', tabId)
           set((draft) => {
+            console.log('🔧 [ProjectStore] Inside set() callback')
             const currentTab = draft.tabs.find(t => t.id === tabId)
             if (!currentTab) {
+              console.log('❌ [ProjectStore] Current tab not found during initialization:', tabId)
               PlaybackDebugger.log('ERROR_OCCURRED', 'Current tab not found during initialization', tabId)
               return
             }
+
+            console.log('🔧 [ProjectStore] Setting playback state - BEFORE:', {
+              isPlaying: currentTab.isPlaying,
+              playbackFrameIndex: currentTab.playbackFrameIndex,
+              playbackFrameId: currentTab.playbackFrameId
+            })
 
             currentTab.isPlaying = true
             currentTab.playbackFrameIndex = 0
             currentTab.playbackFrameId = currentTab.frames[0]?.id || null
             currentTab.playbackStartTime = performance.now()
             currentTab.playbackAccumulatedTime = 0
+            
+            console.log('🔧 [ProjectStore] Setting playback state - AFTER:', {
+              isPlaying: currentTab.isPlaying,
+              playbackFrameIndex: currentTab.playbackFrameIndex,
+              playbackFrameId: currentTab.playbackFrameId,
+              firstFrameId: currentTab.frames[0]?.id
+            })
             
             // Load first frame immediately
             const firstFrame = currentTab.frames[0]
@@ -2014,8 +2080,23 @@ export const useProjectStore = create<ProjectStore>()(
               PlaybackDebugger.log('ERROR_OCCURRED', 'No first frame found', tabId)
             }
           })
+          
+          console.log('🔧 [ProjectStore] set() callback completed, checking state...')
+          // Verify state was set correctly
+          setTimeout(() => {
+            const verifyState = get()
+            const verifyTab = verifyState.tabs.find(t => t.id === tabId)
+            console.log('🔍 [ProjectStore] State verification after set():', {
+              tabExists: !!verifyTab,
+              isPlaying: verifyTab?.isPlaying,
+              playbackFrameIndex: verifyTab?.playbackFrameIndex,
+              playbackFrameId: verifyTab?.playbackFrameId,
+              playbackIntervalId: verifyTab?.playbackIntervalId
+            })
+          }, 10)
 
           // Enhanced frame advancement with requestAnimationFrame precision
+          console.log('🚀 [ProjectStore] About to start frame loop for tabId:', tabId)
           PlaybackDebugger.log('STARTING_FRAME_LOOP', {
             tabId,
             startTime: performance.now()
@@ -2026,6 +2107,9 @@ export const useProjectStore = create<ProjectStore>()(
           
           const frameLoop = (timestamp: number) => {
             frameLoopCount++
+            if (frameLoopCount === 1) {
+              console.log('🎬 [ProjectStore] frameLoop FIRST CALL - Animation started!', { tabId, timestamp })
+            }
             const currentState = get()
             const currentTab = currentState.tabs.find(t => t.id === tabId)
             
@@ -2043,10 +2127,18 @@ export const useProjectStore = create<ProjectStore>()(
             
             // Exit conditions
             if (!currentTab || !currentTab.isPlaying || currentTab.frames.length <= 1) {
+              const exitReason = !currentTab ? 'no_tab' : 
+                                !currentTab.isPlaying ? 'not_playing' : 
+                                'insufficient_frames'
+              console.log('🚫 [ProjectStore] frameLoop EXIT:', {
+                reason: exitReason,
+                frameLoopCount,
+                tabExists: !!currentTab,
+                isPlaying: currentTab?.isPlaying,
+                framesLength: currentTab?.frames?.length
+              })
               PlaybackDebugger.log('FRAME_LOOP_EXIT', {
-                reason: !currentTab ? 'no_tab' : 
-                        !currentTab.isPlaying ? 'not_playing' : 
-                        'insufficient_frames',
+                reason: exitReason,
                 frameLoopCount
               }, tabId)
               return
@@ -2058,12 +2150,39 @@ export const useProjectStore = create<ProjectStore>()(
             const currentFrame = currentTab.frames[currentTab.playbackFrameIndex]
             const frameDelay = currentFrame?.delayMs || 300
             
+            // 🔍 디버깅: 시간 계산 상태 (매 30번마다 로깅)
+            if (frameLoopCount % 30 === 0) {
+              console.log('⏰ [ProjectStore] TIME CALCULATION DEBUG:', {
+                timestamp,
+                startTime,
+                elapsedTime,
+                accumulatedTime: currentTab.playbackAccumulatedTime,
+                frameDelay,
+                timeDifference: elapsedTime - currentTab.playbackAccumulatedTime,
+                shouldAdvance: elapsedTime - currentTab.playbackAccumulatedTime >= frameDelay,
+                currentFrameIndex: currentTab.playbackFrameIndex,
+                playbackSpeed: currentTab.playbackSpeed,
+                framesCount: currentTab.frames.length
+              })
+            }
+            
             // Check if it's time to advance to next frame
             if (elapsedTime - currentTab.playbackAccumulatedTime >= frameDelay) {
               const nextFrameIndex = (currentTab.playbackFrameIndex + 1) % currentTab.frames.length
               const nextFrame = currentTab.frames[nextFrameIndex]
               
-              // 🔍 디버깅: 프레임 전환 시작
+              // 🔍 디버깅: 프레임 전환 시작 (enhanced)
+              console.log('🎞️ [ProjectStore] FRAME ADVANCEMENT:', {
+                fromIndex: currentTab.playbackFrameIndex,
+                toIndex: nextFrameIndex,
+                fromFrameId: currentTab.playbackFrameId,
+                toFrameId: nextFrame?.id,
+                elapsedTime,
+                accumulatedTime: currentTab.playbackAccumulatedTime,
+                frameDelay,
+                timeToAdvance: elapsedTime - currentTab.playbackAccumulatedTime
+              })
+              
               PlaybackDebugger.log('FRAME_ADVANCED', {
                 fromIndex: currentTab.playbackFrameIndex,
                 toIndex: nextFrameIndex,
@@ -2130,6 +2249,15 @@ export const useProjectStore = create<ProjectStore>()(
             // Continue the animation loop
             rafId = requestAnimationFrame(frameLoop)
             
+            // Enhanced logging every 10 frames to track loop continuation
+            if (frameLoopCount % 10 === 0) {
+              console.log('🔄 [ProjectStore] frameLoop continuing:', {
+                loopCount: frameLoopCount,
+                newRafId: rafId,
+                tabId
+              })
+            }
+            
             // Store RAF ID for cleanup
             set((draft) => {
               const tab = draft.tabs.find(t => t.id === tabId)
@@ -2140,20 +2268,34 @@ export const useProjectStore = create<ProjectStore>()(
           }
           
           // Start the frame loop
+          console.log('🎬 [ProjectStore] Calling requestAnimationFrame to start frame loop')
           rafId = requestAnimationFrame(frameLoop)
+          console.log('🎬 [ProjectStore] requestAnimationFrame called, rafId:', rafId)
           
           set((draft) => {
             const currentTab = draft.tabs.find(t => t.id === tabId)
             if (currentTab) {
               currentTab.playbackIntervalId = rafId
+              console.log('🎬 [ProjectStore] Set playbackIntervalId:', rafId, 'for tab:', tabId)
             }
           })
         },
 
         stopPlayback: (tabId) => {
+          console.log('🛑 [ProjectStore] stopPlayback called for tabId:', tabId)
+          console.log('🛑 [ProjectStore] stopPlayback stack trace:', new Error().stack)
           set((draft) => {
             const tab = draft.tabs.find(t => t.id === tabId)
-            if (!tab) return
+            if (!tab) {
+              console.log('🛑 [ProjectStore] stopPlayback - tab not found:', tabId)
+              return
+            }
+
+            console.log('🛑 [ProjectStore] stopPlayback - stopping tab:', {
+              tabId,
+              wasPlaying: tab.isPlaying,
+              hadIntervalId: !!tab.playbackIntervalId
+            })
 
             // Stop playback immediately
             tab.isPlaying = false
