@@ -1776,10 +1776,10 @@ export const useProjectStore = create<ProjectStore>()(
                 data: new Uint8ClampedArray(targetFrameData.canvasData.data)
               }
               storeDebug('SET_ACTIVE_FRAME_LOADED', `Loaded existing canvas data for frame ${frameId}`, {
-                dataLength: targetFrameData.canvasData.data.length,
+                dataLength: tab.canvasData.data.length,
                 hasThumbnail: !!targetFrameData.thumbnail,
                 hasPixelData,
-                samplePixels: Array.from(targetFrameData.canvasData.data.slice(0, 16))
+                samplePixels: Array.from(tab.canvasData.data.slice(0, 16))
               })
             } else {
               // Create empty canvas data for new frame
@@ -1806,20 +1806,23 @@ export const useProjectStore = create<ProjectStore>()(
                 const historyEntry = {
                   id: `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                   timestamp: Date.now(),
-                  action: 'frame_switch' as const,
-                  canvasData: new Uint8ClampedArray(tab.canvasData),
-                  frameId: frameId
+                  action: 'frame_switch',
+                  data: {
+                    width: tab.canvasData.width,
+                    height: tab.canvasData.height,
+                    data: new Uint8ClampedArray(tab.canvasData.data)
+                  }
                 }
                 
-                if (!draft.tabs) draft.tabs = []
-                const draftTab = draft.tabs.find(t => t.id === tabId)
-                if (draftTab) {
-                  if (!draftTab.history) draftTab.history = []
-                  draftTab.history.push(historyEntry)
+                if (!state.tabs) state.tabs = []
+                const stateTab = state.tabs.find(t => t.id === tabId)
+                if (stateTab) {
+                  if (!stateTab.history) stateTab.history = []
+                  stateTab.history.push(historyEntry)
                   
                   // Keep history size manageable
-                  if (draftTab.history.length > 50) {
-                    draftTab.history = draftTab.history.slice(-50)
+                  if (stateTab.history.length > 50) {
+                    stateTab.history = stateTab.history.slice(-50)
                   }
                 }
               }
@@ -2113,6 +2116,18 @@ export const useProjectStore = create<ProjectStore>()(
             const currentState = get()
             const currentTab = currentState.tabs.find(t => t.id === tabId)
             
+            // 🔍 [CRITICAL DEBUG] State reading verification
+            if (frameLoopCount % 10 === 0) {
+              console.log('📖 [READING STATE] frameLoop start:', {
+                frameLoopCount,
+                tabId,
+                currentTabExists: !!currentTab,
+                playbackAccumulatedTime: currentTab?.playbackAccumulatedTime,
+                playbackFrameIndex: currentTab?.playbackFrameIndex,
+                isPlaying: currentTab?.isPlaying
+              })
+            }
+            
             // 🔍 디버깅: 프레임 루프 체크 (5번마다 로깅)
             if (frameLoopCount % 5 === 0) {
               PlaybackDebugger.log('FRAME_LOOP_TICK', {
@@ -2150,19 +2165,66 @@ export const useProjectStore = create<ProjectStore>()(
             const currentFrame = currentTab.frames[currentTab.playbackFrameIndex]
             const frameDelay = currentFrame?.delayMs || 300
             
-            // 🔍 디버깅: 시간 계산 상태 (매 30번마다 로깅)
-            if (frameLoopCount % 30 === 0) {
+            // 🔍 디버깅: 시간 계산 상태 강화 (매 15번마다 로깅)
+            const timeDifference = elapsedTime - currentTab.playbackAccumulatedTime
+            const shouldAdvance = timeDifference >= frameDelay
+            
+            if (frameLoopCount % 15 === 0) {
               console.log('⏰ [ProjectStore] TIME CALCULATION DEBUG:', {
                 timestamp,
                 startTime,
-                elapsedTime,
-                accumulatedTime: currentTab.playbackAccumulatedTime,
-                frameDelay,
-                timeDifference: elapsedTime - currentTab.playbackAccumulatedTime,
-                shouldAdvance: elapsedTime - currentTab.playbackAccumulatedTime >= frameDelay,
+                elapsedTime: elapsedTime.toFixed(2) + 'ms',
+                accumulatedTime: currentTab.playbackAccumulatedTime + 'ms',
+                frameDelay: frameDelay + 'ms',
+                timeDifference: timeDifference.toFixed(2) + 'ms',
+                shouldAdvance: shouldAdvance,
+                condition: `${timeDifference.toFixed(2)} >= ${frameDelay} = ${shouldAdvance}`,
                 currentFrameIndex: currentTab.playbackFrameIndex,
                 playbackSpeed: currentTab.playbackSpeed,
                 framesCount: currentTab.frames.length
+              })
+            }
+            
+            // 🔍 디버깅: 프레임 전환 임계점 근처에서 매번 로깅
+            if (timeDifference > frameDelay * 0.9) {
+              console.log('🔥 [ProjectStore] NEAR FRAME TRANSITION:', {
+                timeDifference: timeDifference.toFixed(2) + 'ms',
+                frameDelay: frameDelay + 'ms',
+                shouldAdvance: shouldAdvance,
+                percentProgress: ((timeDifference / frameDelay) * 100).toFixed(1) + '%'
+              })
+            }
+            
+            // 🔍 [Stage 3 Debug] DETAILED CONDITIONS CHECK - 모든 프레임 전환 조건 검증
+            const timeToAdvance = elapsedTime - currentTab.playbackAccumulatedTime
+            const shouldAdvanceFrame = timeToAdvance >= frameDelay
+            const currentFrameIndex = currentTab.playbackFrameIndex
+            const nextFrameIndex = (currentTab.playbackFrameIndex + 1) % currentTab.frames.length
+            const framesLength = currentTab.frames.length
+            
+            // 매 5번째 frameLoop마다 상세 조건 로깅
+            if (frameLoopCount % 5 === 0) {
+              console.log('🔍 [frameLoop] CONDITIONS CHECK:', {
+                elapsedTime: elapsedTime.toFixed(2) + 'ms',
+                accumulatedTime: currentTab.playbackAccumulatedTime.toFixed(2) + 'ms',
+                timeToAdvance: timeToAdvance.toFixed(2) + 'ms',
+                frameDelay: frameDelay + 'ms',
+                shouldAdvance: shouldAdvanceFrame,
+                currentFrameIndex,
+                nextFrameIndex,
+                framesLength,
+                isStillPlaying: currentTab.isPlaying,
+                progressPercent: ((timeToAdvance / frameDelay) * 100).toFixed(1) + '%'
+              })
+            }
+            
+            // 800ms 경과 시점 특별 로깅 (문제 진단용)
+            if (timeToAdvance >= 800 && frameLoopCount % 3 === 0) {
+              console.log('⚠️ [frameLoop] 800ms+ ELAPSED - Should advance now!', {
+                timeToAdvance: timeToAdvance.toFixed(2) + 'ms',
+                frameDelay: frameDelay + 'ms',
+                shouldAdvance: shouldAdvanceFrame,
+                reasonNotAdvancing: shouldAdvanceFrame ? 'SHOULD ADVANCE!' : 'Condition still false'
               })
             }
             
@@ -2194,15 +2256,34 @@ export const useProjectStore = create<ProjectStore>()(
               }, tabId)
               
               if (nextFrame) {
+                // 🔍 [CRITICAL DEBUG] State before update
+                console.log('🚨 [BEFORE UPDATE]:', {
+                  currentAccumulatedTime: currentTab.playbackAccumulatedTime,
+                  frameDelay,
+                  calculatedNew: currentTab.playbackAccumulatedTime + frameDelay
+                })
+                
                 // Update state atomically to prevent race conditions
                 set((draft) => {
                   const tab = draft.tabs.find(t => t.id === tabId)
                   if (!tab || !tab.isPlaying) return // Double-check state
                   
+                  console.log('🔧 [UPDATING STATE] Before:', {
+                    oldAccumulated: tab.playbackAccumulatedTime,
+                    frameDelay,
+                    willBecome: tab.playbackAccumulatedTime + frameDelay
+                  })
+                  
                   // Update frame index and accumulate time
                   tab.playbackFrameIndex = nextFrameIndex
                   tab.playbackFrameId = nextFrame.id
                   tab.playbackAccumulatedTime += frameDelay
+                  
+                  console.log('🔧 [UPDATED STATE] After:', {
+                    newAccumulated: tab.playbackAccumulatedTime,
+                    frameIndex: tab.playbackFrameIndex,
+                    frameId: tab.playbackFrameId
+                  })
                   
                   // Efficiently update canvas data
                   const frameData = tab.frameCanvasData.find(f => f.frameId === nextFrame.id)
@@ -2223,10 +2304,14 @@ export const useProjectStore = create<ProjectStore>()(
                         dimensions: `${frameData.canvasData.width}x${frameData.canvasData.height}`
                       }, tabId)
                     } else {
-                      // Reuse existing array for better performance
-                      tab.canvasData.data.set(frameData.canvasData.data)
+                      // 🔧 [ANIMATION FIX] Create new object to trigger React re-render
+                      tab.canvasData = {
+                        width: frameData.canvasData.width,
+                        height: frameData.canvasData.height,
+                        data: new Uint8ClampedArray(frameData.canvasData.data)
+                      }
                       PlaybackDebugger.log('CANVAS_UPDATED', {
-                        method: 'reuse',
+                        method: 'new_object_for_rerender',
                         frameId: nextFrame.id,
                         dataLength: frameData.canvasData.data.length
                       }, tabId)

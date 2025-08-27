@@ -62,18 +62,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const frameRefs = useRef<(HTMLDivElement | null)[]>([])
   const [isFocused, setIsFocused] = useState(false)
   
-  // Simple interval-based playback
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  
-  // Cleanup interval on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-  }, [])
+  // intervalRef - DEPRECATED: Removed in favor of RAF-based system
 
   // Enhanced keyboard navigation with safety checks
   const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
@@ -214,111 +203,9 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   // Early return after all hooks are defined
   const activeFrameIndex = frames.findIndex(f => f.id === activeFrameId)
 
-  // Simple interval-based auto-advance (arrow key simulation)
-  const startSimpleAutoPlay = useCallback(() => {
-    console.log('🚀 [startSimpleAutoPlay] Starting simple auto-advance', { 
-      activeTabId, 
-      framesLength: frames.length,
-      currentPlaybackFrameId: playbackFrameId 
-    })
-    
-    if (!activeTabId) {
-      console.log('❌ [startSimpleAutoPlay] No activeTabId - RETURN')
-      return
-    }
-    
-    if (frames.length <= 1) {
-      console.log('❌ [startSimpleAutoPlay] Not enough frames - RETURN', { framesLength: frames.length })
-      return
-    }
-    
-    // Clear any existing interval and stop any running frameLoop
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    
-    // Stop any existing frameLoop system first
-    if (activeTabId && isPlaying) {
-      stopPlayback(activeTabId)
-    }
-    
-    // Set playback state to true without frameLoop
-    if (activeTabId && !isPlaying) {
-      // Directly set playing state using Zustand setState
-      useProjectStore.setState((state) => {
-        const tab = state.tabs.find(t => t.id === activeTabId)
-        if (tab) {
-          tab.isPlaying = true
-          tab.playbackFrameIndex = 0
-        }
-      })
-    }
-    
-    // Start interval to advance frames every 500ms
-    console.log('🔧 [startSimpleAutoPlay] About to create setInterval')
-    
-    // Immediate test to verify interval will work
-    console.log('🧪 [startSimpleAutoPlay] Testing handleNextFrame before interval')
-    try {
-      const testResult = handleNextFrame()
-      console.log('✅ [startSimpleAutoPlay] Test handleNextFrame succeeded:', testResult)
-    } catch (error) {
-      console.error('❌ [startSimpleAutoPlay] Test handleNextFrame failed:', error)
-      return // Don't start interval if handleNextFrame is broken
-    }
-    
-    intervalRef.current = setInterval(() => {
-      const timestamp = Date.now()
-      const currentFramesBefore = frames.length
-      const currentIndexBefore = playbackFrameIndex
-      
-      console.log('⏰ [AutoAdvance] Interval executing at', timestamp, {
-        framesBefore: currentFramesBefore,
-        indexBefore: currentIndexBefore,
-        activeTab: activeTabId
-      })
-      
-      try {
-        const result = handleNextFrame()
-        console.log('✅ [AutoAdvance] Frame advanced successfully', {
-          result,
-          from: currentIndexBefore,
-          to: playbackFrameIndex,
-          totalFrames: currentFramesBefore,
-          timestamp
-        })
-      } catch (error) {
-        console.error('❌ [AutoAdvance] Critical error in handleNextFrame:', error)
-        console.error('🛑 [AutoAdvance] Stopping interval due to error')
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current)
-          intervalRef.current = null
-        }
-      }
-    }, 500)
-    console.log('🔧 [startSimpleAutoPlay] setInterval created with ID:', intervalRef.current)
-    
-    console.log('✅ [startSimpleAutoPlay] Auto-advance started with interval:', intervalRef.current)
-    logger.debug('Started simple auto-play with interval')
-  }, [activeTabId, frames.length, playbackFrameId, isPlaying, startPlayback, handleNextFrame, logger])
+  // Simple interval-based auto-advance - DEPRECATED: Removed in favor of RAF-based system
   
-  // Stop auto-advance
-  const stopSimpleAutoPlay = useCallback(() => {
-    console.log('⏹️ [stopSimpleAutoPlay] Stopping auto-advance')
-    
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-      console.log('✅ [stopSimpleAutoPlay] Interval cleared')
-    }
-    
-    if (activeTabId && isPlaying) {
-      stopPlayback(activeTabId)
-      console.log('✅ [stopSimpleAutoPlay] Playback stopped')
-    }
-    
-    logger.debug('Stopped simple auto-play')
-  }, [activeTabId, isPlaying, stopPlayback, logger])
+  // stopSimpleAutoPlay - DEPRECATED: Removed in favor of RAF-based system
 
   // User interaction detection for auto-stop
   const handleUserInteraction = useCallback((e: Event) => {
@@ -329,7 +216,6 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       
       if (!frameManagerArea) {
         // Click is outside frame manager, stop playback
-        stopSimpleAutoPlay()
         stopPlayback(activeTabId)
         logger.debug(() => 'Playback stopped due to user interaction outside frame manager', {
           eventType: e.type,
@@ -337,7 +223,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         })
       }
     }
-  }, [activeTabId, isPlaying, stopPlayback, stopSimpleAutoPlay, logger])
+  }, [activeTabId, isPlaying, stopPlayback, logger])
 
   // Auto-scroll timeline to active frame
   const scrollToFrame = useCallback((frameIndex: number) => {
@@ -475,7 +361,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     if (!activeTabId) return
     
     // Prevent duplicate stop calls - check if already stopping
-    if (!isPlaying && !intervalRef.current) {
+    if (!isPlaying) {
       console.log('🚫 [handleStop] Already stopped - ignoring duplicate call')
       return
     }
@@ -485,9 +371,6 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       currentFrame: playbackFrameIndex,
       totalFrames: frames.length 
     })
-    
-    // Stop simple auto-play interval first
-    stopSimpleAutoPlay()
     
     // Only call stopPlayback if currently playing
     if (isPlaying) {
