@@ -10,7 +10,6 @@ import { useAuthStore } from './auth-store'
 // Import centralized debug utility
 import { storeDebug, exportDebug } from '@/lib/ui/debug'
 import { PlaybackDebugger } from '@/lib/ui/playback-debugger'
-import { logProject, logError, logDebug, logPerformance } from '@/lib/ui/centralized-logger'
 
 // Utility function to download files
 const downloadFile = (dataURL: string, fileName: string) => {
@@ -305,23 +304,26 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Create new project tab
         createNewProject: (options) => {
-          // Creating new project
+          console.log('🏗️ [ProjectStore] createNewProject called with options:', options)
           
           try {
             set((state) => {
-              // Current state check
+              console.log('📊 [ProjectStore] Current state:', {
+                tabsCount: state.tabs.length,
+                activeTabId: state.activeTabId
+              })
               
               const tabId = `tab-${Date.now()}`
               const projectId = `project-${Date.now()}`
               const frameId = `frame-${Date.now()}`
               
-              // Generated IDs
+              console.log('🆔 [ProjectStore] Generated IDs:', { tabId, projectId, frameId })
               
               // Get current user from auth store
               const authState = useAuthStore.getState()
               const userId = authState.user?.id || null
               
-              // User ID logged
+              console.log('👤 [ProjectStore] User ID:', userId)
             
             const project: Project = {
               id: projectId,
@@ -373,17 +375,24 @@ export const useProjectStore = create<ProjectStore>()(
               playbackAccumulatedTime: 0
             }
 
-            // Adding new tab
+            console.log('📁 [ProjectStore] Adding new tab to state')
             state.tabs.push(newTab)
             state.activeTabId = tabId
             
-            // Project created
+            console.log('✅ [ProjectStore] New project created successfully:', {
+              tabId,
+              projectId,
+              frameId,
+              width: project.width,
+              height: project.height,
+              totalTabs: state.tabs.length
+            })
           })
           
-          // createNewProject completed
+          console.log('✨ [ProjectStore] createNewProject completed')
           
         } catch (error) {
-          // Project creation error
+          console.error('❌ [ProjectStore] Error in createNewProject:', error)
           throw error
         }
       },
@@ -455,11 +464,11 @@ export const useProjectStore = create<ProjectStore>()(
               )
 
             if (shouldClearStorage) {
-              // Clearing localStorage before tab close
+              console.log('🧹 Clearing localStorage before tab close to prevent quota errors')
               try {
                 localStorage.removeItem('pixelbuddy-projects')
               } catch (storageError) {
-                // Failed to clear localStorage
+                console.warn('Failed to clear localStorage:', storageError)
               }
             }
 
@@ -490,15 +499,15 @@ export const useProjectStore = create<ProjectStore>()(
               }
             })
           } catch (error) {
-            // Error during tab close logged
+            console.error('❌ Error during tab close:', error)
             
             // Fallback: Force clear localStorage if we get QuotaExceededError
             if (error instanceof Error && error.name === 'QuotaExceededError') {
               try {
                 localStorage.clear()
-                // Emergency localStorage clear
+                console.log('🚨 Emergency localStorage clear due to quota error')
               } catch (clearError) {
-                // Failed to clear localStorage
+                console.error('Failed to clear localStorage:', clearError)
               }
             }
             
@@ -819,7 +828,7 @@ export const useProjectStore = create<ProjectStore>()(
 
           try {
             // TODO: Implement API save
-            // Saving project
+            console.log('Saving project:', tab.project)
             
             set((state) => {
               const tabToUpdate = state.tabs.find(t => t.id === tabId)
@@ -1818,11 +1827,15 @@ export const useProjectStore = create<ProjectStore>()(
                 }
               }
             } catch (error) {
-              // Failed to add history entry after frame switch
+              console.warn('⚠️ [ProjectStore] Failed to add history entry after frame switch:', error)
             }
           })
         } catch (error) {
-            // setActiveFrame failed
+            console.error('❌ [ProjectStore] setActiveFrame failed:', error, {
+              tabId,
+              frameId,
+              stack: error instanceof Error ? error.stack : 'No stack available'
+            })
           }
         },
 
@@ -1969,7 +1982,14 @@ export const useProjectStore = create<ProjectStore>()(
           const tab = state.tabs.find(t => t.id === tabId)
           
           // 🔍 디버깅: startPlayback 입력 검증 (enhanced)
-          // startPlayback validation logged
+          console.log('🔍 [ProjectStore] startPlayback validation:', {
+            tabId,
+            tabExists: !!tab,
+            framesCount: tab?.frames?.length,
+            frameCanvasDataCount: tab?.frameCanvasData?.length,
+            currentIsPlaying: tab?.isPlaying,
+            currentPlaybackIntervalId: tab?.playbackIntervalId
+          })
           
           PlaybackDebugger.log('START_PLAYBACK_ENTER', {
             tabId,
@@ -1991,16 +2011,16 @@ export const useProjectStore = create<ProjectStore>()(
           }
 
           // Stop any existing playback (but don't call stopPlayback since we're about to start)
-          // Checking for existing playback
+          console.log('🛑 [ProjectStore] Checking for existing playback to stop for tabId:', tabId)
           PlaybackDebugger.log('STOPPING_EXISTING_PLAYBACK', { tabId }, tabId)
           
           // Manually clean up existing playback without calling stopPlayback
           if (tab.playbackIntervalId) {
-            // Canceling existing RAF
+            console.log('🛑 [ProjectStore] Canceling existing RAF:', tab.playbackIntervalId)
             cancelAnimationFrame(tab.playbackIntervalId)
           }
           
-          // Existing playback cleanup completed
+          console.log('🛑 [ProjectStore] Existing playback cleanup completed')
 
           // Initialize playback state with precise timing
           PlaybackDebugger.log('INITIALIZING_PLAYBACK_STATE', {
@@ -2008,9 +2028,9 @@ export const useProjectStore = create<ProjectStore>()(
             firstFrameId: tab.frames[0]?.id
           }, tabId)
           
-          // About to set playback state
+          console.log('🔧 [ProjectStore] About to set playback state for tabId:', tabId)
           set((draft) => {
-            // Inside set() callback
+            console.log('🔧 [ProjectStore] Inside set() callback')
             const currentTab = draft.tabs.find(t => t.id === tabId)
             if (!currentTab) {
               console.log('❌ [ProjectStore] Current tab not found during initialization:', tabId)
@@ -2557,7 +2577,7 @@ export const useProjectStore = create<ProjectStore>()(
           const STORAGE_LIMIT = 2 * 1024 * 1024 // 2MB limit for localStorage
           const shouldOptimizeStorage = totalFrameData > STORAGE_LIMIT
           
-          // Storage optimization check
+          console.log(`📦 Storage usage: ${Math.round(totalFrameData / 1024)}KB, Optimizing: ${shouldOptimizeStorage}`)
           
           return {
             // Only persist essential data, not the full canvas data or thumbnails
@@ -2592,9 +2612,9 @@ export const useProjectStore = create<ProjectStore>()(
             if (error) {
               console.error('❌ Failed to restore from localStorage:', error)
             } else {
-              // Restored project state from localStorage
+              console.log('✅ Restored project state from localStorage')
               if (restoredState?._storageOptimized) {
-                // Previous session was storage-optimized (frame data truncated)
+                console.warn('⚠️ Previous session was storage-optimized (frame data truncated)')
               }
             }
           }

@@ -1,7 +1,7 @@
 /**
  * Canvas and AI Generation related types
  */
-import { CanvasAnalysis } from '@/lib/utils/canvas-analysis';
+import { CanvasAnalysis } from '@/lib/core/canvas-analysis';
 
 // AI Generation Modes
 export type AIGenerationMode = 

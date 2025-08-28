@@ -30,13 +30,13 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
   const [customHeight, setCustomHeight] = useState(64)
 
   const handleQuickCreate = (size: typeof QUICK_SIZES[0]) => {
-    console.log('🚀 handleQuickCreate called with:', size)
+    // Quick create
     onCreateProject({ width: size.width, height: size.height })
     handleClose()
   }
 
   const handleCustomCreate = () => {
-    console.log('🚀 handleCustomCreate called with:', { customWidth, customHeight })
+    // Custom create
     if (customWidth > 0 && customHeight > 0) {
       onCreateProject({ width: customWidth, height: customHeight })
       handleClose()
@@ -44,7 +44,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
   }
 
   const handleClose = () => {
-    console.log('🚀 handleClose called')
+    // Modal closing
     setShowCustom(false)
     setCustomWidth(64)
     setCustomHeight(64)
@@ -52,7 +52,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
   }
 
   const handleBackgroundClick = (e: React.MouseEvent) => {
-    console.log('🚀 handleBackgroundClick called')
+    // Background clicked
     if (e.target === e.currentTarget) {
       handleClose()
     }
@@ -60,11 +60,11 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
 
   // Don't render modal if not open
   if (!open) {
-    console.log('🚀 Modal not rendering because open =', open)
+    // Modal not rendering
     return null
   }
 
-  console.log('🚀 Modal rendering with open =', open)
+  // Modal rendering
 
   return (
     <div 
@@ -74,7 +74,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
       <div 
         className="max-w-md w-full mx-4 bg-white rounded-lg shadow-xl animate-in zoom-in-95 duration-200"
         onClick={(e) => {
-          console.log('🚀 Modal content clicked - preventing propagation')
+          // Modal content clicked
           e.stopPropagation()
         }}
       >
@@ -93,7 +93,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
             variant="ghost" 
             size="sm" 
             onClick={(e) => {
-              console.log('🚀 X button clicked')
+              // X button clicked
               e.stopPropagation()
               handleClose()
             }} 
@@ -118,7 +118,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
                     <button
                       key={index}
                       onClick={(e) => {
-                        console.log('🚀 Quick size button clicked:', size)
+                        // Quick size selected
                         e.stopPropagation()
                         handleQuickCreate(size)
                       }}

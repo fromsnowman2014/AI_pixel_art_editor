@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEnv, isAIEnabled } from './env-validation';
-import { logger } from './smart-logger';
+import { getEnv, isAIEnabled } from '@/lib/domain/env-validation';
+import { logger } from '@/lib/ui/smart-logger';
 
 /**
  * API Middleware utilities for request validation, security, and error handling

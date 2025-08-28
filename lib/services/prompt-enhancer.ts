@@ -3,7 +3,7 @@
  * Automatically improves prompts for pixel art generation
  */
 
-import { CanvasAnalysis } from './canvas-analysis';
+import { CanvasAnalysis } from '@/lib/core/canvas-analysis';
 import { PromptEnhancementOptions, AIGenerationMode } from '@/lib/types/canvas';
 
 // Pixel art style keywords for different styles
@@ -610,7 +610,7 @@ export function getPromptSuggestions(
   // Customize based on canvas analysis
   if (canvasAnalysis && mode === 'image-to-image') {
     if (canvasAnalysis.dominantColors.length > 0) {
-      const hasWarmColors = canvasAnalysis.dominantColors.some(color => 
+      const hasWarmColors = canvasAnalysis.dominantColors.some((color: string) => 
         color.includes('255,') || color.includes('red') || color.includes('orange')
       );
       

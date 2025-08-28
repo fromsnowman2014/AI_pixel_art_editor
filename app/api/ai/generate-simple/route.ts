@@ -11,8 +11,8 @@ import {
   logApiRequest,
   getErrorInfo,
   CORS_HEADERS
-} from '@/lib/utils/api-middleware';
-import { getEnv } from '@/lib/utils/env-validation';
+} from '@/lib/services/api-middleware';
+import { getEnv } from '@/lib/domain/env-validation';
 
 // Request validation schema
 const GenerateRequestSchema = z.object({

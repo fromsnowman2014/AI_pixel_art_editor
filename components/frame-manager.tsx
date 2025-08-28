@@ -19,8 +19,8 @@ import {
   Gauge,
   RotateCcw
 } from 'lucide-react'
-import { createComponentLogger } from '@/lib/utils/smart-logger'
-import { PlaybackDebugger } from '@/lib/utils/playback-debugger'
+import { createComponentLogger } from '@/lib/ui/smart-logger'
+import { PlaybackDebugger } from '@/lib/ui/playback-debugger'
 
 interface FrameManagerProps {
   frames: Frame[]
@@ -150,26 +150,24 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   useEffect(() => {
     if (isFocused) {
       document.addEventListener('keydown', handleKeyboardNavigation)
-      logger.debug(() => 'Keyboard navigation listeners attached', { framesCount: frames.length })
+      // Keyboard listeners attached
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyboardNavigation)
-      if (isFocused) {
-        logger.debug(() => 'Keyboard navigation listeners removed')
-      }
+      // Keyboard listeners removed
     }
   }, [handleKeyboardNavigation, isFocused, frames.length, logger])
 
   // Handle focus events for timeline
   const handleTimelineFocus = useCallback(() => {
     setIsFocused(true)
-    logger.debug(() => 'Timeline focused - keyboard navigation enabled')
+    // Timeline focused
   }, [logger])
 
   const handleTimelineBlur = useCallback(() => {
     setIsFocused(false)
-    logger.debug(() => 'Timeline blurred - keyboard navigation disabled')
+    // Timeline blurred
   }, [logger])
 
   // Handle clicks on timeline to set focus
@@ -188,12 +186,12 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     return () => {
       // 🚨 PROBLEM WAS HERE: This was running on every dependency change!
       // Only cleanup on actual component unmount
-      console.log('🧹 [FrameManager] Component unmount cleanup - checking playback')
+      // Component cleanup
       if (capturedActiveTabId) {
         const currentState = useProjectStore.getState()
         const currentTab = currentState.tabs.find(t => t.id === capturedActiveTabId)
         if (currentTab?.isPlaying && currentTab?.playbackIntervalId) {
-          console.log('🧹 [FrameManager] Stopping playback on unmount')
+          // Stop playback on unmount
           stopPlayback(capturedActiveTabId)
         }
       }
@@ -266,11 +264,11 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   const handlePlayPause = (e: React.MouseEvent): void => {
-    console.log('🎬 [FrameManager] handlePlayPause START')
+    // handlePlayPause START
     
     // 🚨 CRITICAL: Stop event bubbling to prevent handleGlobalClick from stopping playback
     e.stopPropagation()
-    console.log('🛡️ [FrameManager] Event propagation stopped to prevent global click handler')
+    // Event propagation stopped
     
     try {
       // 🔍 디버깅: Play 버튼 클릭 추적
@@ -283,36 +281,36 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         hasActiveTab: !!activeTab
       }, activeTabId)
       
-      console.log('✅ [FrameManager] PlaybackDebugger.log PLAY_BUTTON_CLICKED completed')
+      // PlaybackDebugger logged
     
-      console.log('🔍 [FrameManager] Checking activeTabId:', activeTabId)
+      // Check activeTabId
       if (!activeTabId) {
-        console.log('❌ [FrameManager] No activeTabId - RETURN')
+        // No activeTabId - RETURN
         PlaybackDebugger.log('ERROR_OCCURRED', 'No active tab ID', activeTabId)
         return
       }
-      console.log('✅ [FrameManager] activeTabId check passed')
+      // activeTabId check passed
       
-      console.log('🔍 [FrameManager] Checking frames.length:', frames.length)
+      // Check frames.length
       if (frames.length <= 1) {
-        console.log('❌ [FrameManager] Not enough frames - RETURN')
+        // Not enough frames - RETURN
         PlaybackDebugger.log('ERROR_OCCURRED', 'Not enough frames for playback', activeTabId)
         logger.debug(() => 'Cannot play animation with only one frame', { framesLength: frames.length })
         return
       }
-      console.log('✅ [FrameManager] frames.length check passed')
+      // frames.length check passed
     
-      console.log('🔍 [FrameManager] Creating state snapshot for activeTab')
+      // Create state snapshot
       // 🔍 디버깅: 현재 탭 상태 스냅샷
       PlaybackDebugger.createStateSnapshot(activeTab)
-      console.log('✅ [FrameManager] State snapshot created')
+      // State snapshot created
       
-      console.log('🔍 [FrameManager] Calling logger.debug')
+      // Calling logger.debug
       logger.debug(() => isPlaying ? 'Pausing playback' : 'Starting playback', { 
         isPlaying, 
         framesLength: frames.length 
       })
-      console.log('✅ [FrameManager] logger.debug completed')
+      // logger.debug completed
       
       console.log('🔍 [FrameManager] About to log TOGGLE_PLAYBACK_CALLED')
       // 🔍 디버깅: togglePlayback 호출 전
@@ -330,25 +328,25 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
         startPlayback(activeTabId)
       }
     
-      console.log('🕰️ [FrameManager] Setting timeout for result check')
+      // Setting timeout for result check
       // 🔍 디버깅: togglePlayback 호출 후 상태 확인 (비동기적으로)
       setTimeout(() => {
-        console.log('🔍 [FrameManager] Timeout callback - checking result')
+        // Timeout callback - checking result
         const updatedTab = getActiveTab()
         PlaybackDebugger.log('TOGGLE_PLAYBACK_RESULT', {
           newIsPlaying: updatedTab?.isPlaying,
           newPlaybackFrameIndex: updatedTab?.playbackFrameIndex,
           newPlaybackIntervalId: updatedTab?.playbackIntervalId
         }, activeTabId)
-        console.log('✅ [FrameManager] Result check completed')
+        // Result check completed
       }, 50)
       
-      console.log('🎉 [FrameManager] handlePlayPause completed successfully')
+      // handlePlayPause completed successfully
       return
       
     } catch (error) {
       console.error('❌ [FrameManager] ERROR in handlePlayPause:', error)
-      console.error('❌ [FrameManager] Error stack:', error instanceof Error ? error.stack : 'No stack')
+      // Error stack logged
       PlaybackDebugger.log('ERROR_OCCURRED', `handlePlayPause error: ${error instanceof Error ? error.message : 'Unknown error'}`, activeTabId)
       return
     }
@@ -356,13 +354,13 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
 
   const handleStop = (e: React.MouseEvent): void => {
     e.stopPropagation() // Prevent event bubbling
-    console.log('🛡️ [FrameManager] handleStop - Event propagation stopped')
+    // handleStop - Event propagation stopped
     
     if (!activeTabId) return
     
     // Prevent duplicate stop calls - check if already stopping
     if (!isPlaying) {
-      console.log('🚫 [handleStop] Already stopped - ignoring duplicate call')
+      // Already stopped - ignoring duplicate call
       return
     }
     
@@ -391,9 +389,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   const handleDuplicateFrame = (frameId: string) => {
-    logger.debug(() => 'Frame duplication initiated', { frameId, totalFrames: frames.length })
     duplicateFrame(activeTabId, frameId)
-    logger.debug(() => 'Frame duplication completed', { frameId })
   }
 
   const handleDeleteFrame = (frameId: string) => {
@@ -405,26 +401,21 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   const handleFrameSelect = (frameId: string) => {
     // Input validation
     if (!frameId || !activeTabId || !frames?.length) {
-      logger.warn('Invalid frame selection parameters', { frameId, activeTabId, framesLength: frames?.length })
       return
     }
 
     // Verify frame exists
     const targetFrame = frames.find(f => f.id === frameId)
     if (!targetFrame) {
-      logger.warn('Target frame not found', { frameId, availableFrames: frames.length })
       return
     }
 
     // Prevent selection of same frame
     if (activeFrameId === frameId && !isPlaying) {
-      logger.debug(() => 'Same frame already selected', { frameId })
       return
     }
 
     try {
-      logger.debug(() => 'Switching to frame', { from: activeFrameId, to: frameId })
-      
       if (!isPlaying) {
         // Normal frame selection when not playing
         setActiveFrame(activeTabId, frameId)
@@ -434,8 +425,6 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
       const frameIndex = frames.findIndex(f => f.id === frameId)
       if (frameIndex >= 0) {
         setPlaybackFrame(activeTabId, frameIndex)
-      } else {
-        logger.warn('Could not find frame index for playback', { frameId })
       }
     } catch (error) {
       logger.error('Frame selection failed', { frameId, activeTabId }, error)
@@ -447,7 +436,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     if (frame) {
       // Toggle frame inclusion in animation
       // This would update the frame's included property
-      console.log('Toggle frame visibility:', frameId)
+      // Toggle frame visibility
     }
   }
 
@@ -713,9 +702,7 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                         className="w-full h-full object-cover"
                         style={{ imageRendering: 'pixelated' }}
                         onError={() => {
-                          // If thumbnail fails to load, regenerate it
                           if (activeTabId) {
-                            console.log('Thumbnail failed to load, regenerating...')
                             regenerateFrameThumbnail(activeTabId, frame.id)
                           }
                         }}

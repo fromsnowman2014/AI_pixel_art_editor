@@ -47,23 +47,15 @@ export function Toolbar({ className }: ToolbarProps) {
   const activeTab = getActiveTab()
   const canvasState = activeTab?.canvasState
 
-  // Debug logging utility
-  const DEBUG_MODE = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.localStorage?.getItem('pixelbuddy-debug') === 'true')
+  // Debug logging utility (disabled)
   const debugLog = (category: string, message: string, data?: any) => {
-    if (DEBUG_MODE) {
-      const timestamp = new Date().toISOString().split('T')[1]?.split('.')[0] || 'unknown'
-      console.log(`[${timestamp}] 🛠️  Toolbar [${category}]:`, message, data || '')
-    }
+    // Debug logs disabled for playback optimization
   }
 
   const handleToolChange = React.useCallback((tool: Tool) => {
     if (!canvasState || !activeTabId) return
     
-    debugLog('TOOL_CHANGE', `Tool changed from ${canvasState.tool} to ${tool}`, {
-      previousTool: canvasState.tool,
-      newTool: tool,
-      activeTabId: activeTabId
-    })
+    // Tool changed
     
     // Clear selection when switching away from magic wand
     if (canvasState.tool === 'magic-wand' && tool !== 'magic-wand' && canvasState.selection?.isActive) {
@@ -79,7 +71,7 @@ export function Toolbar({ className }: ToolbarProps) {
     } else {
       updateCanvasState(activeTabId, { tool })
     }
-  }, [canvasState, activeTabId, debugLog, updateCanvasState])
+  }, [canvasState, activeTabId, updateCanvasState])
 
   // Handle keyboard shortcuts
   React.useEffect(() => {
@@ -103,7 +95,7 @@ export function Toolbar({ className }: ToolbarProps) {
   }, [handleToolChange])
 
   if (!activeTabId || !canvasState) {
-    debugLog('RENDER_ERROR', 'Missing activeTabId or canvasState', { activeTabId, hasCanvasState: !!canvasState })
+    // Render error: missing state
     return null
   }
 

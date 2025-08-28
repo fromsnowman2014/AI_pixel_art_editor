@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { X, Plus, Copy, Save } from 'lucide-react'
 import { ProjectDeletionModal, SimpleConfirmationModal } from './project-deletion-modal'
 import { NewProjectModal } from './new-project-modal'
-import { analyzeProjectFrames, needsSaveConfirmation } from '@/lib/utils/project-helpers'
+import { analyzeProjectFrames, needsSaveConfirmation } from '@/lib/core/project-helpers'
 
 export function ProjectTabs() {
   const {
@@ -205,7 +205,7 @@ export function ProjectTabs() {
             tabs.length === 0 && "bg-blue-50 hover:bg-blue-100 animate-pulse"
           )}
           onClick={() => {
-            console.log('🚀 Plus button clicked, opening modal')
+            // Plus button clicked
             // If no existing tabs, show quick options modal for better UX
             // If tabs exist, still show modal for consistency
             setNewProjectModal(true)
@@ -255,11 +255,11 @@ export function ProjectTabs() {
       <NewProjectModal
         open={newProjectModal}
         onOpenChange={(open) => {
-          console.log('🚀 onOpenChange called with:', open)
+          // Modal state change
           setNewProjectModal(open)
         }}
         onCreateProject={(options) => {
-          console.log('🚀 onCreateProject called with:', options)
+          // Creating project
           createNewProject(options)
         }}
       />

@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback, type ScalingMode, type ExtendedScalingMode } from '@/lib/utils/enhanced-media-importer'
+import { EnhancedMediaImporter, MediaImportOptions, ProgressCallback, type ScalingMode, type ExtendedScalingMode } from '@/lib/services/enhanced-media-importer'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { FrameImportOptionsModal } from './frame-import-options-modal'
 import { getVideoFrameLimit, getGifFrameLimit, getCurrentUserTier } from '@/lib/types/user'

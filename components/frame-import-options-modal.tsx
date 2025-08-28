@@ -8,7 +8,7 @@ import {
   analyzeSizeRelationship, 
   type ScalingMode,
   type ExtendedScalingMode
-} from '@/lib/utils/enhanced-media-importer'
+} from '@/lib/services/enhanced-media-importer'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { MinimalOption } from './minimal-option'
 import { ColorPreview } from './color-preview'

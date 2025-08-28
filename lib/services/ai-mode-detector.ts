@@ -3,7 +3,7 @@
  * Automatically determines the best AI generation mode based on canvas state
  */
 
-import { CanvasAnalysis } from './canvas-analysis';
+import { CanvasAnalysis } from '@/lib/core/canvas-analysis';
 import { AIGenerationMode, AIGenerationContext } from '@/lib/types/canvas';
 
 // Mode selection criteria

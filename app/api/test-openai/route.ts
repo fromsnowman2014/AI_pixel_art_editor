@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { getEnv } from '@/lib/utils/env-validation';
-import { CORS_HEADERS } from '@/lib/utils/api-middleware';
+import { getEnv } from '@/lib/domain/env-validation';
+import { CORS_HEADERS } from '@/lib/services/api-middleware';
 
 /**
  * Simple OpenAI Test API

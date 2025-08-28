@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { ExportModal } from '@/components/export-modal';
 import { api } from '@/lib/api/client';
 import toast from 'react-hot-toast';
-import { debugLog } from '@/lib/utils/debug';
-import { generateGuidedPrompt, type GuidedPromptOptions } from '@/lib/utils/prompt-enhancer';
+import { debugLog } from '@/lib/ui/debug';
+import { generateGuidedPrompt, type GuidedPromptOptions } from '@/lib/services/prompt-enhancer';
 import {
   Settings,
   Download,

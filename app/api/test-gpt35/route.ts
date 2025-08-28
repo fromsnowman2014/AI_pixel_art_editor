@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { CORS_HEADERS } from '@/lib/utils/api-middleware';
+import { CORS_HEADERS } from '@/lib/services/api-middleware';
 
 /**
  * Simple GPT-3.5-turbo Test API

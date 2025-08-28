@@ -5,7 +5,7 @@ import { getVideoFrameLimit, getGifFrameLimit } from '@/lib/types/user'
 import { decompressFrames, parseGIF } from 'gifuct-js'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
-import { FastVideoProcessor } from './fast-video-processor'
+import { FastVideoProcessor } from '@/lib/domain/fast-video-processor'
 
 export type ScalingMode = 'fit' | 'fill' | 'original' | 'smart'
 

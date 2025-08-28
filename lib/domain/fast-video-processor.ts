@@ -1,7 +1,7 @@
 'use client'
 
 import { Frame } from '@/lib/types/api'
-import { MediaImportOptions, ImportResult, ProgressCallback } from './enhanced-media-importer'
+import { MediaImportOptions, ImportResult, ProgressCallback } from '@/lib/services/enhanced-media-importer'
 
 /**
  * 고속 동영상 처리기 - 부분 로딩 및 최적화된 프레임 추출
@@ -244,7 +244,7 @@ export class FastVideoProcessor {
       try {
         // HTML5 비디오 방식으로 처리
         onProgress?.(40, 'Processing partial video data...')
-        const result = await this.processVideoWithHTML5(blobUrl, options, (progress, message) => {
+        const result = await this.processVideoWithHTML5(blobUrl, options, (progress: number, message: string) => {
           onProgress?.(40 + (progress - 10) * 0.6, message) // 40-100% 범위로 조정
         })
         

@@ -2,8 +2,8 @@
 
 import React, { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { FastVideoProcessor } from '@/lib/utils/fast-video-processor'
-import { EnhancedMediaImporter, MediaImportOptions } from '@/lib/utils/enhanced-media-importer'
+import { FastVideoProcessor } from '@/lib/domain/fast-video-processor'
+import { EnhancedMediaImporter, MediaImportOptions } from '@/lib/services/enhanced-media-importer'
 
 interface TestResult {
   method: string
@@ -45,7 +45,7 @@ export default function VideoPerformancePage() {
       const result1 = await FastVideoProcessor.processVideoWithHTML5(
         file,
         options,
-        (prog, msg) => setProgress(`FastVideoProcessor: ${msg} (${prog}%)`)
+        (prog: number, msg: string) => setProgress(`FastVideoProcessor: ${msg} (${prog}%)`)
       )
       
       const duration1 = performance.now() - startTime

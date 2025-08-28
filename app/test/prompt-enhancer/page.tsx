@@ -8,7 +8,7 @@ import {
   validatePrompt,
   analyzePrompt,
   debugPromptEnhancement
-} from '@/lib/utils/prompt-enhancer';
+} from '@/lib/services/prompt-enhancer';
 import { PromptEnhancementOptions, AIGenerationMode } from '@/lib/types/canvas';
 
 export default function PromptEnhancerTestPage() {

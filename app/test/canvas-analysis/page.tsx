@@ -6,7 +6,7 @@ import {
   isCanvasEmpty, 
   generateContentHash,
   debugCanvasAnalysis 
-} from '@/lib/utils/canvas-analysis';
+} from '@/lib/core/canvas-analysis';
 
 // Helper function to create test ImageData
 function createTestImageData(width: number, height: number, fillPattern?: 'empty' | 'full' | 'partial'): ImageData {

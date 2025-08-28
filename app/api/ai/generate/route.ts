@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { processImageForPixelArt, validateImageConstraints } from '@/lib/utils/image-processing';
+import { processImageForPixelArt, validateImageConstraints } from '@/lib/domain/image-processing';
 import { 
   validateRequestBody, 
   applyRateLimit, 
@@ -12,13 +12,13 @@ import {
   logApiRequest,
   getErrorInfo,
   CORS_HEADERS
-} from '@/lib/utils/api-middleware';
-import { getEnv } from '@/lib/utils/env-validation';
-import { generateCompletePrompt } from '@/lib/utils/prompt-enhancer';
-import { detectOptimalAIMode, validateModeForCanvas } from '@/lib/utils/ai-mode-detector';
-import { analyzeCanvas } from '@/lib/utils/canvas-analysis';
+} from '@/lib/services/api-middleware';
+import { getEnv } from '@/lib/domain/env-validation';
+import { generateCompletePrompt } from '@/lib/services/prompt-enhancer';
+import { detectOptimalAIMode, validateModeForCanvas } from '@/lib/services/ai-mode-detector';
+import { analyzeCanvas } from '@/lib/core/canvas-analysis';
 import { AIGenerationMode } from '@/lib/types/canvas';
-import { createApiLogger } from '@/lib/utils/smart-logger';
+import { createApiLogger } from '@/lib/ui/smart-logger';
 
 // Enhanced request validation schema supporting multiple AI generation modes
 const GenerateRequestSchema = z.object({
@@ -592,7 +592,7 @@ export async function POST(request: NextRequest) {
     const responseData = {
       assetId: requestId, // Use request ID as asset ID
       pngUrl: processedBase64Image, // Use pngUrl to match frontend expectations
-      palette: processed.palette.map(color => `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a || 1})`),
+      palette: processed.palette.map((color: any) => `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a || 1})`),
       width: processed.width,
       height: processed.height,
       colorCount: processed.colorCount,

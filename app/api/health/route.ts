@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { CORS_HEADERS } from '@/lib/utils/api-middleware';
+import { CORS_HEADERS } from '@/lib/services/api-middleware';
 
 export interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';

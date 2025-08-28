@@ -5,7 +5,7 @@ import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Download, FileImage, Film, Image, Play, X } from 'lucide-react'
-import { createComponentLogger } from '@/lib/utils/smart-logger'
+import { createComponentLogger } from '@/lib/ui/smart-logger'
 
 interface ExportModalProps {
   open: boolean

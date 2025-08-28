@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { PlaybackDebugger, PlaybackDebugInfo } from '@/lib/utils/playback-debugger'
+import { PlaybackDebugger, PlaybackDebugInfo } from '@/lib/ui/playback-debugger'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { 

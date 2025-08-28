@@ -4,10 +4,10 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
-import { performMagicWandSelection, clearSelection } from '@/lib/utils/magic-wand'
+import { performMagicWandSelection, clearSelection } from '@/lib/core/magic-wand'
 
 // Simplified debug logging
-import { canvasDebug } from '@/lib/utils/debug'
+import { canvasDebug } from '@/lib/ui/debug'
 
 interface PixelCanvasProps {
   project: Project
