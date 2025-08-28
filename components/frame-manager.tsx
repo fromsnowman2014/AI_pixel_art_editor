@@ -479,10 +479,10 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   return (
-    <div className={cn('space-y-3', className)}>
-      {/* Animation Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+    <div className={cn('space-y-2', className)}>
+      {/* Animation Controls - Compact layout */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center space-x-2 flex-wrap">
           {/* Enhanced Unified Play/Stop Button with Tooltip */}
           <div className="relative group">
             <Button
@@ -645,21 +645,21 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
           </span>
         </div>
 
-        {/* Timeline container with dynamic minimum width */}
+        {/* Timeline container with compact design */}
         <div 
           ref={timelineScrollRef}
-          className="overflow-x-auto pb-2"
+          className="overflow-x-auto pb-1"
           style={{
-            minWidth: Math.max(frames.length * 80, 400) + 'px'
+            minWidth: Math.max(frames.length * 70, 350) + 'px'
           }}
         >
-          <div className="flex space-x-2 w-max">
+          <div className="flex space-x-1 w-max">
           {frames.map((frame, index) => (
             <div
               key={frame.id}
               ref={el => { frameRefs.current[index] = el }}
               className={cn(
-                'group relative flex-shrink-0 cursor-pointer rounded border-2 p-2 transition-all duration-200',
+                'group relative flex-shrink-0 cursor-pointer rounded border-2 p-1.5 transition-all duration-200',
                 activeFrameId === frame.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 bg-white hover:border-gray-300',
@@ -680,8 +680,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
               }}
               tabIndex={-1} // Timeline container handles keyboard navigation
             >
-              {/* Frame Preview with Thumbnail */}
-              <div className="h-12 w-12 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
+              {/* Frame Preview with Thumbnail - Compact size */}
+              <div className="h-10 w-10 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
                 {(() => {
                   let thumbnail = activeTabId ? getFrameThumbnail(activeTabId, frame.id) : null
                   
@@ -718,19 +718,19 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                 })()}
               </div>
 
-              {/* Frame Info */}
-              <div className="mt-1 text-center">
-                <div className="text-xs text-gray-600">
+              {/* Frame Info - Compact */}
+              <div className="mt-0.5 text-center">
+                <div className="text-[10px] text-gray-600 leading-tight">
                   {frame.delayMs}ms
                 </div>
               </div>
 
-              {/* Frame Actions */}
-              <div className="absolute -top-2 -right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Frame Actions - Compact layout */}
+              <div className="absolute -top-1 -right-1 flex flex-col space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-6 w-6 p-0 bg-white hover:bg-green-50"
+                  className="h-5 w-5 p-0 bg-white hover:bg-green-50 border-gray-300"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleFrameVisibilityToggle(frame.id)
@@ -738,39 +738,39 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                   title={frame.included ? 'Hide from animation' : 'Include in animation'}
                 >
                   {frame.included ? (
-                    <Eye className="h-3 w-3 text-green-600" />
+                    <Eye className="h-2.5 w-2.5 text-green-600" />
                   ) : (
-                    <EyeOff className="h-3 w-3 text-gray-400" />
+                    <EyeOff className="h-2.5 w-2.5 text-gray-400" />
                   )}
                 </Button>
               </div>
 
-              <div className="absolute -bottom-2 -right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute -bottom-1 -right-1 flex space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-6 w-6 p-0 bg-white hover:bg-blue-50"
+                  className="h-5 w-5 p-0 bg-white hover:bg-blue-50 border-gray-300"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleDuplicateFrame(frame.id)
                   }}
                   title="Duplicate frame"
                 >
-                  <Copy className="h-3 w-3 text-blue-600" />
+                  <Copy className="h-2.5 w-2.5 text-blue-600" />
                 </Button>
 
                 {frames.length > 1 && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-6 w-6 p-0 bg-white hover:bg-red-50"
+                    className="h-5 w-5 p-0 bg-white hover:bg-red-50 border-gray-300"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDeleteFrame(frame.id)
                     }}
                     title="Delete frame"
                   >
-                    <Trash2 className="h-3 w-3 text-red-600" />
+                    <Trash2 className="h-2.5 w-2.5 text-red-600" />
                   </Button>
                 )}
               </div>
@@ -786,22 +786,20 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
 
       </div>
 
-      {/* Playback Info & Quick Tips */}
-      <div className="space-y-2">
+      {/* Compact Playback Info & Tips */}
+      <div className="space-y-1">
         {isPlaying && (
-          <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">
-            🎬 <strong>Playing Animation:</strong> {frames.filter(f => f.included).length} frames • 
-            {frames[playbackFrameIndex]?.delayMs || 500}ms per frame • 
-            Click frames to jump or use controls to navigate
+          <div className="rounded bg-green-50 border border-green-200 px-2 py-1 text-xs text-green-700">
+            🎬 <strong>Playing:</strong> {frames.filter(f => f.included).length} frames @ {frames[playbackFrameIndex]?.delayMs || 500}ms
           </div>
         )}
         
-        <div className="rounded bg-amber-50 p-2 text-xs text-amber-700">
-          💡 <strong>Tip:</strong> {isPlaying 
-            ? 'Use ← → keys or buttons to scrub through frames, or click pause to edit'
+        <div className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">
+          💡 {isPlaying 
+            ? 'Use ← → keys or controls to navigate'
             : isFocused
-              ? 'Use ← → keys to navigate frames, Space to play/pause, Home/End for first/last frame'
-              : 'Click the timeline to enable keyboard navigation, or click frames to switch between them'
+              ? 'Use ← → keys, Space to play/pause'
+              : 'Click timeline for keyboard shortcuts'
           }
         </div>
       </div>

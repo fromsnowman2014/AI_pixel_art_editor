@@ -92,10 +92,10 @@ export function PixelEditor({ className }: PixelEditorProps) {
       {/* Top Toolbar - Primary Actions */}
       <TopToolbar />
 
-      {/* Main editor area with responsive grid layout */}
-      <div className="grid grid-cols-[minmax(280px,320px)_1fr_minmax(350px,400px)] flex-1 overflow-hidden">
-        {/* Left sidebar - Tools and Colors with minimum width */}
-        <div className="border-r border-gray-200 bg-white overflow-y-auto min-w-[280px]">
+      {/* Main editor area with responsive grid layout - optimized for viewport fit */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,300px)_1fr] lg:grid-cols-[minmax(260px,300px)_1fr_minmax(320px,380px)] xl:grid-cols-[minmax(280px,320px)_1fr_minmax(350px,400px)] flex-1 min-h-0">
+        {/* Left sidebar - Tools and Colors with responsive collapsing */}
+        <div className="border-r border-gray-200 bg-white overflow-y-auto order-2 md:order-1">
           <div className="p-4 space-y-6">
             {/* Tools Section - Top Priority */}
             <div className="min-w-0">
@@ -115,11 +115,12 @@ export function PixelEditor({ className }: PixelEditorProps) {
           </div>
         </div>
 
-        {/* Center - Canvas Area */}
-        <div className="flex flex-1 flex-col">
+        {/* Center - Canvas Area with improved height distribution */}
+        <div className="flex flex-col min-h-0 order-1 md:order-2">
           {activeTab && (
             <>
-              <div className="flex-1 overflow-auto">
+              {/* Canvas Area - responsive height with timeline guaranteed visibility */}
+              <div className="flex-1 min-h-[200px] md:min-h-[300px] overflow-auto">
                 <PixelCanvas
                   project={activeTab.project}
                   canvasData={activeTab.canvasData}
@@ -127,19 +128,21 @@ export function PixelEditor({ className }: PixelEditorProps) {
                 />
               </div>
               
-              {/* Bottom - Frame Manager */}
-              <div className="border-t border-gray-200 bg-white p-4" data-frame-manager>
-                <FrameManager 
-                  frames={activeTab.frames}
-                  activeFrameId={activeTab.project.activeFrameId}
-                />
+              {/* Frame Manager - fixed height ensuring always visible */}
+              <div className="flex-shrink-0 border-t border-gray-200 bg-white" data-frame-manager>
+                <div className="p-2 md:p-3 max-h-[280px] min-h-[160px] md:min-h-[180px] overflow-y-auto">
+                  <FrameManager 
+                    frames={activeTab.frames}
+                    activeFrameId={activeTab.project.activeFrameId}
+                  />
+                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Right sidebar - Project Panel with responsive width */}
-        <div className="border-l border-gray-200 bg-white">
+        {/* Right sidebar - Project Panel with responsive behavior */}
+        <div className="border-l border-gray-200 bg-white overflow-y-auto order-3 lg:block hidden">
           <ProjectPanel />
         </div>
       </div>
