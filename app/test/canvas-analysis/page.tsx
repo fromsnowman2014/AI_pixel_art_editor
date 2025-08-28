@@ -1,5 +1,6 @@
 'use client';
 
+import { logCanvas, logFrame, logProject, logAI, logUI, logAPI, logError, logDebug } from '@/lib/ui/centralized-logger'
 import { useEffect } from 'react';
 import { 
   analyzeCanvas, 
@@ -48,7 +49,7 @@ function createTestImageData(width: number, height: number, fillPattern?: 'empty
 }
 
 function testEmptyCanvas(): boolean {
-  console.log('🧪 Testing empty canvas detection...');
+logCanvas('🧪 Testing empty canvas detection...')
   
   const emptyCanvas = createTestImageData(32, 32, 'empty');
   const analysis = analyzeCanvas(emptyCanvas);
@@ -59,13 +60,13 @@ function testEmptyCanvas(): boolean {
                    analysis.contentBounds === null;
   
   debugCanvasAnalysis(analysis, 'Empty Canvas');
-  console.log(isCorrect ? '✅ Empty canvas test passed' : '❌ Empty canvas test failed');
+logCanvas(isCorrect ? '✅ Empty canvas test passed' : '❌ Empty canvas test failed')
   
   return isCorrect;
 }
 
 function testFullCanvas(): boolean {
-  console.log('🧪 Testing full canvas detection...');
+logCanvas('🧪 Testing full canvas detection...')
   
   const fullCanvas = createTestImageData(32, 32, 'full');
   const analysis = analyzeCanvas(fullCanvas);
@@ -78,13 +79,13 @@ function testFullCanvas(): boolean {
                    analysis.dominantColors.includes('rgb(255,0,0)');
   
   debugCanvasAnalysis(analysis, 'Full Canvas');
-  console.log(isCorrect ? '✅ Full canvas test passed' : '❌ Full canvas test failed');
+logCanvas(isCorrect ? '✅ Full canvas test passed' : '❌ Full canvas test failed')
   
   return isCorrect;
 }
 
 function testPartialCanvas(): boolean {
-  console.log('🧪 Testing partial canvas detection...');
+logCanvas('🧪 Testing partial canvas detection...')
   
   const partialCanvas = createTestImageData(32, 32, 'partial');
   const analysis = analyzeCanvas(partialCanvas);
@@ -98,13 +99,13 @@ function testPartialCanvas(): boolean {
                    analysis.contentBounds !== null;
   
   debugCanvasAnalysis(analysis, 'Partial Canvas');
-  console.log(isCorrect ? '✅ Partial canvas test passed' : '❌ Partial canvas test failed');
+logCanvas(isCorrect ? '✅ Partial canvas test passed' : '❌ Partial canvas test failed')
   
   return isCorrect;
 }
 
 function testContentHash(): boolean {
-  console.log('🧪 Testing content hash generation...');
+logDebug('🧪 Testing content hash generation...')
   
   const canvas1 = createTestImageData(16, 16, 'empty');
   const canvas2 = createTestImageData(16, 16, 'empty');
@@ -116,14 +117,14 @@ function testContentHash(): boolean {
   
   const isCorrect = hash1 === hash2 && hash1 !== hash3;
   
-  console.log('Hash results:', { hash1, hash2, hash3 });
-  console.log(isCorrect ? '✅ Content hash test passed' : '❌ Content hash test failed');
+logDebug('Hash results:', { arg0: { hash1, arg1: hash2, arg2: hash3 } })
+logAI(isCorrect ? '✅ Content hash test passed' : '❌ Content hash test failed')
   
   return isCorrect;
 }
 
 function runCanvasAnalysisTests(): boolean {
-  console.log('🎯 Running Canvas Analysis Tests...\n');
+logCanvas('🎯 Running Canvas Analysis Tests...\n')
   
   const results = [
     testEmptyCanvas(),
@@ -134,8 +135,8 @@ function runCanvasAnalysisTests(): boolean {
   
   const allPassed = results.every(result => result);
   
-  console.log(`\n📊 Test Results: ${results.filter(r => r).length}/${results.length} passed`);
-  console.log(allPassed ? '🎉 All tests passed!' : '⚠️ Some tests failed');
+logDebug(`\n📊 Test Results: ${results.filter(r => r).length}/${results.length} passed`)
+logAI(allPassed ? '🎉 All tests passed!' : '⚠️ Some tests failed')
   
   return allPassed;
 }

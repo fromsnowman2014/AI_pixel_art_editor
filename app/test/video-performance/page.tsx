@@ -1,5 +1,6 @@
 'use client'
 
+import { logCanvas, logFrame, logProject, logAI, logUI, logAPI, logError, logDebug } from '@/lib/ui/centralized-logger'
 import React, { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { FastVideoProcessor } from '@/lib/domain/fast-video-processor'
@@ -128,7 +129,7 @@ export default function VideoPerformancePage() {
       if (fastTime > 0 && ffmpegTime > 0) {
         const improvement = ((ffmpegTime - fastTime) / ffmpegTime) * 100
         
-        console.log(`🚀 Performance improvement: ${Math.round(improvement)}% faster with FastVideoProcessor`)
+logDebug(`🚀 Performance improvement: ${Math.round(improvement)}% faster with FastVideoProcessor`)
         setProgress(`Completed! FastVideoProcessor is ${Math.round(improvement)}% faster`)
       }
     }

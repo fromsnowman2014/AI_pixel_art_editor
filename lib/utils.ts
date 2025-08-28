@@ -1,3 +1,5 @@
+
+import { logCanvas, logFrame, logProject, logAI, logUI, logAPI, logError, logDebug } from '@/lib/ui/centralized-logger'
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -51,7 +53,7 @@ export function saveToLocalStorage<T>(key: string, data: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(data))
   } catch (error) {
-    console.warn('Failed to save to localStorage:', error)
+logAI('Failed to save to localStorage:', error)
   }
 }
 
@@ -60,7 +62,7 @@ export function loadFromLocalStorage<T>(key: string, defaultValue: T): T {
     const item = localStorage.getItem(key)
     return item ? JSON.parse(item) : defaultValue
   } catch (error) {
-    console.warn('Failed to load from localStorage:', error)
+logAI('Failed to load from localStorage:', error)
     return defaultValue
   }
 }
