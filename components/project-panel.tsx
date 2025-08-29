@@ -835,6 +835,15 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                     setPendingWidth(parseCanvasSize(e.target.value))
                   }
                   onBlur={handleWidthBlur}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const heightInput = document.getElementById('canvas-height') as HTMLInputElement;
+                      if (heightInput) {
+                        heightInput.focus();
+                      }
+                    }
+                  }}
                   className={`w-full rounded-md border px-3 py-2 text-sm ${
                     pendingWidth === '' || (typeof pendingWidth === 'number' && validateCanvasSize(pendingWidth))
                       ? 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
@@ -862,6 +871,14 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
                     setPendingHeight(parseCanvasSize(e.target.value))
                   }
                   onBlur={handleHeightBlur}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (haveDimensionsChanged && arePendingDimensionsValid) {
+                        handleApplyDimensions();
+                      }
+                    }
+                  }}
                   className={`w-full rounded-md border px-3 py-2 text-sm ${
                     pendingHeight === '' || (typeof pendingHeight === 'number' && validateCanvasSize(pendingHeight))
                       ? 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'

@@ -39,6 +39,43 @@ export function TopToolbar({ className }: TopToolbarProps) {
 
   const canvasState = activeTab.canvasState
 
+  // Global keyboard shortcuts for undo/redo
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey
+
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        
+        if (e.shiftKey) {
+          // Ctrl+Shift+Z or Cmd+Shift+Z for redo
+          if (activeTabId) {
+            redo(activeTabId)
+          }
+        } else {
+          // Ctrl+Z or Cmd+Z for undo
+          if (activeTabId) {
+            undo(activeTabId)
+          }
+        }
+      } else if (isCtrlOrCmd && e.key.toLowerCase() === 'y') {
+        // Ctrl+Y for redo (Windows style)
+        e.preventDefault()
+        if (activeTabId) {
+          redo(activeTabId)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTabId, undo, redo])
+
   const handleUndo = () => {
     if (activeTabId) {
       undo(activeTabId)
