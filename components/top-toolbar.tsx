@@ -32,12 +32,6 @@ export function TopToolbar({ className }: TopToolbarProps) {
   const [showImportModal, setShowImportModal] = React.useState(false)
 
   const activeTab = getActiveTab()
-  
-  if (!activeTab || !activeTabId) {
-    return null
-  }
-
-  const canvasState = activeTab.canvasState
 
   // Global keyboard shortcuts for undo/redo
   React.useEffect(() => {
@@ -75,6 +69,12 @@ export function TopToolbar({ className }: TopToolbarProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeTabId, undo, redo])
+
+  if (!activeTab || !activeTabId) {
+    return null
+  }
+
+  const canvasState = activeTab.canvasState
 
   const handleUndo = () => {
     if (activeTabId) {
