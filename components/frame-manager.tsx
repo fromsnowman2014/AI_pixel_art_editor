@@ -21,7 +21,6 @@ import {
 } from 'lucide-react'
 import { createComponentLogger } from '@/lib/ui/smart-logger'
 import { PlaybackDebugger } from '@/lib/ui/playback-debugger'
-import { useMobileLayout, isTouchDevice } from '@/lib/utils/mobile-layout'
 
 interface FrameManagerProps {
   frames: Frame[]
@@ -47,9 +46,6 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
     resetPlaybackToStart,
     getActiveTab,
   } = useProjectStore()
-
-  const { deviceInfo, optimalLayout } = useMobileLayout()
-  const isTouch = isTouchDevice()
 
   // Get enhanced playback state from store
   const activeTab = getActiveTab()
@@ -483,42 +479,30 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
   }
 
   return (
-    <div className={cn(
-      deviceInfo.isMobile ? 'space-y-1' : 'space-y-2', 
-      className
-    )}>
-      {/* Animation Controls - Mobile-optimized layout */}
-      <div className={cn(
-        "flex items-center gap-2",
-        deviceInfo.isMobile 
-          ? "justify-center flex-wrap" // Center controls on mobile
-          : "justify-between flex-wrap"
-      )}>
-        <div className={cn(
-          "flex items-center flex-wrap",
-          deviceInfo.isMobile ? "space-x-1" : "space-x-2"
-        )}>
-          {/* Enhanced Unified Play/Stop Button with Mobile Optimization */}
+    <div className={cn('space-y-2', className)}>
+      {/* Animation Controls - Compact layout */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center space-x-2 flex-wrap">
+          {/* Enhanced Unified Play/Stop Button with Tooltip */}
           <div className="relative group">
             <Button
               variant={isPlaying ? 'secondary' : 'default'}
-              size={deviceInfo.isMobile ? "default" : "sm"}
+              size="sm"
               onClick={isPlaying ? handleStop : handlePlayPause}
               disabled={frames.length <= 1}
               className={cn(
-                "transition-all duration-200 touch-button",
-                deviceInfo.isMobile ? "px-4 min-h-11" : "px-3",
+                "px-3 transition-all duration-200",
                 isPlaying && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
               )}
             >
               {isPlaying ? (
                 <>
-                  <Square className={cn(deviceInfo.isMobile ? "h-5 w-5 mr-2" : "h-4 w-4 mr-2", "animate-pulse")} />
+                  <Square className="h-4 w-4 mr-2 animate-pulse" />
                   Stop
                 </>
               ) : (
                 <>
-                  <Play className={cn(deviceInfo.isMobile ? "h-5 w-5 mr-2" : "h-4 w-4 mr-2")} />
+                  <Play className="h-4 w-4 mr-2" />
                   Play
                 </>
               )}
@@ -533,159 +517,8 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
             )}
           </div>
 
-          {/* Speed Control - Mobile-optimized */}
-          {!deviceInfo.isMobile && (
-            <div className="flex items-center space-x-2 ml-2">
-              <Gauge className="h-4 w-4 text-gray-500" />
-              <select
-                value={playbackSpeed}
-                onChange={(e) => {
-                  if (activeTabId) {
-                    const newSpeed = parseFloat(e.target.value)
-                    setPlaybackSpeed(activeTabId, newSpeed)
-                  }
-                }}
-                className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!activeTabId || frames.length <= 1}
-              >
-                <option value={0.25}>0.25×</option>
-                <option value={0.5}>0.5×</option>
-                <option value={0.75}>0.75×</option>
-                <option value={1.0}>1.0×</option>
-                <option value={1.25}>1.25×</option>
-                <option value={1.5}>1.5×</option>
-                <option value={2.0}>2.0×</option>
-                <option value={3.0}>3.0×</option>
-              </select>
-            </div>
-          )}
-
-          {/* Mobile Speed Control - Simplified */}
-          {deviceInfo.isMobile && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (activeTabId) {
-                  // Cycle through common speeds: 0.5x, 1x, 2x
-                  const speeds = [0.5, 1.0, 2.0]
-                  const currentIndex = speeds.indexOf(playbackSpeed)
-                  const nextSpeed = speeds[(currentIndex + 1) % speeds.length]
-                  setPlaybackSpeed(activeTabId, nextSpeed)
-                }
-              }}
-              disabled={!activeTabId || frames.length <= 1}
-              className="px-3 touch-button"
-              title={`Speed: ${playbackSpeed}x (tap to change)`}
-            >
-              <Gauge className="h-4 w-4 mr-1" />
-              {playbackSpeed}×
-            </Button>
-          )}
-
-          {/* Navigation Controls - Mobile-friendly */}
-          <div className={cn(
-            "flex items-center",
-            deviceInfo.isMobile ? "space-x-1" : "space-x-1"
-          )}>
-            <Button
-              variant="ghost"
-              size={deviceInfo.isMobile ? "default" : "sm"}
-              onClick={handlePrevFrame}
-              disabled={activeFrameIndex <= 0}
-              className={cn(
-                deviceInfo.isMobile ? "px-3 min-h-11 touch-button" : "px-2"
-              )}
-              title="Previous frame"
-            >
-              <SkipBack className={cn(deviceInfo.isMobile ? "h-5 w-5" : "h-4 w-4")} />
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size={deviceInfo.isMobile ? "default" : "sm"}
-              onClick={handleNextFrame}
-              disabled={activeFrameIndex >= frames.length - 1}
-              className={cn(
-                deviceInfo.isMobile ? "px-3 min-h-11 touch-button" : "px-2"
-              )}
-              title="Next frame"
-            >
-              <SkipForward className={cn(deviceInfo.isMobile ? "h-5 w-5" : "h-4 w-4")} />
-            </Button>
-            
-            {/* Reset Button - Hide on compact mobile */}
-            {!className?.includes('mobile-timeline-compact') && (
-              <Button
-                variant="ghost"
-                size={deviceInfo.isMobile ? "default" : "sm"}
-                onClick={() => {
-                  if (activeTabId) {
-                    resetPlaybackToStart(activeTabId)
-                  }
-                }}
-                disabled={frames.length <= 1 || playbackFrameIndex === 0}
-                className={cn(
-                  deviceInfo.isMobile ? "px-3 min-h-11 touch-button" : "px-2 ml-2"
-                )}
-                title="Reset to first frame"
-              >
-                <RotateCcw className={cn(deviceInfo.isMobile ? "h-5 w-5" : "h-4 w-4")} />
-              </Button>
-            )}
-          </div>
-
-          {/* Frame Info - Responsive */}
-          <div className={cn(
-            "text-gray-600",
-            deviceInfo.isMobile ? "text-xs" : "text-sm"
-          )}>
-            {isPlaying ? (
-              <span className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                {deviceInfo.isMobile 
-                  ? `${playbackFrameIndex + 1}/${frames.length}`
-                  : `Playing: Frame ${playbackFrameIndex + 1} of ${frames.length}`
-                }
-              </span>
-            ) : (
-              <span>
-                {deviceInfo.isMobile 
-                  ? `${activeFrameIndex + 1}/${frames.length}`
-                  : `Frame ${activeFrameIndex + 1} of ${frames.length}`
-                }
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Add Frame Button - Mobile-optimized */}
-        <Button
-          variant="outline"
-          size={deviceInfo.isMobile ? "default" : "sm"}
-          onClick={handleAddFrame}
-          className={cn(
-            "flex-shrink-0",
-            deviceInfo.isMobile ? "px-3 min-h-11 touch-button" : "px-3"
-          )}
-          title="Add new frame"
-        >
-          <Plus className={cn(deviceInfo.isMobile ? "h-5 w-5 mr-2" : "h-4 w-4 mr-2")} />
-          {deviceInfo.isMobile ? "+" : "Add"}
-        </Button>
-
-        {/* Additional info - Desktop only */}
-        {!deviceInfo.isMobile && (
-          <div className="text-xs text-gray-500">
-            {frames.filter(f => f.included).length} frames in animation
-          </div>
-        )}
-      </div>
-
-      {/* Mobile Speed Control Row - Separate for better UX */}
-      {deviceInfo.isMobile && (
-        <div className="flex justify-center">
-          <div className="flex items-center space-x-2 bg-gray-50 rounded-lg p-2">
+          {/* Speed Control */}
+          <div className="flex items-center space-x-2 ml-2">
             <Gauge className="h-4 w-4 text-gray-500" />
             <select
               value={playbackSpeed}
@@ -695,16 +528,86 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                   setPlaybackSpeed(activeTabId, newSpeed)
                 }
               }}
-              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-11 touch-button"
+              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={!activeTabId || frames.length <= 1}
             >
-              <option value={0.5}>0.5× Speed</option>
-              <option value={1.0}>1.0× Speed</option>
-              <option value={2.0}>2.0× Speed</option>
+              <option value={0.25}>0.25×</option>
+              <option value={0.5}>0.5×</option>
+              <option value={0.75}>0.75×</option>
+              <option value={1.0}>1.0×</option>
+              <option value={1.25}>1.25×</option>
+              <option value={1.5}>1.5×</option>
+              <option value={2.0}>2.0×</option>
+              <option value={3.0}>3.0×</option>
             </select>
           </div>
+
+          {/* Reset to Start Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (activeTabId) {
+                resetPlaybackToStart(activeTabId)
+              }
+            }}
+            disabled={frames.length <= 1 || playbackFrameIndex === 0}
+            className="px-2 ml-2"
+            title="Reset to first frame"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handlePrevFrame}
+              disabled={activeFrameIndex <= 0}
+              className="px-2"
+            >
+              <SkipBack className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNextFrame}
+              disabled={activeFrameIndex >= frames.length - 1}
+              className="px-2"
+            >
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            {isPlaying ? (
+              <span className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                Playing: Frame {playbackFrameIndex + 1} of {frames.length}
+              </span>
+            ) : (
+              <span>Frame {activeFrameIndex + 1} of {frames.length}</span>
+            )}
+          </div>
         </div>
-      )}
+
+        <Button
+          variant={frames.length <= 1 ? "default" : "outline"}
+          size="sm"
+          onClick={handleAddFrame}
+          className={cn(
+            "px-3 transition-all duration-200",
+            frames.length <= 1 && "animate-pulse bg-blue-500 text-white hover:bg-blue-600"
+          )}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Frame
+          {frames.length <= 1 && (
+            <span className="ml-2 text-xs">← 애니메이션 시작</span>
+          )}
+        </Button>
+      </div>
 
       {/* Frame Timeline */}
       <div 
@@ -742,35 +645,21 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
           </span>
         </div>
 
-        {/* Timeline container with mobile-optimized design */}
+        {/* Timeline container with compact design */}
         <div 
           ref={timelineScrollRef}
-          className={cn(
-            "overflow-x-auto pb-1",
-            className?.includes('mobile-timeline') && "mobile-timeline",
-            className?.includes('mobile-timeline-compact') && "mobile-timeline max-h-[60px]"
-          )}
+          className="overflow-x-auto pb-1"
           style={{
-            minWidth: deviceInfo.isMobile ? '100%' : Math.max(frames.length * 70, 350) + 'px'
+            minWidth: Math.max(frames.length * 70, 350) + 'px'
           }}
         >
-          <div className={cn(
-            "flex w-max",
-            deviceInfo.isMobile ? "space-x-2 px-2" : "space-x-1"
-          )}>
+          <div className="flex space-x-1 w-max">
           {frames.map((frame, index) => (
             <div
               key={frame.id}
               ref={el => { frameRefs.current[index] = el }}
               className={cn(
-                'group relative flex-shrink-0 cursor-pointer rounded border-2 transition-all duration-200',
-                // Mobile-optimized sizing
-                deviceInfo.isMobile 
-                  ? "p-2 mobile-frame-thumbnail touch-button" 
-                  : "p-1.5",
-                // Touch-friendly feedback
-                isTouch && "touch-feedback",
-                // State-based styling
+                'group relative flex-shrink-0 cursor-pointer rounded border-2 p-1.5 transition-all duration-200',
                 activeFrameId === frame.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 bg-white hover:border-gray-300',
@@ -789,26 +678,10 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                   handleFrameSelect(frame.id)
                 }
               }}
-              // Touch-friendly interaction
-              onTouchStart={(e) => {
-                if (isTouch) {
-                  e.currentTarget.style.transform = 'scale(0.95)'
-                }
-              }}
-              onTouchEnd={(e) => {
-                if (isTouch) {
-                  e.currentTarget.style.transform = ''
-                }
-              }}
               tabIndex={-1} // Timeline container handles keyboard navigation
             >
-              {/* Frame Preview with Thumbnail - Mobile-optimized size */}
-              <div className={cn(
-                "rounded bg-gray-100 border border-gray-200 overflow-hidden relative",
-                deviceInfo.isMobile 
-                  ? "h-12 w-12" // 48px for mobile (better touch target)
-                  : "h-10 w-10"  // 40px for desktop
-              )}>
+              {/* Frame Preview with Thumbnail - Compact size */}
+              <div className="h-10 w-10 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
                 {(() => {
                   let thumbnail = activeTabId ? getFrameThumbnail(activeTabId, frame.id) : null
                   
@@ -852,24 +725,12 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                 </div>
               </div>
 
-              {/* Frame Actions - Mobile-optimized layout */}
-              <div className={cn(
-                "absolute flex transition-opacity",
-                deviceInfo.isMobile ? (
-                  "top-0 right-0 flex-row space-x-1 opacity-100" // Always visible on mobile
-                ) : (
-                  "-top-1 -right-1 flex-col space-y-0.5 opacity-0 group-hover:opacity-100"
-                )
-              )}>
+              {/* Frame Actions - Compact layout */}
+              <div className="absolute -top-1 -right-1 flex flex-col space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="outline"
                   size="sm"
-                  className={cn(
-                    "bg-white border-gray-300",
-                    deviceInfo.isMobile 
-                      ? "h-6 w-6 p-0 hover:bg-green-50" // Larger for mobile
-                      : "h-5 w-5 p-0 hover:bg-green-50"
-                  )}
+                  className="h-5 w-5 p-0 bg-white hover:bg-green-50 border-gray-300"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleFrameVisibilityToggle(frame.id)
@@ -877,56 +738,39 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                   title={frame.included ? 'Hide from animation' : 'Include in animation'}
                 >
                   {frame.included ? (
-                    <Eye className={cn(deviceInfo.isMobile ? "h-3 w-3" : "h-2.5 w-2.5", "text-green-600")} />
+                    <Eye className="h-2.5 w-2.5 text-green-600" />
                   ) : (
-                    <EyeOff className={cn(deviceInfo.isMobile ? "h-3 w-3" : "h-2.5 w-2.5", "text-gray-400")} />
+                    <EyeOff className="h-2.5 w-2.5 text-gray-400" />
                   )}
                 </Button>
               </div>
 
-              <div className={cn(
-                "absolute flex transition-opacity",
-                deviceInfo.isMobile ? (
-                  "bottom-0 right-0 flex-row space-x-1 opacity-100" // Always visible on mobile
-                ) : (
-                  "-bottom-1 -right-1 flex-row space-x-0.5 opacity-0 group-hover:opacity-100"
-                )
-              )}>
+              <div className="absolute -bottom-1 -right-1 flex space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="outline"
                   size="sm"
-                  className={cn(
-                    "bg-white border-gray-300",
-                    deviceInfo.isMobile 
-                      ? "h-6 w-6 p-0 hover:bg-blue-50" // Larger for mobile
-                      : "h-5 w-5 p-0 hover:bg-blue-50"
-                  )}
+                  className="h-5 w-5 p-0 bg-white hover:bg-blue-50 border-gray-300"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleDuplicateFrame(frame.id)
                   }}
                   title="Duplicate frame"
                 >
-                  <Copy className={cn(deviceInfo.isMobile ? "h-3 w-3" : "h-2.5 w-2.5", "text-blue-600")} />
+                  <Copy className="h-2.5 w-2.5 text-blue-600" />
                 </Button>
 
                 {frames.length > 1 && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className={cn(
-                      "bg-white border-gray-300",
-                      deviceInfo.isMobile 
-                        ? "h-6 w-6 p-0 hover:bg-red-50" // Larger for mobile
-                        : "h-5 w-5 p-0 hover:bg-red-50"
-                    )}
+                    className="h-5 w-5 p-0 bg-white hover:bg-red-50 border-gray-300"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDeleteFrame(frame.id)
                     }}
                     title="Delete frame"
                   >
-                    <Trash2 className={cn(deviceInfo.isMobile ? "h-3 w-3" : "h-2.5 w-2.5", "text-red-600")} />
+                    <Trash2 className="h-2.5 w-2.5 text-red-600" />
                   </Button>
                 )}
               </div>
