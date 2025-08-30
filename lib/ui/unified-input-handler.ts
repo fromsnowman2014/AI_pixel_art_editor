@@ -532,8 +532,8 @@ export class UnifiedInputHandler {
     // Calculate deltas
     const deltaX = currentCenter.x - this.activeGesture.center!.x
     const deltaY = currentCenter.y - this.activeGesture.center!.y
-    const scale = currentDistance / this.activeGesture.points[0] ? 
-      this.calculateDistance(this.activeGesture.points[0], this.activeGesture.points[1]) : 1
+    const scale = this.activeGesture.points[0] && this.activeGesture.points[1] ? 
+      currentDistance / this.calculateDistance(this.activeGesture.points[0], this.activeGesture.points[1]) : 1
 
     // Determine if this is pan or zoom
     const isZoom = Math.abs(scale - 1) > 0.1

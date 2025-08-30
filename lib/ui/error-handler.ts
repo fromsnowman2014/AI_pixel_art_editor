@@ -339,10 +339,12 @@ export class CentralErrorHandler {
     const errorsByComponent: Record<string, number> = {}
     let criticalErrorsCount = 0
 
-    for (const [key, count] of this.errorCounts.entries()) {
+    this.errorCounts.forEach((count, key) => {
       const component = key.split(':')[0]
-      errorsByComponent[component] = (errorsByComponent[component] || 0) + count
-    }
+      if (component) {
+        errorsByComponent[component] = (errorsByComponent[component] || 0) + count
+      }
+    })
 
     // Count critical errors from recent errors
     const fiveMinutesAgo = Date.now() - (5 * 60 * 1000)
@@ -369,7 +371,7 @@ export class CentralErrorHandler {
     this.componentLogger.info(
       'ERROR_HISTORY_CLEARED',
       {
-        timestamp: Date.now()
+        timestamp: new Date().toISOString()
       }
     )
   }

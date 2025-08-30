@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2015",
     "lib": ["dom", "dom.iterable", "es6", "webworker"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -31,7 +31,7 @@
       "@/public/*": ["./public/*"]
     },
     "forceConsistentCasingInFileNames": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,

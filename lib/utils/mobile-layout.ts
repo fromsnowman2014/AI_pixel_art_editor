@@ -432,6 +432,13 @@ export const responsive = {
 }
 
 /**
+ * Check if device supports touch
+ */
+export function isTouchDevice(): boolean {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0
+}
+
+/**
  * CSS custom properties utility for responsive design
  */
 export function setCSSCustomProperties(): void {
