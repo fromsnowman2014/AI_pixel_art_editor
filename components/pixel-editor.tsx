@@ -12,6 +12,8 @@ import { FrameManager } from './frame-manager'
 import { ProjectPanel } from './project-panel'
 import { AppHeader } from './app-header'
 import { ProjectEmptyState } from './project-empty-state'
+import { MobilePixelEditor } from './mobile/mobile-pixel-editor'
+import { shouldUseMobileUI } from '@/lib/utils/device-detection'
 import toast from 'react-hot-toast'
 
 interface PixelEditorProps {
@@ -31,6 +33,9 @@ export function PixelEditor({ className }: PixelEditorProps) {
   } = useProjectStore()
 
   const activeTab = getActiveTab()
+  
+  // Device-specific UI rendering
+  const useMobileUI = shouldUseMobileUI()
   
   // Auto-stop playback when clicking outside frame manager
   const handleGlobalClick = (e: React.MouseEvent) => {
@@ -58,6 +63,11 @@ export function PixelEditor({ className }: PixelEditorProps) {
       clearError()
     }
   }, [error, clearError])
+  
+  // If mobile device detected, use mobile UI
+  if (useMobileUI) {
+    return <MobilePixelEditor className={className} />
+  }
 
   if (tabs.length === 0) {
     return (

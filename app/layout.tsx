@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
@@ -13,7 +13,6 @@ export const metadata: Metadata = {
   description: 'A kid-friendly AI-assisted pixel art and GIF studio. Create amazing pixel art and animations with the power of AI!',
   keywords: ['pixel art', 'gif', 'kids', 'ai', 'drawing', 'animation'],
   authors: [{ name: 'PixelBuddy Team' }],
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   robots: 'index, follow',
   openGraph: {
     title: 'PixelBuddy - AI Pixel Art Studio for Kids',
@@ -21,6 +20,13 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({

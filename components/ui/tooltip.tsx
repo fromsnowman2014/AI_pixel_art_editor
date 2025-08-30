@@ -24,7 +24,7 @@ export function Tooltip({
   const tooltipRef = React.useRef<HTMLDivElement>(null)
 
   const calculatePosition = React.useCallback(() => {
-    if (!triggerRef.current || !tooltipRef.current) return
+    if (!triggerRef.current || !tooltipRef.current || typeof window === 'undefined') return
 
     const triggerRect = triggerRef.current.getBoundingClientRect()
     const tooltipRect = tooltipRef.current.getBoundingClientRect()
@@ -63,7 +63,7 @@ export function Tooltip({
   }, [side])
 
   const showTooltip = React.useCallback(() => {
-    if (disabled) return
+    if (disabled || typeof window === 'undefined') return
     setIsVisible(true)
     // Delay position calculation to ensure tooltip is rendered
     setTimeout(calculatePosition, 0)
@@ -74,7 +74,7 @@ export function Tooltip({
   }, [])
 
   React.useEffect(() => {
-    if (isVisible) {
+    if (isVisible && typeof window !== 'undefined') {
       window.addEventListener('scroll', calculatePosition)
       window.addEventListener('resize', calculatePosition)
       return () => {
