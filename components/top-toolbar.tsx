@@ -33,9 +33,8 @@ export function TopToolbar({ className }: TopToolbarProps) {
 
   const activeTab = getActiveTab()
 
-  // Global keyboard shortcuts for undo/redo - Hook MUST be called unconditionally
+  // Global keyboard shortcuts for undo/redo
   React.useEffect(() => {
-    if (!activeTab || !activeTabId) return // Guard clause inside useEffect
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if typing in input fields
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -69,9 +68,8 @@ export function TopToolbar({ className }: TopToolbarProps) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTabId, undo, redo, activeTab])
+  }, [activeTabId, undo, redo])
 
-  // Early return after all hooks
   if (!activeTab || !activeTabId) {
     return null
   }
