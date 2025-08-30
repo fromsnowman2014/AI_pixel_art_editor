@@ -8,6 +8,48 @@
 import React from 'react'
 import { logger, createComponentLogger } from '@/lib/ui/smart-logger'
 
+function getDefaultLayout(): OptimalLayout {
+  return {
+    config: {
+      toolbarPlacement: 'sidebar',
+      timelinePlacement: 'bottom',
+      colorPalettePlacement: 'sidebar',
+      touchTargetSize: 32,
+      gridLayout: 'grid-cols-[280px_1fr_350px]',
+      componentSpacing: 16
+    },
+    css: {
+      container: 'min-h-screen bg-gray-50',
+      toolbar: 'w-64 bg-white border-r',
+      canvas: 'flex-1 relative',
+      timeline: 'h-24 bg-white border-t',
+      colorPalette: 'w-80 bg-white border-l'
+    },
+    breakpoints: {
+      mobile: 768,
+      tablet: 1024,
+      desktop: 1440
+    }
+  }
+}
+
+function getDefaultCapabilities(): DeviceCapabilities {
+  return {
+    hasTouch: false,
+    hasKeyboard: true,
+    hasMouse: true,
+    supportsHover: true,
+    screenSize: 'desktop',
+    orientation: 'landscape',
+    safeAreaInsets: {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0
+    }
+  }
+}
+
 export interface DeviceCapabilities {
   hasTouch: boolean
   hasKeyboard: boolean
@@ -405,11 +447,19 @@ export function useResponsiveLayout(component: string): {
   applyLayout: (componentName: keyof OptimalLayout['css']) => string
   shouldRecalculate: boolean
 } {
-  const [manager] = React.useState(() => new ResponsiveLayoutManager())
-  const [layout, setLayout] = React.useState<OptimalLayout>(() => manager.calculateOptimalLayout())
-  const [capabilities, setCapabilities] = React.useState<DeviceCapabilities>(() => manager.getCurrentCapabilities())
+  const [manager] = React.useState(() => 
+    typeof window !== 'undefined' ? new ResponsiveLayoutManager() : null
+  )
+  const [layout, setLayout] = React.useState<OptimalLayout>(() => 
+    manager ? manager.calculateOptimalLayout() : getDefaultLayout()
+  )
+  const [capabilities, setCapabilities] = React.useState<DeviceCapabilities>(() => 
+    manager ? manager.getCurrentCapabilities() : getDefaultCapabilities()
+  )
 
   React.useEffect(() => {
+    if (!manager) return
+    
     const handleResize = () => {
       if (manager.shouldRecalculateLayout()) {
         const newLayout = manager.calculateOptimalLayout()
@@ -431,10 +481,12 @@ export function useResponsiveLayout(component: string): {
   }, [manager])
 
   const applyLayout = React.useCallback((componentName: keyof OptimalLayout['css']) => {
+    if (!manager) return layout.css[componentName]
     return manager.applyLayout(componentName)
-  }, [manager])
+  }, [manager, layout])
 
   const shouldRecalculate = React.useMemo(() => {
+    if (!manager) return false
     return manager.shouldRecalculateLayout()
   }, [manager, layout])
 

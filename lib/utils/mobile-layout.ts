@@ -60,6 +60,25 @@ const DEFAULT_CONFIG: ResponsiveConfig = {
  * Get current device and layout information
  */
 export function getDeviceInfo(): DeviceInfo {
+  // Handle SSR - return sensible defaults when window is undefined
+  if (typeof window === 'undefined') {
+    return {
+      isMobile: false,
+      isTablet: false,
+      isDesktop: true,
+      isPortrait: false,
+      isLandscape: true,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      devicePixelRatio: 1,
+      isTouch: false,
+      isIOS: false,
+      isAndroid: false,
+      supportsHover: true,
+      safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 }
+    }
+  }
+
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
   const devicePixelRatio = window.devicePixelRatio || 1
@@ -147,7 +166,10 @@ export class MobileLayoutManager {
     this.config = { ...DEFAULT_CONFIG, ...config }
     this.currentDeviceInfo = getDeviceInfo()
     
-    this.setupEventListeners()
+    // Only setup event listeners on client-side
+    if (typeof window !== 'undefined') {
+      this.setupEventListeners()
+    }
   }
 
   /**
@@ -330,8 +352,10 @@ export class MobileLayoutManager {
    * Cleanup event listeners
    */
   destroy(): void {
-    window.removeEventListener('resize', this.handleResize)
-    window.removeEventListener('orientationchange', this.handleOrientationChange)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', this.handleResize)
+      window.removeEventListener('orientationchange', this.handleOrientationChange)
+    }
     
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer)
@@ -349,10 +373,30 @@ export class MobileLayoutManager {
  * React hook for using mobile layout manager
  */
 export function useMobileLayout(config?: Partial<ResponsiveConfig>) {
-  const [deviceInfo, setDeviceInfo] = React.useState<DeviceInfo>(() => getDeviceInfo())
-  const [layoutManager] = React.useState(() => new MobileLayoutManager(config))
+  const [deviceInfo, setDeviceInfo] = React.useState<DeviceInfo>(() => 
+    typeof window !== 'undefined' ? getDeviceInfo() : {
+      isMobile: false,
+      isTablet: false,
+      isDesktop: true,
+      isPortrait: false,
+      isLandscape: true,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      devicePixelRatio: 1,
+      isTouch: false,
+      isIOS: false,
+      isAndroid: false,
+      supportsHover: true,
+      safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 }
+    }
+  )
+  const [layoutManager] = React.useState(() => 
+    typeof window !== 'undefined' ? new MobileLayoutManager(config) : null
+  )
 
   React.useEffect(() => {
+    if (!layoutManager) return
+    
     const unsubscribe = layoutManager.subscribe(setDeviceInfo)
     
     return () => {
@@ -362,13 +406,22 @@ export function useMobileLayout(config?: Partial<ResponsiveConfig>) {
   }, [layoutManager])
 
   const optimalLayout = React.useMemo(() => {
+    if (!layoutManager) {
+      return {
+        gridColumns: 'grid-cols-[280px_1fr_350px]',
+        toolbarPosition: 'left' as const,
+        timelinePosition: 'bottom' as const,
+        panelVisibility: 'visible' as const,
+        touchTargetSize: 32
+      }
+    }
     return layoutManager.getOptimalLayout()
   }, [layoutManager, deviceInfo])
 
   return {
     deviceInfo,
     optimalLayout,
-    matches: (query: Partial<DeviceInfo>) => layoutManager.matches(query)
+    matches: (query: Partial<DeviceInfo>) => layoutManager?.matches(query) || false
   }
 }
 
@@ -406,6 +459,7 @@ export const responsive = {
    * Check if viewport matches media query
    */
   matchesQuery(query: string): boolean {
+    if (typeof window === 'undefined') return false
     return window.matchMedia(query).matches
   },
 
@@ -413,6 +467,10 @@ export const responsive = {
    * Get dynamic viewport dimensions (accounts for mobile browser UI)
    */
   getDynamicViewport(): { width: number, height: number } {
+    if (typeof window === 'undefined') {
+      return { width: 1440, height: 900 }
+    }
+    
     // Try to get the actual viewport size (excluding mobile browser UI)
     const visualViewport = (window as any).visualViewport
     
@@ -435,6 +493,7 @@ export const responsive = {
  * Check if device supports touch
  */
 export function isTouchDevice(): boolean {
+  if (typeof window === 'undefined') return false
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0
 }
 
@@ -442,6 +501,8 @@ export function isTouchDevice(): boolean {
  * CSS custom properties utility for responsive design
  */
 export function setCSSCustomProperties(): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+  
   const deviceInfo = getDeviceInfo()
   const root = document.documentElement
   
