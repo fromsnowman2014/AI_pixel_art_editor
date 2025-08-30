@@ -5,9 +5,8 @@ import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
 import { performMagicWandSelection, clearSelection } from '@/lib/core/magic-wand'
-
-// Simplified debug logging
-import { canvasDebug } from '@/lib/ui/debug'
+import { createComponentLogger } from '@/lib/ui/smart-logger'
+import { useUnifiedInput, InputPoint, InputGesture } from '@/lib/ui/unified-input-handler'
 
 interface PixelCanvasProps {
   project: Project
@@ -18,8 +17,12 @@ interface PixelCanvasProps {
 export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null)
+  const componentLogger = createComponentLogger('PixelCanvas')
+  
+  // Unified drawing state
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [lastPosition, setLastPosition] = useState<{ x: number; y: number } | null>(null)
+  const [currentGesture, setCurrentGesture] = useState<InputGesture | null>(null)
   
   const {
     activeTabId,
@@ -33,6 +36,103 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   // Get playback state for optimized rendering
   const activeTab = getActiveTab()
   const isPlaying = activeTab?.isPlaying || false
+
+  // Unified input handling
+  const { performanceMetrics } = useUnifiedInput(containerRef, {
+    onDrawStart: (point: InputPoint) => {
+      componentLogger.debug(
+        'DRAW_START',
+        {
+          inputType: point.inputType,
+          coordinates: { x: point.x, y: point.y },
+          tool: canvasState.tool,
+          pressure: point.pressure
+        }
+      )
+      
+      handleDrawStart(point)
+    },
+    onDrawMove: (point: InputPoint, gesture: InputGesture) => {
+      if (isDrawing) {
+        componentLogger.debug(
+          'DRAW_MOVE',
+          {
+            inputType: point.inputType,
+            gestureType: gesture.type,
+            coordinates: { x: point.x, y: point.y }
+          }
+        )
+        
+        handleDrawMove(point)
+      }
+    },
+    onDrawEnd: (point: InputPoint, gesture: InputGesture) => {
+      componentLogger.debug(
+        'DRAW_END',
+        {
+          inputType: point.inputType,
+          gestureType: gesture.type,
+          gestureDuration: gesture.duration,
+          coordinates: { x: point.x, y: point.y }
+        }
+      )
+      
+      handleDrawEnd(point)
+    },
+    onPan: (delta: { x: number, y: number }, gesture: InputGesture) => {
+      componentLogger.debug(
+        'CANVAS_PAN',
+        {
+          delta,
+          gestureType: gesture.type,
+          currentZoom: canvasState.zoom
+        }
+      )
+      
+      handlePan(delta)
+    },
+    onZoom: (scale: number, center: { x: number, y: number }, gesture: InputGesture) => {
+      componentLogger.debug(
+        'CANVAS_ZOOM',
+        {
+          scale,
+          center,
+          currentZoom: canvasState.zoom,
+          gestureType: gesture.type
+        }
+      )
+      
+      handleZoom(scale, center)
+    },
+    onLongPress: (point: InputPoint) => {
+      componentLogger.debug(
+        'LONG_PRESS_DETECTED',
+        {
+          coordinates: { x: point.x, y: point.y },
+          currentTool: canvasState.tool
+        }
+      )
+      
+      handleLongPress(point)
+    },
+    onError: (error: Error, context: string) => {
+      componentLogger.error(
+        'CANVAS_INPUT_ERROR',
+        {
+          context,
+          currentTool: canvasState.tool,
+          isDrawing,
+          errorMessage: error.message
+        },
+        error
+      )
+    }
+  }, {
+    component: 'PixelCanvas',
+    enableHaptics: true,
+    performanceMode: 'high',
+    debugMode: process.env.NODE_ENV === 'development'
+  })
 
   // Handle keyboard shortcuts for selection
   useEffect(() => {
@@ -134,6 +234,89 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   // Component mounted
 
   // Props updated (removed debug logs)
+
+  // Unified drawing handlers
+  const handleDrawStart = useCallback((point: InputPoint) => {
+    if (!canvasData || !activeTabId) return
+    
+    setIsDrawing(true)
+    setCurrentGesture(null)
+    
+    const canvasCoords = getCanvasCoordinates(point.x, point.y)
+    setLastPosition(canvasCoords)
+    
+    // Start drawing operation
+    drawPixel(canvasCoords.x, canvasCoords.y)
+  }, [canvasData, activeTabId, canvasState])
+
+  const handleDrawMove = useCallback((point: InputPoint) => {
+    if (!isDrawing || !lastPosition) return
+    
+    const canvasCoords = getCanvasCoordinates(point.x, point.y)
+    setLastPosition(canvasCoords)
+    
+    // Continue drawing operation
+    drawPixel(canvasCoords.x, canvasCoords.y)
+  }, [isDrawing, lastPosition, canvasState])
+
+  const handleDrawEnd = useCallback((point: InputPoint) => {
+    if (!isDrawing) return
+    
+    setIsDrawing(false)
+    setLastPosition(null)
+    setCurrentGesture(null)
+    
+    // Finalize drawing operation
+    if (activeTabId) {
+      addHistoryEntry(activeTabId)
+      regenerateFrameThumbnail(activeTabId, project.activeFrameId)
+    }
+  }, [isDrawing, activeTabId, addHistoryEntry, regenerateFrameThumbnail, project.activeFrameId])
+
+  const handlePan = useCallback((delta: { x: number, y: number }) => {
+    if (!activeTabId) return
+    
+    updateCanvasState(activeTabId, {
+      pan: {
+        x: canvasState.pan.x + delta.x,
+        y: canvasState.pan.y + delta.y
+      }
+    })
+  }, [activeTabId, canvasState.pan, updateCanvasState])
+
+  const handleZoom = useCallback((scale: number, center: { x: number, y: number }) => {
+    if (!activeTabId) return
+    
+    const newZoom = Math.max(0.1, Math.min(10, canvasState.zoom * scale))
+    
+    updateCanvasState(activeTabId, {
+      zoom: newZoom,
+      pan: {
+        x: canvasState.pan.x + (center.x - canvasState.pan.x) * (1 - scale),
+        y: canvasState.pan.y + (center.y - canvasState.pan.y) * (1 - scale)
+      }
+    })
+  }, [activeTabId, canvasState.zoom, canvasState.pan, updateCanvasState])
+
+  const handleLongPress = useCallback((point: InputPoint) => {
+    // Long press activates eyedropper tool
+    if (canvasState.tool !== 'eyedropper') {
+      const canvasCoords = getCanvasCoordinates(point.x, point.y)
+      drawPixel(canvasCoords.x, canvasCoords.y) // Simulate eyedropper
+    }
+  }, [canvasState.tool])
+
+  // Get canvas coordinates from screen coordinates
+  const getCanvasCoordinates = useCallback((screenX: number, screenY: number) => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: 0, y: 0 }
+    
+    const rect = canvas.getBoundingClientRect()
+    const x = screenX - rect.left - canvasState.pan.x
+    const y = screenY - rect.top - canvasState.pan.y
+    
+    return { x, y }
+  }, [canvasState.pan])
 
   // Handle drawing on canvas
   const drawPixel = useCallback((x: number, y: number) => {
@@ -274,6 +457,173 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       }, 100) // Small delay to ensure canvas data is saved
     }
   }, [canvasData, canvasState, project, activeTabId, updateCanvasData, updateCanvasState])
+
+  // Touch event handlers for mobile support
+  const convertTouchToCanvasCoords = useCallback((touch: Touch): { x: number, y: number } => {
+    if (!canvasRef.current) return { x: 0, y: 0 }
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    return {
+      x: touch.clientX - canvasRect.left,
+      y: touch.clientY - canvasRect.top
+    }
+  }, [])
+
+  const showTouchIndicator = useCallback((x: number, y: number, type: 'tap' | 'drag' | 'pinch' | 'long-press') => {
+    const id = `touch-${Date.now()}-${Math.random()}`
+    
+    setTouchIndicators(prev => [...prev, { id, x, y, type }])
+    
+    // Remove indicator after animation
+    setTimeout(() => {
+      setTouchIndicators(prev => prev.filter(indicator => indicator.id !== id))
+    }, 300)
+  }, [])
+
+  const handleSingleTap = useCallback((point: TouchPoint) => {
+    if (!canvasRef.current || isPlaying) return
+    
+    const coords = convertTouchToCanvasCoords({ clientX: point.x, clientY: point.y } as Touch)
+    drawPixel(coords.x, coords.y)
+    
+    // Show visual feedback
+    showTouchIndicator(point.x, point.y, 'tap')
+    
+    canvasDebug('TOUCH', 'Single tap detected', { x: coords.x, y: coords.y })
+  }, [convertTouchToCanvasCoords, drawPixel, showTouchIndicator, isPlaying])
+
+  const handleSingleDrag = useCallback((points: TouchPoint[], currentPoint: TouchPoint) => {
+    if (!canvasRef.current || isPlaying) return
+    
+    const coords = convertTouchToCanvasCoords({ clientX: currentPoint.x, clientY: currentPoint.y } as Touch)
+    drawPixel(coords.x, coords.y)
+    
+    // Show continuous drag feedback
+    showTouchIndicator(currentPoint.x, currentPoint.y, 'drag')
+    
+    canvasDebug('TOUCH', 'Single drag', { x: coords.x, y: coords.y, pointCount: points.length })
+  }, [convertTouchToCanvasCoords, drawPixel, showTouchIndicator, isPlaying])
+
+
+  const handleTwoFingerPan = useCallback((delta: { x: number, y: number }, center: { x: number, y: number }) => {
+    if (!activeTabId || isPlaying) return
+    
+    // Update pan state
+    updateCanvasState(activeTabId, {
+      panX: canvasState.panX + delta.x,
+      panY: canvasState.panY + delta.y
+    })
+    
+    canvasDebug('TOUCH', 'Two finger pan', { delta, center, newPan: { x: canvasState.panX + delta.x, y: canvasState.panY + delta.y } })
+  }, [activeTabId, canvasState.panX, canvasState.panY, updateCanvasState, isPlaying])
+
+  const handlePinchZoom = useCallback((scale: number, center: { x: number, y: number }) => {
+    if (!activeTabId || isPlaying) return
+    
+    // Calculate new zoom level with constraints
+    const newZoom = Math.max(1, Math.min(32, canvasState.zoom * scale))
+    
+    // Adjust pan to zoom around the pinch center
+    if (canvasRef.current) {
+      const canvasRect = canvasRef.current.getBoundingClientRect()
+      const centerOffsetX = center.x - canvasRect.width / 2
+      const centerOffsetY = center.y - canvasRect.height / 2
+      
+      const zoomRatio = newZoom / canvasState.zoom
+      const newPanX = canvasState.panX - centerOffsetX * (zoomRatio - 1)
+      const newPanY = canvasState.panY - centerOffsetY * (zoomRatio - 1)
+      
+      updateCanvasState(activeTabId, {
+        zoom: newZoom,
+        panX: newPanX,
+        panY: newPanY
+      })
+    }
+    
+    // Show pinch zoom feedback
+    showTouchIndicator(center.x, center.y, 'pinch')
+    
+    canvasDebug('TOUCH', 'Pinch zoom', { scale, newZoom, center })
+  }, [activeTabId, canvasState.zoom, canvasState.panX, canvasState.panY, updateCanvasState, showTouchIndicator, isPlaying])
+
+  // Initialize touch gesture recognizer
+  useEffect(() => {
+    if (!isTouchDevice() || !canvasRef.current) return
+
+    const recognizer = new MobileGestureRecognizer({
+      onSingleTap: handleSingleTap,
+      onSingleDrag: handleSingleDrag,
+      onLongPress: handleLongPress,
+      onTwoFingerPan: handleTwoFingerPan,
+      onPinchZoom: handlePinchZoom,
+      onGestureStart: (gesture) => {
+        setIsTouching(true)
+        canvasDebug('TOUCH', 'Gesture started', gesture)
+      },
+      onGestureEnd: (gesture) => {
+        setIsTouching(false)
+        
+        // Add to history for drawing gestures
+        if (canvasData && activeTabId && (gesture.type === 'single-tap' || gesture.type === 'single-drag')) {
+          addHistoryEntry(activeTabId, `${canvasState.tool}_touch`, canvasData)
+          
+          // Update thumbnail
+          if (project.activeFrameId) {
+            setTimeout(() => {
+              regenerateFrameThumbnail(activeTabId, project.activeFrameId!)
+            }, 100)
+          }
+        }
+        
+        canvasDebug('TOUCH', 'Gesture ended', gesture)
+      }
+    }, {
+      debug: process.env.NODE_ENV === 'development',
+      hapticFeedback: true
+    })
+
+    setGestureRecognizer(recognizer)
+
+    // Set up touch event listeners
+    const canvas = canvasRef.current
+    const handleTouchStart = (e: TouchEvent) => recognizer.handleTouchStart(e)
+    const handleTouchMove = (e: TouchEvent) => recognizer.handleTouchMove(e)
+    const handleTouchEnd = (e: TouchEvent) => recognizer.handleTouchEnd(e)
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false })
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false })
+
+    // Prevent default touch behaviors
+    const cleanup = preventTouchDefaults(canvas)
+    touchCleanupRef.current = cleanup
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart)
+      canvas.removeEventListener('touchmove', handleTouchMove)
+      canvas.removeEventListener('touchend', handleTouchEnd)
+      canvas.removeEventListener('touchcancel', handleTouchEnd)
+      
+      if (touchCleanupRef.current) {
+        touchCleanupRef.current()
+      }
+      
+      recognizer.reset()
+    }
+  }, [
+    handleSingleTap, 
+    handleSingleDrag, 
+    handleLongPress, 
+    handleTwoFingerPan, 
+    handlePinchZoom,
+    canvasData,
+    activeTabId,
+    canvasState.tool,
+    addHistoryEntry,
+    project.activeFrameId,
+    regenerateFrameThumbnail
+  ])
 
   // Simple flood fill algorithm
   const floodFill = useCallback((
@@ -598,7 +948,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   return (
     <div 
       ref={containerRef}
-      className="relative flex h-full items-center justify-center overflow-hidden bg-gray-100"
+      className="relative flex h-full items-center justify-center overflow-hidden bg-gray-100 mobile-canvas-container"
       onWheel={handleWheel}
     >
       <div 
@@ -647,17 +997,37 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           }}
         />
         
-        {/* Tool indicator */}
+        {/* Tool indicator - enhanced for mobile */}
         <div className="absolute -top-8 left-0 rounded bg-black/75 px-2 py-1 text-xs text-white">
           {isPlaying ? '🎬 Playing Animation - editing disabled' :
-           canvasState.tool === 'eyedropper' ? 'Color Picker - click to pick color' :
+           isTouching ? '👆 Touch active' :
+           canvasState.tool === 'eyedropper' ? 'Color Picker - tap to pick color / Long press anywhere' :
            canvasState.tool === 'magic-wand' ? (
              canvasState.selection?.isActive 
                ? `🪄 ${canvasState.selection.selectedPixels.size} pixels selected | ${canvasState.zoom}x`
-               : `🪄 Magic Wand - click to select pixels | ${canvasState.zoom}x`
+               : `🪄 Magic Wand - tap to select pixels | ${canvasState.zoom}x`
            ) :
-           `${canvasState.tool} | ${canvasState.zoom}x`}
+           isTouchDevice() 
+             ? `${canvasState.tool} | ${canvasState.zoom}x | 👆 Tap/drag to draw, 🤏 pinch to zoom`
+             : `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
+        
+        {/* Touch gesture indicators */}
+        {touchIndicators.map(indicator => (
+          <div
+            key={indicator.id}
+            className={`gesture-indicator ${
+              indicator.type === 'pinch' ? 'pinch-zoom-indicator' :
+              indicator.type === 'long-press' ? 'long-press-indicator' :
+              'gesture-indicator'
+            }`}
+            style={{
+              left: indicator.x,
+              top: indicator.y,
+              zIndex: 10
+            }}
+          />
+        ))}
       </div>
     </div>
   )

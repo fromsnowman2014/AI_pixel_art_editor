@@ -27,6 +27,13 @@ body {
   image-rendering: -webkit-crisp-edges;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  /* Prevent touch scrolling conflicts */
+  touch-action: none;
+  /* Prevent text selection on touch */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 /* Kid-friendly focus styles */
@@ -206,4 +213,249 @@ body {
   background: #2563eb;
   transform: scale(1.1);
   box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+
+/* Mobile Touch Optimization Styles */
+
+/* Touch-friendly canvas container */
+.mobile-canvas-container {
+  /* Prevent scroll and zoom conflicts */
+  touch-action: none;
+  overscroll-behavior: none;
+  /* Smooth touch interactions */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch gesture feedback */
+.touch-feedback {
+  transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+}
+
+.touch-feedback:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+/* Mobile-first responsive layout utilities */
+.mobile-layout {
+  /* Portrait layout (default mobile) */
+  display: grid;
+  grid-template-areas: 
+    "header"
+    "tabs"
+    "canvas"
+    "timeline"
+    "tools";
+  grid-template-rows: auto auto 1fr auto auto;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile browsers */
+}
+
+/* Landscape mobile layout */
+@media (orientation: landscape) and (max-width: 1024px) {
+  .mobile-landscape-layout {
+    grid-template-areas: "tools canvas timeline";
+    grid-template-columns: 80px 1fr 200px;
+    grid-template-rows: 1fr;
+  }
+}
+
+/* Touch-optimized button styles */
+.touch-button {
+  min-width: 44px;
+  min-height: 44px;
+  /* Larger touch targets for better accessibility */
+  padding: 12px;
+  /* Prevent double-tap zoom on iOS */
+  touch-action: manipulation;
+  /* Better touch feedback */
+  transition: all 0.15s ease;
+}
+
+.touch-button:active {
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
+
+/* Mobile-optimized frame timeline */
+.mobile-timeline {
+  /* Horizontal scroll optimization */
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  /* Hide scrollbars but keep functionality */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-timeline::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch-friendly frame thumbnails */
+.mobile-frame-thumbnail {
+  min-width: 56px;
+  min-height: 56px;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mobile-frame-thumbnail:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Floating toolbar for mobile */
+.mobile-floating-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  /* Account for iOS safe area */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Backdrop blur for better visibility */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Gesture recognition visual feedback */
+.gesture-indicator {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(59, 130, 246, 0.2);
+  border: 2px solid rgba(59, 130, 246, 0.6);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: gesture-pulse 0.3s ease-out;
+}
+
+@keyframes gesture-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Pinch zoom visual feedback */
+.pinch-zoom-indicator {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(168, 85, 247, 0.2);
+  border: 2px solid rgba(168, 85, 247, 0.6);
+  border-radius: 8px;
+  transform: translate(-50%, -50%);
+  animation: pinch-feedback 0.2s ease-out;
+}
+
+@keyframes pinch-feedback {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Long press feedback */
+.long-press-indicator {
+  position: absolute;
+  pointer-events: none;
+  width: 32px;
+  height: 32px;
+  background: rgba(34, 197, 94, 0.3);
+  border: 2px solid rgba(34, 197, 94, 0.8);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: long-press-expand 0.5s ease-out;
+}
+
+@keyframes long-press-expand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* iOS and Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific styles */
+  .mobile-canvas-container {
+    /* Prevent iOS zooming on double tap */
+    touch-action: manipulation;
+  }
+  
+  /* Prevent iOS selection handles */
+  .pixel-canvas {
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Safe area handling */
+  .mobile-floating-toolbar {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  }
+}
+
+/* High contrast mode adjustments */
+@media (prefers-contrast: high) {
+  .gesture-indicator,
+  .pinch-zoom-indicator,
+  .long-press-indicator {
+    border-width: 3px;
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .touch-feedback,
+  .mobile-frame-thumbnail,
+  .touch-button {
+    transition: none;
+  }
+  
+  .gesture-indicator,
+  .pinch-zoom-indicator,
+  .long-press-indicator {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* Dark mode support for touch indicators */
+@media (prefers-color-scheme: dark) {
+  .mobile-floating-toolbar {
+    background: rgba(31, 41, 55, 0.9);
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .gesture-indicator {
+    background: rgba(96, 165, 250, 0.3);
+    border-color: rgba(96, 165, 250, 0.7);
+  }
+  
+  .pinch-zoom-indicator {
+    background: rgba(196, 181, 253, 0.3);
+    border-color: rgba(196, 181, 253, 0.7);
+  }
+  
+  .long-press-indicator {
+    background: rgba(74, 222, 128, 0.3);
+    border-color: rgba(74, 222, 128, 0.8);
+  }
 }
