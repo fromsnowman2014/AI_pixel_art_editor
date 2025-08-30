@@ -27,10 +27,9 @@ interface FrameManagerProps {
   frames: Frame[]
   activeFrameId: string | null
   className?: string
-  layout?: import('@/lib/ui/responsive-layout-manager').LayoutConfiguration
 }
 
-export function FrameManager({ frames, activeFrameId, className, layout }: FrameManagerProps) {
+export function FrameManager({ frames, activeFrameId, className }: FrameManagerProps) {
   const {
     activeTabId,
     addFrame,
@@ -571,7 +570,7 @@ export function FrameManager({ frames, activeFrameId, className, layout }: Frame
                   // Cycle through common speeds: 0.5x, 1x, 2x
                   const speeds = [0.5, 1.0, 2.0]
                   const currentIndex = speeds.indexOf(playbackSpeed)
-                  const nextSpeed = speeds[(currentIndex + 1) % speeds.length] || 1.0
+                  const nextSpeed = speeds[(currentIndex + 1) % speeds.length]
                   setPlaybackSpeed(activeTabId, nextSpeed)
                 }
               }}

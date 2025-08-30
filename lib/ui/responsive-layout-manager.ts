@@ -154,7 +154,7 @@ export class ResponsiveLayoutManager {
       {
         query: event.media,
         matches: event.matches,
-        timestamp: new Date().toISOString()
+        timestamp: performance.now()
       }
     )
 

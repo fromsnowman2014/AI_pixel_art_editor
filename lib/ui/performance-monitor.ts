@@ -350,11 +350,11 @@ export class PerformanceMonitor {
 
   private optimizeMemoryUsage(component: string): void {
     // Clear old metrics to free memory
-    this.metrics.forEach((metrics, key) => {
+    for (const [key, metrics] of this.metrics.entries()) {
       if (metrics.length > 50) {
         this.metrics.set(key, metrics.slice(-25))
       }
-    })
+    }
     
     this.componentLogger.info(
       'MEMORY_OPTIMIZATION_APPLIED',
@@ -417,14 +417,14 @@ export class PerformanceMonitor {
   private getWorstPerformingComponents(): string[] {
     const componentPerformance: Record<string, number> = {}
     
-    this.metrics.forEach((metricList, metricName) => {
+    for (const [metricName, metricList] of this.metrics.entries()) {
       for (const metric of metricList) {
         if (metric.severity === 'critical' || metric.severity === 'warning') {
           componentPerformance[metric.component] = 
             (componentPerformance[metric.component] || 0) + 1
         }
       }
-    })
+    }
 
     return Object.entries(componentPerformance)
       .sort(([,a], [,b]) => b - a)
@@ -545,16 +545,12 @@ export function withPerformanceMonitoring<P extends object>(
   WrappedComponent: React.ComponentType<P>,
   componentName: string
 ): React.ComponentType<P> {
-  const MemoizedComponent = React.memo((props: P) => {
+  return React.memo((props: P) => {
     const { measureOperation } = usePerformanceMonitor(componentName)
 
-    return measureOperation('component-render', () => 
-      React.createElement(WrappedComponent, props)
-    )
+    return measureOperation('component-render', () => (
+      <WrappedComponent {...props} />
+    ))
   })
-
-  MemoizedComponent.displayName = `withPerformanceMonitoring(${componentName})`
-  
-  return MemoizedComponent as unknown as React.ComponentType<P>
 }
 

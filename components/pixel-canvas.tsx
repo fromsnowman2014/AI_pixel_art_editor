@@ -7,9 +7,6 @@ import type { Project, PixelData, CanvasState } from '@/lib/types/api'
 import { performMagicWandSelection, clearSelection } from '@/lib/core/magic-wand'
 import { createComponentLogger } from '@/lib/ui/smart-logger'
 import { useUnifiedInput, InputPoint, InputGesture } from '@/lib/ui/unified-input-handler'
-import { canvasDebug } from '@/lib/ui/debug'
-import { TouchPoint, MobileGestureRecognizer, preventTouchDefaults } from '@/lib/utils/mobile-gestures'
-import { isTouchDevice } from '@/lib/utils/mobile-layout'
 
 interface PixelCanvasProps {
   project: Project
@@ -20,18 +17,12 @@ interface PixelCanvasProps {
 export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const touchCleanupRef = useRef<(() => void) | null>(null)
   const componentLogger = createComponentLogger('PixelCanvas')
   
   // Unified drawing state
   const [isDrawing, setIsDrawing] = useState(false)
   const [lastPosition, setLastPosition] = useState<{ x: number; y: number } | null>(null)
   const [currentGesture, setCurrentGesture] = useState<InputGesture | null>(null)
-  const [touchIndicators, setTouchIndicators] = useState<Array<{ id: string; x: number; y: number; type: 'tap' | 'drag' | 'pinch' | 'long-press' }>>([])
-  const [isTouching, setIsTouching] = useState(false)
-  const [gestureRecognizer, setGestureRecognizer] = useState<MobileGestureRecognizer | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null)
   
   const {
     activeTabId,
@@ -122,15 +113,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
         }
       )
       
-      handleLongPress({
-        id: 0,
-        x: point.x,
-        y: point.y,
-        startX: point.x,
-        startY: point.y,
-        startTime: Date.now(),
-        moved: false
-      })
+      handleLongPress(point)
     },
     onError: (error: Error, context: string) => {
       componentLogger.error(
@@ -284,8 +267,8 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     setCurrentGesture(null)
     
     // Finalize drawing operation
-    if (activeTabId && canvasData && project.activeFrameId) {
-      addHistoryEntry(activeTabId, `${canvasState.tool}_complete`, canvasData)
+    if (activeTabId) {
+      addHistoryEntry(activeTabId)
       regenerateFrameThumbnail(activeTabId, project.activeFrameId)
     }
   }, [isDrawing, activeTabId, addHistoryEntry, regenerateFrameThumbnail, project.activeFrameId])
@@ -294,10 +277,12 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     if (!activeTabId) return
     
     updateCanvasState(activeTabId, {
-      panX: canvasState.panX + delta.x,
-      panY: canvasState.panY + delta.y
+      pan: {
+        x: canvasState.pan.x + delta.x,
+        y: canvasState.pan.y + delta.y
+      }
     })
-  }, [activeTabId, canvasState.panX, canvasState.panY, updateCanvasState])
+  }, [activeTabId, canvasState.pan, updateCanvasState])
 
   const handleZoom = useCallback((scale: number, center: { x: number, y: number }) => {
     if (!activeTabId) return
@@ -306,12 +291,14 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     
     updateCanvasState(activeTabId, {
       zoom: newZoom,
-      panX: canvasState.panX + (center.x - canvasState.panX) * (1 - scale),
-      panY: canvasState.panY + (center.y - canvasState.panY) * (1 - scale)
+      pan: {
+        x: canvasState.pan.x + (center.x - canvasState.pan.x) * (1 - scale),
+        y: canvasState.pan.y + (center.y - canvasState.pan.y) * (1 - scale)
+      }
     })
-  }, [activeTabId, canvasState.zoom, canvasState.panX, canvasState.panY, updateCanvasState])
+  }, [activeTabId, canvasState.zoom, canvasState.pan, updateCanvasState])
 
-  const handleLongPress = useCallback((point: TouchPoint) => {
+  const handleLongPress = useCallback((point: InputPoint) => {
     // Long press activates eyedropper tool
     if (canvasState.tool !== 'eyedropper') {
       const canvasCoords = getCanvasCoordinates(point.x, point.y)
@@ -325,11 +312,11 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     if (!canvas) return { x: 0, y: 0 }
     
     const rect = canvas.getBoundingClientRect()
-    const x = screenX - rect.left - canvasState.panX
-    const y = screenY - rect.top - canvasState.panY
+    const x = screenX - rect.left - canvasState.pan.x
+    const y = screenY - rect.top - canvasState.pan.y
     
     return { x, y }
-  }, [canvasState.panX, canvasState.panY])
+  }, [canvasState.pan])
 
   // Handle drawing on canvas
   const drawPixel = useCallback((x: number, y: number) => {

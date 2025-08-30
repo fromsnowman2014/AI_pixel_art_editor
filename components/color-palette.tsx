@@ -8,11 +8,9 @@ import { Plus, Palette } from 'lucide-react'
 
 interface ColorPaletteProps {
   className?: string
-  touchTargetSize?: number
-  placement?: string
 }
 
-export function ColorPalette({ className, touchTargetSize, placement }: ColorPaletteProps) {
+export function ColorPalette({ className }: ColorPaletteProps) {
   const {
     activeTabId,
     getActiveTab,
