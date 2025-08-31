@@ -587,7 +587,7 @@ export function MobilePixelCanvas({ project, canvasData, canvasState }: MobilePi
   return (
     <div 
       ref={containerRef}
-      className="relative flex h-full items-center justify-center overflow-hidden bg-gray-100"
+      className="relative flex h-full items-center justify-center overflow-hidden bg-gray-100 mobile-canvas"
     >
       <div 
         className="relative"
@@ -617,7 +617,7 @@ export function MobilePixelCanvas({ project, canvasData, canvasState }: MobilePi
         
         <canvas
           ref={canvasRef}
-          className="pixel-canvas border-2 border-gray-300 shadow-lg relative"
+          className="pixel-canvas border-2 border-gray-300 shadow-lg relative mobile-canvas"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}

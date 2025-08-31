@@ -108,6 +108,11 @@ export function getSafeAreaInsets(): SafeAreaInsets {
  * This is the main function to determine UI variant
  */
 export function shouldUseMobileUI(): boolean {
+  // During SSR, always return false (desktop) to prevent hydration mismatch
+  if (typeof window === 'undefined') {
+    return false
+  }
+  
   const deviceInfo = getDeviceInfo()
   return deviceInfo.isMobile || (deviceInfo.isTablet && deviceInfo.isTouchDevice)
 }

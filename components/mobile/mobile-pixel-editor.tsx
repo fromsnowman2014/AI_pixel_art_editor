@@ -3,7 +3,7 @@
 import React from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
-import { PixelCanvas } from '../pixel-canvas'
+import { MobilePixelCanvas } from './mobile-pixel-canvas'
 import { MobileToolbar } from './mobile-toolbar'
 import { MobileTopToolbar } from './mobile-top-toolbar'
 import { ProjectTabs } from '../project-tabs'
@@ -101,7 +101,7 @@ export function MobilePixelEditor({ className }: MobilePixelEditorProps) {
             <>
               {/* Canvas Area - takes most space */}
               <div className="flex-1 min-h-[240px] overflow-hidden">
-                <PixelCanvas
+                <MobilePixelCanvas
                   project={activeTab.project}
                   canvasData={activeTab.canvasData}
                   canvasState={activeTab.canvasState}
@@ -161,7 +161,7 @@ export function MobilePixelEditor({ className }: MobilePixelEditorProps) {
         <div className="flex flex-col min-h-0">
           {activeTab && (
             <div className="flex-1 overflow-hidden">
-              <PixelCanvas
+              <MobilePixelCanvas
                 project={activeTab.project}
                 canvasData={activeTab.canvasData}
                 canvasState={activeTab.canvasState}
