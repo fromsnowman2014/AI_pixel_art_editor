@@ -101,3 +101,7 @@ nyc_output
 
 # Redis dump
 dump.rdb
+
+# MCP configuration (contains tokens)
+.mcp.json
+.claude/
