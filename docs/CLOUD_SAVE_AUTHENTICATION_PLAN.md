@@ -556,18 +556,119 @@ Login Required → Login Flow → Fetch Projects → Show Modal → User Choice 
 }
 ```
 
-#### 2. **Email MCP Server** (for notification features)
-```json
-// Add to .mcp.json
-"email": {
-  "type": "stdio",
-  "command": "npx", 
-  "args": ["-y", "@modelcontextprotocol/server-email"],
-  "env": {
-    "SMTP_HOST": "smtp.gmail.com",
-    "SMTP_USER": "${EMAIL_USER}",
-    "SMTP_PASS": "${EMAIL_PASS}"
+#### 2. **Backend 내장 이메일 서비스** (권장) 
+```typescript
+// Backend embedded email service using nodemailer
+// Implement in backend/src/services/email.ts
+
+import nodemailer from 'nodemailer';
+import { z } from 'zod';
+
+interface EmailTemplate {
+  welcome: { name: string; projectCount: number };
+  projectSaved: { projectName: string; userName: string };
+  accountActivity: { loginTime: Date; provider: string };
+}
+
+class EmailService {
+  private transporter: nodemailer.Transporter;
+  
+  constructor() {
+    this.transporter = nodemailer.createTransporter({
+      service: 'gmail', // or AWS SES, SendGrid
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_APP_PASSWORD
+      }
+    });
   }
+
+  async sendWelcomeEmail(to: string, data: EmailTemplate['welcome']) {
+    const htmlContent = `
+      <h2>Welcome to PixelBuddy! 🎨</h2>
+      <p>Hi ${data.name}!</p>
+      <p>You've successfully created your account. You can save up to 3 projects.</p>
+      <p>Current projects: ${data.projectCount}/3</p>
+    `;
+    
+    return this.sendEmail(to, 'Welcome to PixelBuddy!', htmlContent);
+  }
+
+  async sendProjectSavedNotification(to: string, data: EmailTemplate['projectSaved']) {
+    const htmlContent = `
+      <h3>Project Saved Successfully! ✅</h3>
+      <p>Hi ${data.userName}!</p>
+      <p>Your project "${data.projectName}" has been saved to the cloud.</p>
+      <p>You can access it anytime by logging in.</p>
+    `;
+    
+    return this.sendEmail(to, 'Project Saved - PixelBuddy', htmlContent);
+  }
+
+  private async sendEmail(to: string, subject: string, html: string) {
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"PixelBuddy" <${process.env.EMAIL_FROM}>`,
+        to,
+        subject,
+        html
+      });
+      console.log('Email sent:', info.messageId);
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      console.error('Email send failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+export const emailService = new EmailService();
+```
+
+### Backend API Integration
+```typescript
+// backend/src/routes/projects.ts - Add email notifications
+
+import { emailService } from '../services/email.js';
+
+// After successful project save
+fastify.post('/api/projects/save', async (request, reply) => {
+  // ... existing save logic ...
+  
+  // Send notification email (optional)
+  if (user.email && process.env.ENABLE_EMAIL_NOTIFICATIONS === 'true') {
+    await emailService.sendProjectSavedNotification(user.email, {
+      projectName: project.name,
+      userName: user.display_name || user.email
+    });
+  }
+  
+  return { success: true, projectId: project.id };
+});
+```
+
+### Environment Variables
+```env
+# Email Service Configuration (Backend)
+EMAIL_USER=pixelbuddy.noreply@gmail.com
+EMAIL_APP_PASSWORD=your-gmail-app-password
+EMAIL_FROM=pixelbuddy.noreply@gmail.com
+ENABLE_EMAIL_NOTIFICATIONS=true
+
+# Alternative Email Providers
+# EMAIL_SERVICE=sendgrid  # or 'ses', 'mailgun'
+# SENDGRID_API_KEY=your-sendgrid-key
+# AWS_SES_REGION=us-east-1
+# AWS_ACCESS_KEY_ID=your-aws-key
+# AWS_SECRET_ACCESS_KEY=your-aws-secret
+```
+
+### Package Dependencies
+```json
+{
+  "nodemailer": "^6.9.0",
+  "@types/nodemailer": "^6.4.0",
+  "html-to-text": "^9.0.0"
 }
 ```
 
@@ -594,14 +695,27 @@ Login Required → Login Flow → Fetch Projects → Show Modal → User Choice 
 ## Dependencies
 
 ### New NPM Packages
+
+#### Frontend (package.json)
 ```json
 {
   "next-auth": "^4.24.0",
   "@auth/drizzle-adapter": "^1.1.0", 
   "lz-string": "^1.5.0",
-  "sharp": "^0.33.0", // For thumbnail generation
-  "@supabase/supabase-js": "^2.45.0", // Supabase client
-  "jose": "^5.0.0" // JWT handling
+  "sharp": "^0.33.0",
+  "@supabase/supabase-js": "^2.45.0",
+  "jose": "^5.0.0"
+}
+```
+
+#### Backend (backend/package.json)
+```json
+{
+  "nodemailer": "^6.9.0",
+  "@types/nodemailer": "^6.4.0",
+  "html-to-text": "^9.0.0",
+  "bull": "^4.12.0",
+  "@types/bull": "^4.10.0"
 }
 ```
 
@@ -685,6 +799,161 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # mcp__supabase-ai-pixel-art-editor__get_anon_key()
 ```
 
+## 📧 Backend 이메일 서비스 구현 전략
+
+### Email Service Architecture
+- **Location**: `backend/src/services/email.ts`
+- **Provider**: Nodemailer with Gmail/AWS SES/SendGrid support
+- **Templates**: HTML email templates for notifications
+- **Queue**: Optional Redis queue for reliable email delivery
+- **Monitoring**: Email delivery status tracking
+
+### Implementation Steps
+
+#### 1. Email Service Setup
+```bash
+# Install email dependencies in backend
+cd backend
+npm install nodemailer @types/nodemailer html-to-text
+```
+
+#### 2. Email Template System
+```typescript
+// backend/src/services/emailTemplates.ts
+export const emailTemplates = {
+  welcome: (data: { name: string; projectCount: number }) => ({
+    subject: 'Welcome to PixelBuddy! 🎨',
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Welcome to PixelBuddy! 🎨</h1>
+          </div>
+          <div style="padding: 20px;">
+            <p>Hi ${data.name}!</p>
+            <p>Welcome to PixelBuddy! You can now save your pixel art creations to the cloud.</p>
+            <ul>
+              <li>✅ Account created successfully</li>
+              <li>📁 Save up to 3 projects</li>
+              <li>🎨 Access your art anywhere</li>
+            </ul>
+            <p>Current projects: <strong>${data.projectCount}/3</strong></p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="https://ai-pixel-art-editor.vercel.app" 
+                 style="background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+                Start Creating! 🚀
+              </a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `
+  }),
+
+  projectSaved: (data: { projectName: string; userName: string }) => ({
+    subject: `Project "${data.projectName}" Saved Successfully!`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #4CAF50; padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Project Saved! ✅</h1>
+          </div>
+          <div style="padding: 20px;">
+            <p>Hi ${data.userName}!</p>
+            <p>Great news! Your pixel art project <strong>"${data.projectName}"</strong> has been successfully saved to the cloud.</p>
+            <p>🎯 <strong>What you can do now:</strong></p>
+            <ul>
+              <li>Access your project from any device</li>
+              <li>Share it with friends and family</li>
+              <li>Continue editing anytime</li>
+            </ul>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="https://ai-pixel-art-editor.vercel.app" 
+                 style="background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+                Continue Creating! 🎨
+              </a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `
+  })
+};
+```
+
+#### 3. Email Queue Integration (Optional)
+```typescript
+// backend/src/services/emailQueue.ts
+import Queue from 'bull';
+
+interface EmailJob {
+  to: string;
+  template: 'welcome' | 'projectSaved';
+  data: any;
+}
+
+export const emailQueue = new Queue('email notifications', {
+  redis: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    password: process.env.REDIS_PASSWORD
+  }
+});
+
+emailQueue.process(async (job) => {
+  const { to, template, data } = job.data as EmailJob;
+  
+  switch (template) {
+    case 'welcome':
+      return await emailService.sendWelcomeEmail(to, data);
+    case 'projectSaved':
+      return await emailService.sendProjectSavedNotification(to, data);
+  }
+});
+
+// Add job to queue
+export async function queueEmail(job: EmailJob) {
+  return emailQueue.add(job, {
+    attempts: 3,
+    backoff: 'exponential',
+    delay: 1000
+  });
+}
+```
+
+### Security & Privacy
+- **COPPA Compliance**: Only send emails to verified parent/teacher accounts
+- **Opt-out**: Easy unsubscribe links in all emails
+- **Rate Limiting**: Max 5 emails per user per day
+- **Data Protection**: No sensitive project content in emails
+
+### Testing Strategy
+```typescript
+// backend/tests/email.test.ts
+describe('Email Service', () => {
+  test('should send welcome email successfully', async () => {
+    const result = await emailService.sendWelcomeEmail('test@example.com', {
+      name: 'Test User',
+      projectCount: 0
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('should handle email send failures gracefully', async () => {
+    // Mock transporter failure
+    const result = await emailService.sendProjectSavedNotification('invalid', {
+      projectName: 'Test Project',
+      userName: 'Test User'
+    });
+    expect(result.success).toBe(false);
+  });
+});
+```
+
 ## 🚀 MCP-Powered Development Workflow
 
 ### Quick Start Commands
@@ -717,5 +986,7 @@ mcp__playwright__browser_navigate("http://localhost:3000/api/auth/signin")
 | UI Testing | Playwright MCP | Automated auth flow testing |
 | Project Management | GitHub MCP | Issue tracking, repository management |
 | Code Quality | Filesystem MCP | File operations, structure management |
+| Session Management | Redis MCP | Caching, rate limiting, session storage |
+| Email Notifications | Backend Service | Nodemailer integration, template management |
 
 This MCP-enhanced plan provides a comprehensive roadmap for implementing cloud save and social authentication while maintaining the kid-friendly focus and security requirements of PixelBuddy, with significant automation and productivity improvements.
