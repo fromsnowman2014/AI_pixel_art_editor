@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.analyticsRelations = exports.assetsRelations = exports.layersRelations = exports.framesRelations = exports.projectsRelations = exports.usersRelations = exports.systemLogs = exports.analytics = exports.rateLimits = exports.assets = exports.layers = exports.frames = exports.projects = exports.users = exports.assetTypeEnum = exports.userRoleEnum = void 0;
+exports.analyticsRelations = exports.assetsRelations = exports.layersRelations = exports.framesRelations = exports.projectsRelations = exports.savedProjectsRelations = exports.sessionsRelations = exports.accountsRelations = exports.usersRelations = exports.systemLogs = exports.analytics = exports.rateLimits = exports.assets = exports.layers = exports.frames = exports.projects = exports.savedProjects = exports.verificationTokens = exports.sessions = exports.accounts = exports.users = exports.assetTypeEnum = exports.userRoleEnum = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 // Enums
@@ -10,12 +10,57 @@ exports.assetTypeEnum = (0, pg_core_1.pgEnum)('asset_type', ['upload', 'ai', 'ge
 exports.users = (0, pg_core_1.pgTable)('users', {
     id: (0, pg_core_1.uuid)('id').defaultRandom().primaryKey(),
     email: (0, pg_core_1.varchar)('email', { length: 255 }).notNull().unique(),
+    name: (0, pg_core_1.varchar)('name', { length: 100 }),
+    image: (0, pg_core_1.text)('image'),
     role: (0, exports.userRoleEnum)('role').notNull().default('parent'),
     locale: (0, pg_core_1.varchar)('locale', { length: 10 }).notNull().default('en'),
     isVerified: (0, pg_core_1.boolean)('is_verified').notNull().default(false),
     emailVerificationToken: (0, pg_core_1.varchar)('email_verification_token', { length: 255 }),
     emailVerificationExpires: (0, pg_core_1.timestamp)('email_verification_expires'),
     lastLoginAt: (0, pg_core_1.timestamp)('last_login_at'),
+    createdAt: (0, pg_core_1.timestamp)('created_at').defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)('updated_at').defaultNow().notNull(),
+});
+// OAuth accounts table (for NextAuth.js integration)
+exports.accounts = (0, pg_core_1.pgTable)('accounts', {
+    id: (0, pg_core_1.uuid)('id').defaultRandom().primaryKey(),
+    userId: (0, pg_core_1.uuid)('user_id').references(() => exports.users.id, { onDelete: 'cascade' }).notNull(),
+    type: (0, pg_core_1.varchar)('type', { length: 255 }).notNull(),
+    provider: (0, pg_core_1.varchar)('provider', { length: 255 }).notNull(),
+    providerAccountId: (0, pg_core_1.varchar)('provider_account_id', { length: 255 }).notNull(),
+    refreshToken: (0, pg_core_1.text)('refresh_token'),
+    accessToken: (0, pg_core_1.text)('access_token'),
+    expiresAt: (0, pg_core_1.integer)('expires_at'),
+    tokenType: (0, pg_core_1.varchar)('token_type', { length: 255 }),
+    scope: (0, pg_core_1.varchar)('scope', { length: 255 }),
+    idToken: (0, pg_core_1.text)('id_token'),
+    sessionState: (0, pg_core_1.varchar)('session_state', { length: 255 }),
+    createdAt: (0, pg_core_1.timestamp)('created_at').defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)('updated_at').defaultNow().notNull(),
+});
+// Sessions table (for NextAuth.js integration)
+exports.sessions = (0, pg_core_1.pgTable)('sessions', {
+    id: (0, pg_core_1.uuid)('id').defaultRandom().primaryKey(),
+    sessionToken: (0, pg_core_1.varchar)('session_token', { length: 255 }).notNull().unique(),
+    userId: (0, pg_core_1.uuid)('user_id').references(() => exports.users.id, { onDelete: 'cascade' }).notNull(),
+    expires: (0, pg_core_1.timestamp)('expires').notNull(),
+    createdAt: (0, pg_core_1.timestamp)('created_at').defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)('updated_at').defaultNow().notNull(),
+});
+// Verification tokens table (for NextAuth.js integration)
+exports.verificationTokens = (0, pg_core_1.pgTable)('verification_tokens', {
+    identifier: (0, pg_core_1.varchar)('identifier', { length: 255 }).notNull(),
+    token: (0, pg_core_1.varchar)('token', { length: 255 }).notNull().unique(),
+    expires: (0, pg_core_1.timestamp)('expires').notNull(),
+    createdAt: (0, pg_core_1.timestamp)('created_at').defaultNow().notNull(),
+});
+// Saved projects table (for cloud save functionality)
+exports.savedProjects = (0, pg_core_1.pgTable)('saved_projects', {
+    id: (0, pg_core_1.uuid)('id').defaultRandom().primaryKey(),
+    userId: (0, pg_core_1.uuid)('user_id').references(() => exports.users.id, { onDelete: 'cascade' }).notNull(),
+    name: (0, pg_core_1.varchar)('name', { length: 50 }).notNull(),
+    projectData: (0, pg_core_1.jsonb)('project_data').notNull(), // Full project state
+    thumbnailData: (0, pg_core_1.text)('thumbnail_data'), // Base64 thumbnail
     createdAt: (0, pg_core_1.timestamp)('created_at').defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)('updated_at').defaultNow().notNull(),
 });
@@ -118,6 +163,27 @@ exports.usersRelations = (0, drizzle_orm_1.relations)(exports.users, ({ many }) 
     projects: many(exports.projects),
     assets: many(exports.assets),
     analytics: many(exports.analytics),
+    accounts: many(exports.accounts),
+    sessions: many(exports.sessions),
+    savedProjects: many(exports.savedProjects),
+}));
+exports.accountsRelations = (0, drizzle_orm_1.relations)(exports.accounts, ({ one }) => ({
+    user: one(exports.users, {
+        fields: [exports.accounts.userId],
+        references: [exports.users.id],
+    }),
+}));
+exports.sessionsRelations = (0, drizzle_orm_1.relations)(exports.sessions, ({ one }) => ({
+    user: one(exports.users, {
+        fields: [exports.sessions.userId],
+        references: [exports.users.id],
+    }),
+}));
+exports.savedProjectsRelations = (0, drizzle_orm_1.relations)(exports.savedProjects, ({ one }) => ({
+    user: one(exports.users, {
+        fields: [exports.savedProjects.userId],
+        references: [exports.users.id],
+    }),
 }));
 exports.projectsRelations = (0, drizzle_orm_1.relations)(exports.projects, ({ one, many }) => ({
     user: one(exports.users, {

@@ -14,6 +14,9 @@ import toast from 'react-hot-toast'
 jest.mock('@/lib/api/client')
 jest.mock('react-hot-toast')
 jest.mock('@/lib/stores/project-store')
+jest.mock('@/lib/services/prompt-enhancer', () => ({
+  generateGuidedPrompt: jest.fn((prompt: string) => ({ finalPrompt: prompt }))
+}))
 jest.mock('@/components/export-modal', () => ({
   ExportModal: ({ open, onOpenChange }: any) => 
     open ? <div data-testid="export-modal">Export Modal</div> : null

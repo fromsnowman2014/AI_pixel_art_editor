@@ -5,6 +5,8 @@ import { useProjectStore } from '@/lib/stores/project-store';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ExportModal } from '@/components/export-modal';
+import { SaveProjectModal } from '@/components/save-project-modal';
+import { LoadProjectModal } from '@/components/load-project-modal';
 import { api } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { debugLog } from '@/lib/ui/debug';
@@ -17,6 +19,8 @@ import {
   AlertTriangle,
   Save,
   Trash2,
+  Cloud,
+  FolderOpen,
 } from 'lucide-react';
 
 interface ProjectPanelProps {
@@ -70,6 +74,8 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
 
   // AI Guided Prompt Options State - Updated for compact checkbox layout
   const [guidedOptions, setGuidedOptions] = useState({
@@ -608,6 +614,20 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
     setShowExportModal(true);
   }, [activeTabId]);
 
+  const handleOpenSave = useCallback(() => {
+    debugLog('🎛️  ProjectPanel', 'SAVE_MODAL_OPEN', 'Opening save modal', {
+      activeTabId,
+    });
+    setShowSaveModal(true);
+  }, [activeTabId]);
+
+  const handleOpenLoad = useCallback(() => {
+    debugLog('🎛️  ProjectPanel', 'LOAD_MODAL_OPEN', 'Opening load modal', {
+      activeTabId,
+    });
+    setShowLoadModal(true);
+  }, [activeTabId]);
+
   const handleAiGenerate = useCallback(async () => {
     // Enhanced input validation
     const trimmedPrompt = aiPrompt.trim();
@@ -1114,6 +1134,16 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
           <Download className='mr-2 h-4 w-4' />
           Export Project
         </Button>
+
+        <Button onClick={handleOpenLoad} variant='outline' className='w-full'>
+          <FolderOpen className='mr-2 h-4 w-4' />
+          Load from Cloud
+        </Button>
+
+        <Button onClick={handleOpenSave} variant='outline' className='w-full'>
+          <Cloud className='mr-2 h-4 w-4' />
+          Save to Cloud
+        </Button>
       </div>
 
       {/* Canvas Resize Confirmation Modal */}
@@ -1180,6 +1210,12 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
       {/* Export Modal */}
       <ExportModal open={showExportModal} onOpenChange={setShowExportModal} />
+
+      {/* Save Project Modal */}
+      <SaveProjectModal open={showSaveModal} onOpenChange={setShowSaveModal} />
+
+      {/* Load Project Modal */}
+      <LoadProjectModal open={showLoadModal} onOpenChange={setShowLoadModal} />
     </div>
   );
 });

@@ -376,6 +376,8 @@ export declare const AuthResponseSchema: z.ZodObject<{
     }>;
     expiresAt: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    refreshToken: string;
+    accessToken: string;
     expiresAt: string;
     user: {
         id: string;
@@ -385,9 +387,9 @@ export declare const AuthResponseSchema: z.ZodObject<{
         isVerified: boolean;
         createdAt: string;
     };
-    accessToken: string;
-    refreshToken: string;
 }, {
+    refreshToken: string;
+    accessToken: string;
     expiresAt: string;
     user: {
         id: string;
@@ -397,8 +399,6 @@ export declare const AuthResponseSchema: z.ZodObject<{
         isVerified: boolean;
         createdAt: string;
     };
-    accessToken: string;
-    refreshToken: string;
 }>;
 export declare const ApiErrorSchema: z.ZodObject<{
     error: z.ZodString;

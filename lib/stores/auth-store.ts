@@ -3,10 +3,15 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
+import { useSession } from 'next-auth/react'
 
 interface User {
   id: string
-  type: 'local'
+  type: 'local' | 'authenticated'
+  email?: string
+  name?: string
+  image?: string
+  provider?: string
   permissions: string[]
   rateLimits: {
     ai: number
@@ -15,10 +20,15 @@ interface User {
 
 interface AuthState {
   user: User | null
+  isAuthenticated: boolean
+  isLoading: boolean
   
   // Actions
   setUser: (user: User | null) => void
+  setAuthenticatedUser: (sessionUser: any) => void
   initializeUser: () => void
+  login: (provider: string) => Promise<void>
+  logout: () => Promise<void>
   reset: () => void
 }
 
@@ -27,17 +37,29 @@ const createDefaultUser = (): User => ({
   type: 'local',
   permissions: ['create', 'read', 'update', 'delete', 'save', 'export'],
   rateLimits: {
-    ai: 60 // Generous AI calls for all users
+    ai: 60
+  }
+})
+
+const createAuthenticatedUser = (sessionUser: any): User => ({
+  id: sessionUser.id || sessionUser.sub,
+  type: 'authenticated',
+  email: sessionUser.email,
+  name: sessionUser.name,
+  image: sessionUser.image,
+  permissions: ['create', 'read', 'update', 'delete', 'save', 'export', 'cloud_save'],
+  rateLimits: {
+    ai: 100 // More AI calls for authenticated users
   }
 })
 
 export const useAuthStore = create<AuthState>()(
   devtools(
     immer((set, get) => ({
-      // Initial state - user will be initialized on app start
       user: null,
+      isAuthenticated: false,
+      isLoading: false,
 
-      // Initialize default user
       initializeUser: () => {
         set((state) => {
           if (!state.user) {
@@ -46,17 +68,47 @@ export const useAuthStore = create<AuthState>()(
         })
       },
 
-      // Set user directly
       setUser: (user: User | null) => {
         set((state) => {
           state.user = user
+          state.isAuthenticated = user?.type === 'authenticated'
         })
       },
 
-      // Reset auth state
+      setAuthenticatedUser: (sessionUser: any) => {
+        set((state) => {
+          state.user = createAuthenticatedUser(sessionUser)
+          state.isAuthenticated = true
+          state.isLoading = false
+        })
+      },
+
+      login: async (provider: string) => {
+        set((state) => {
+          state.isLoading = true
+        })
+        const { signIn } = await import('next-auth/react')
+        await signIn(provider, { callbackUrl: '/' })
+      },
+
+      logout: async () => {
+        set((state) => {
+          state.isLoading = true
+        })
+        const { signOut } = await import('next-auth/react')
+        await signOut({ callbackUrl: '/' })
+        set((state) => {
+          state.user = createDefaultUser()
+          state.isAuthenticated = false
+          state.isLoading = false
+        })
+      },
+
       reset: () => {
         set((state) => {
           state.user = null
+          state.isAuthenticated = false
+          state.isLoading = false
         })
       },
     })),

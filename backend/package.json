@@ -33,6 +33,7 @@
     "fastify-plugin": "^4.5.0",
     "gif-encoder-2": "^1.0.5",
     "jsonwebtoken": "^9.0.0",
+    "lz-string": "^1.5.0",
     "openai": "^4.20.0",
     "pino": "^8.16.0",
     "pino-pretty": "^10.2.0",

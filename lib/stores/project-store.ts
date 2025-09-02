@@ -108,6 +108,7 @@ interface ProjectStore {
   getTab: (tabId: string) => ProjectTab | null
   markTabDirty: (tabId: string) => void
   clearError: () => void
+  loadProject: (projectData: any) => void
   
   // Storage optimization flags (optional)
   _storageOptimized?: boolean
@@ -189,6 +190,9 @@ export const useProjectStore = create<ProjectStore>()(
               })
             })
 
+          } else {
+            // No tabs exist, create a default project
+            get().createNewProject()
           }
         },
 
@@ -1762,6 +1766,75 @@ export const useProjectStore = create<ProjectStore>()(
           set((state) => {
             state.error = null
           })
+        },
+
+        // Load project from cloud data
+        loadProject: (projectData: any) => {
+          const { id, name, projectData: data, thumbnailData, createdAt, updatedAt } = projectData
+          
+          // Create a new tab with the loaded project data
+          const tabId = crypto.randomUUID()
+          const project: Project = {
+            id: id,
+            name: name,
+            width: data.canvasSettings.width,
+            height: data.canvasSettings.height,
+            createdAt: createdAt || new Date().toISOString(),
+            updatedAt: updatedAt || new Date().toISOString(),
+            colorLimit: data.canvasSettings.colorLimit || 16,
+            palette: data.canvasSettings.palette || [],
+            frames: data.frames.map((f: any) => f.id),
+            activeFrameId: data.activeFrameId,
+            userId: null,
+          }
+
+          const frames: Frame[] = data.frames.map((frameData: any, index: number) => ({
+            id: frameData.id,
+            projectId: id,
+            index: index,
+            delayMs: frameData.delayMs || 500,
+            included: frameData.included ?? true,
+            layers: [],
+            flattenedPngUrl: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }))
+
+          const currentFrame = frames.find(f => f.id === data.activeFrameId) || frames[0] || null
+
+          const newTab: ProjectTab = {
+            id: tabId,
+            project,
+            frames,
+            currentFrame,
+            canvasData: null,
+            canvasState: {
+              tool: 'pencil',
+              color: '#000000',
+              brushSize: 1,
+              zoom: data.canvasSettings.zoom || 200,
+              panX: 0,
+              panY: 0,
+            },
+            history: [],
+            historyIndex: 0,
+            isDirty: false,
+            frameCanvasData: [],
+            isPlaying: false,
+            playbackFrameIndex: 0,
+            playbackFrameId: null,
+            playbackIntervalId: null,
+            playbackSpeed: 1.0,
+            playbackStartTime: null,
+            playbackAccumulatedTime: 0,
+          }
+
+          set((state) => {
+            state.tabs.push(newTab)
+            state.activeTabId = tabId
+          })
+
+          storeDebug('LOAD_PROJECT', `Loaded project "${name}" with ${frames.length} frames`)
         },
 
         // Regenerate all thumbnails for all tabs and frames

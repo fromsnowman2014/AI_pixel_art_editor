@@ -22,6 +22,7 @@ const projects_1 = require("./routes/projects");
 const frames_1 = require("./routes/frames");
 const export_1 = require("./routes/export");
 const upload_1 = require("./routes/upload");
+const saved_projects_1 = __importDefault(require("./routes/saved-projects"));
 const fastify = (0, fastify_1.default)({
     logger: {
         level: env_1.env.LOG_LEVEL,
@@ -106,6 +107,7 @@ async function buildServer() {
         await fastify.register(frames_1.frameRoutes, { prefix: '/api/frames' });
         await fastify.register(export_1.exportRoutes, { prefix: '/api/export' });
         await fastify.register(upload_1.uploadRoutes, { prefix: '/api/upload' });
+        await fastify.register(saved_projects_1.default, { prefix: '/api/saved-projects' });
         // Global error handler
         fastify.setErrorHandler(async (error, request, reply) => {
             logger_1.logger.error('Unhandled error', {

@@ -21,12 +21,61 @@ export const assetTypeEnum = pgEnum('asset_type', ['upload', 'ai', 'generated'])
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: varchar('email', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 100 }),
+  image: text('image'),
   role: userRoleEnum('role').notNull().default('parent'),
   locale: varchar('locale', { length: 10 }).notNull().default('en'),
   isVerified: boolean('is_verified').notNull().default(false),
   emailVerificationToken: varchar('email_verification_token', { length: 255 }),
   emailVerificationExpires: timestamp('email_verification_expires'),
   lastLoginAt: timestamp('last_login_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// OAuth accounts table (for NextAuth.js integration)
+export const accounts = pgTable('accounts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 255 }).notNull(),
+  provider: varchar('provider', { length: 255 }).notNull(),
+  providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
+  refreshToken: text('refresh_token'),
+  accessToken: text('access_token'),
+  expiresAt: integer('expires_at'),
+  tokenType: varchar('token_type', { length: 255 }),
+  scope: varchar('scope', { length: 255 }),
+  idToken: text('id_token'),
+  sessionState: varchar('session_state', { length: 255 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Sessions table (for NextAuth.js integration)
+export const sessions = pgTable('sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionToken: varchar('session_token', { length: 255 }).notNull().unique(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  expires: timestamp('expires').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Verification tokens table (for NextAuth.js integration)
+export const verificationTokens = pgTable('verification_tokens', {
+  identifier: varchar('identifier', { length: 255 }).notNull(),
+  token: varchar('token', { length: 255 }).notNull().unique(),
+  expires: timestamp('expires').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Saved projects table (for cloud save functionality)
+export const savedProjects = pgTable('saved_projects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar('name', { length: 50 }).notNull(),
+  projectData: jsonb('project_data').notNull(), // Full project state
+  thumbnailData: text('thumbnail_data'), // Base64 thumbnail
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -144,6 +193,30 @@ export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
   assets: many(assets),
   analytics: many(analytics),
+  accounts: many(accounts),
+  sessions: many(sessions),
+  savedProjects: many(savedProjects),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, {
+    fields: [accounts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const savedProjectsRelations = relations(savedProjects, ({ one }) => ({
+  user: one(users, {
+    fields: [savedProjects.userId],
+    references: [users.id],
+  }),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -190,6 +263,14 @@ export const analyticsRelations = relations(analytics, ({ one }) => ({
 // Export types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
+export type VerificationToken = typeof verificationTokens.$inferSelect;
+export type NewVerificationToken = typeof verificationTokens.$inferInsert;
+export type SavedProject = typeof savedProjects.$inferSelect;
+export type NewSavedProject = typeof savedProjects.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type Frame = typeof frames.$inferSelect;

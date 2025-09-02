@@ -18,6 +18,7 @@ import { projectRoutes } from './routes/projects';
 import { frameRoutes } from './routes/frames';
 import { exportRoutes } from './routes/export';
 import { uploadRoutes } from './routes/upload';
+import savedProjectsRoutes from './routes/saved-projects';
 
 const fastify = Fastify({
   logger: {
@@ -116,6 +117,7 @@ async function buildServer() {
     await fastify.register(frameRoutes, { prefix: '/api/frames' });
     await fastify.register(exportRoutes, { prefix: '/api/export' });
     await fastify.register(uploadRoutes, { prefix: '/api/upload' });
+    await fastify.register(savedProjectsRoutes, { prefix: '/api/saved-projects' });
 
     // Global error handler
     fastify.setErrorHandler(async (error, request, reply) => {

@@ -4,6 +4,7 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Heart, Shield, Users, Settings } from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth-store'
+import { AuthButton } from '@/components/auth-button'
 
 interface AppHeaderProps {
   onSettingsClick?: () => void
@@ -59,8 +60,9 @@ export function AppHeader({ onSettingsClick }: AppHeaderProps) {
           </div>
         )}
 
-        {/* Settings */}
+        {/* Authentication and Settings */}
         <div className="flex items-center space-x-2">
+          <AuthButton />
           {onSettingsClick && (
             <Button
               variant="ghost"
