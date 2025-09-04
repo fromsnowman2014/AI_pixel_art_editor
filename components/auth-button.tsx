@@ -34,7 +34,7 @@ export function AuthButton() {
     )
   }
 
-  if (session && user?.type === 'authenticated') {
+  if (session?.user && status === 'authenticated') {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

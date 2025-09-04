@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { useSession, signIn } from 'next-auth/react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
@@ -16,6 +17,7 @@ interface SaveProjectModalProps {
 }
 
 export function SaveProjectModal({ open, onOpenChange }: SaveProjectModalProps) {
+  const { data: session, status } = useSession()
   const { user, isAuthenticated, login } = useAuthStore()
   const { getActiveTab } = useProjectStore()
   const [projectName, setProjectName] = React.useState('')
@@ -30,7 +32,7 @@ export function SaveProjectModal({ open, onOpenChange }: SaveProjectModalProps) 
   }, [open, activeTab])
 
   const handleSave = async () => {
-    if (!isAuthenticated || !user || !activeTab) {
+    if (!session?.user || status !== 'authenticated' || !activeTab) {
       toast.error('Please sign in to save your project')
       return
     }
@@ -146,8 +148,13 @@ export function SaveProjectModal({ open, onOpenChange }: SaveProjectModalProps) 
   }
 
   const getAuthToken = async (): Promise<string> => {
-    // For now, return a mock token - this would be replaced with actual NextAuth session token
-    return 'mock-jwt-token'
+    if (!session?.user) {
+      throw new Error('No authenticated session')
+    }
+    
+    // For NextAuth, we use the session directly rather than a JWT token for API calls
+    // In a production setup, you'd want to implement JWT tokens from NextAuth
+    return session.user.email || 'authenticated-user'
   }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -158,7 +165,7 @@ export function SaveProjectModal({ open, onOpenChange }: SaveProjectModalProps) 
 
   if (!open) return null
 
-  if (!isAuthenticated) {
+  if (!session?.user || status !== 'authenticated') {
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -199,7 +206,7 @@ export function SaveProjectModal({ open, onOpenChange }: SaveProjectModalProps) 
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => login('google')}>
+              <Button onClick={() => signIn()}>
                 Sign In
               </Button>
             </div>

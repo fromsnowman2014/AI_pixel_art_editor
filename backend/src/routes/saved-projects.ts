@@ -31,7 +31,7 @@ const LoadProjectParamsSchema = z.object({
 })
 
 const savedProjectsRoutes: FastifyPluginAsync = async function (fastify) {
-  // Authentication middleware
+  // Authentication middleware - simplified for NextAuth integration
   async function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<User | null> {
     try {
       const authHeader = request.headers.authorization
@@ -40,18 +40,32 @@ const savedProjectsRoutes: FastifyPluginAsync = async function (fastify) {
         return null
       }
 
-      const token = authHeader.substring(7)
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      const userIdentifier = authHeader.substring(7)
       
-      const user = await db.select().from(users).where(eq(users.id, decoded.userId)).limit(1)
-      if (user.length === 0) {
-        reply.code(401).send({ error: 'Invalid user' })
-        return null
+      // For development - accept email as identifier and create user if not exists
+      if (userIdentifier && userIdentifier.includes('@')) {
+        let user = await db.select().from(users).where(eq(users.email, userIdentifier)).limit(1)
+        
+        if (user.length === 0) {
+          // Create new user
+          const [newUser] = await db.insert(users).values({
+            email: userIdentifier,
+            name: userIdentifier.split('@')[0],
+            role: 'parent',
+            isVerified: true,
+          }).returning()
+          
+          return newUser
+        }
+        
+        return user[0]
       }
 
-      return user[0]
+      reply.code(401).send({ error: 'Invalid authentication format' })
+      return null
     } catch (error) {
-      reply.code(401).send({ error: 'Invalid authentication token' })
+      console.error('Authentication error:', error)
+      reply.code(401).send({ error: 'Authentication failed' })
       return null
     }
   }
