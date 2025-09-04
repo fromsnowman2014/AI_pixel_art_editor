@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { Button } from '@/components/ui/button'
@@ -258,12 +259,14 @@ export function LoadProjectModal({ open, onOpenChange }: LoadProjectModalProps) 
                   className="group border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-md transition-all"
                 >
                   {/* Thumbnail */}
-                  <div className="aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden">
+                  <div className="aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden relative">
                     {project.thumbnailData ? (
-                      <img
+                      <Image
                         src={project.thumbnailData}
                         alt={project.name}
-                        className="w-full h-full object-cover"
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-cover"
                         style={{ imageRendering: 'pixelated' }}
                       />
                     ) : (

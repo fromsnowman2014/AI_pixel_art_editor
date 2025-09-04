@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import NextImage from 'next/image'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -324,10 +325,12 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                     if (thumbnail) {
                       return (
                         <div className="text-center">
-                          <img
+                          <NextImage
                             src={thumbnail}
                             alt={`Frame ${previewFrameIndex + 1}`}
-                            className="h-16 w-16 mx-auto mb-2 border border-gray-200 rounded"
+                            width={64}
+                            height={64}
+                            className="mx-auto mb-2 border border-gray-200 rounded"
                             style={{ imageRendering: 'pixelated' }}
                           />
                           <div className="text-xs text-gray-500">

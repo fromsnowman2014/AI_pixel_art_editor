@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -695,11 +696,13 @@ export function FrameManager({ frames, activeFrameId, className }: FrameManagerP
                   
                   if (thumbnail) {
                     return (
-                      <img
+                      <Image
                         key={`${frame.id}-${thumbnail.length}`} // Force re-render when thumbnail changes
                         src={thumbnail}
                         alt={`Frame ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        width={64}
+                        height={64}
+                        className="object-cover"
                         style={{ imageRendering: 'pixelated' }}
                         onError={() => {
                           if (activeTabId) {

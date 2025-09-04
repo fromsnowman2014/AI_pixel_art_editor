@@ -17,17 +17,21 @@ import {
 export const userRoleEnum = pgEnum('user_role', ['parent', 'teacher']);
 export const assetTypeEnum = pgEnum('asset_type', ['upload', 'ai', 'generated']);
 
-// Users table (for parent/teacher accounts - COPPA compliant)
+// Users table (NextAuth.js compatible schema - minimal required fields only)
 export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  name: varchar('name', { length: 100 }),
+  id: text('id').primaryKey(),
+  name: text('name'),
+  email: text('email').unique(),
+  emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
-  role: userRoleEnum('role').notNull().default('parent'),
-  locale: varchar('locale', { length: 10 }).notNull().default('en'),
-  isVerified: boolean('is_verified').notNull().default(false),
-  emailVerificationToken: varchar('email_verification_token', { length: 255 }),
-  emailVerificationExpires: timestamp('email_verification_expires'),
+});
+
+// Extended user profile table for additional app-specific fields  
+export const userProfiles = pgTable('user_profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
+  role: userRoleEnum('role').default('parent'),
+  locale: varchar('locale', { length: 10 }).default('en'),
   lastLoginAt: timestamp('last_login_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -35,8 +39,8 @@ export const users = pgTable('users', {
 
 // OAuth accounts table (for NextAuth.js integration)
 export const accounts = pgTable('accounts', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   type: varchar('type', { length: 255 }).notNull(),
   provider: varchar('provider', { length: 255 }).notNull(),
   providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
@@ -53,9 +57,9 @@ export const accounts = pgTable('accounts', {
 
 // Sessions table (for NextAuth.js integration)
 export const sessions = pgTable('sessions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  sessionToken: varchar('session_token', { length: 255 }).notNull().unique(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  id: text('id').primaryKey(),
+  sessionToken: text('session_token').notNull().unique(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   expires: timestamp('expires').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -63,8 +67,8 @@ export const sessions = pgTable('sessions', {
 
 // Verification tokens table (for NextAuth.js integration)
 export const verificationTokens = pgTable('verification_tokens', {
-  identifier: varchar('identifier', { length: 255 }).notNull(),
-  token: varchar('token', { length: 255 }).notNull().unique(),
+  identifier: text('identifier').notNull(),
+  token: text('token').notNull().unique(),
   expires: timestamp('expires').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -72,7 +76,7 @@ export const verificationTokens = pgTable('verification_tokens', {
 // Saved projects table (for cloud save functionality)
 export const savedProjects = pgTable('saved_projects', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   name: varchar('name', { length: 50 }).notNull(),
   projectData: jsonb('project_data').notNull(), // Full project state
   thumbnailData: text('thumbnail_data'), // Base64 thumbnail
@@ -83,7 +87,7 @@ export const savedProjects = pgTable('saved_projects', {
 // Projects table
 export const projects = pgTable('projects', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }), // null for anonymous users
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }), // null for anonymous users
   name: varchar('name', { length: 100 }).notNull(),
   width: integer('width').notNull(),
   height: integer('height').notNull(),
@@ -127,7 +131,7 @@ export const layers = pgTable('layers', {
 // Assets table (for storing generated images, uploads, etc.)
 export const assets = pgTable('assets', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
   type: assetTypeEnum('type').notNull(),
   originalUrl: varchar('original_url', { length: 512 }).notNull(),
   processedUrl: varchar('processed_url', { length: 512 }),
@@ -167,7 +171,7 @@ export const rateLimits = pgTable('rate_limits', {
 // Analytics table (opt-in, COPPA compliant)
 export const analytics = pgTable('analytics', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
   sessionId: varchar('session_id', { length: 255 }),
   event: varchar('event', { length: 100 }).notNull(),
   properties: jsonb('properties').$type<Record<string, any>>(),
@@ -184,18 +188,29 @@ export const systemLogs = pgTable('system_logs', {
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   service: varchar('service', { length: 100 }).notNull(),
   requestId: uuid('request_id'),
-  userId: uuid('user_id'),
+  userId: text('user_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  profile: one(userProfiles, {
+    fields: [users.id],
+    references: [userProfiles.userId],
+  }),
   projects: many(projects),
   assets: many(assets),
   analytics: many(analytics),
   accounts: many(accounts),
   sessions: many(sessions),
   savedProjects: many(savedProjects),
+}));
+
+export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [userProfiles.userId],
+    references: [users.id],
+  }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -263,6 +278,8 @@ export const analyticsRelations = relations(analytics, ({ one }) => ({
 // Export types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type NewUserProfile = typeof userProfiles.$inferInsert;
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 export type Session = typeof sessions.$inferSelect;

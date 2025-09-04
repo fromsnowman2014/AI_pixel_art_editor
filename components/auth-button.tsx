@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { Button } from '@/components/ui/button'
@@ -40,10 +41,12 @@ export function AuthButton() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="gap-2">
             {session.user?.image ? (
-              <img 
+              <Image 
                 src={session.user.image} 
                 alt="Profile" 
-                className="w-6 h-6 rounded-full"
+                width={24}
+                height={24}
+                className="rounded-full"
               />
             ) : (
               <User className="w-4 h-4" />

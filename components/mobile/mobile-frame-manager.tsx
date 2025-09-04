@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -227,10 +228,12 @@ export function MobileFrameManager({ frames, activeFrameId, className }: MobileF
                 {/* Frame Preview - Larger for mobile */}
                 <div className="h-14 w-14 rounded bg-gray-100 border border-gray-200 overflow-hidden relative">
                   {thumbnail ? (
-                    <img
+                    <Image
                       src={thumbnail}
                       alt={`Frame ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      width={56}
+                      height={56}
+                      className="object-cover"
                       style={{ imageRendering: 'pixelated' }}
                     />
                   ) : (

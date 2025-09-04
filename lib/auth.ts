@@ -5,7 +5,6 @@ import GitHub from "next-auth/providers/github"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
-import { accounts, sessions, users, verificationTokens } from "@/backend/src/db/schema"
 
 const connectionString = process.env.DATABASE_URL!
 const pool = postgres(connectionString, { max: 1 })
@@ -45,20 +44,17 @@ if (providers.length === 0 && process.env.NODE_ENV === 'development') {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    sessionsTable: sessions,
-    verificationTokensTable: verificationTokens,
-  }),
+  // Temporarily disable adapter until schema is fully compatible
+  // adapter: DrizzleAdapter(db),
   providers,
   pages: {
     signIn: '/auth/signin',
   },
   callbacks: {
-    async session({ session, user }) {
-      if (session.user && user) {
-        session.user.id = user.id
+    async session({ session, token }) {
+      if (session.user && token.sub) {
+        // Type assertion for now - in a real app you'd extend the session types
+        (session.user as any).id = token.sub
       }
       return session
     },
