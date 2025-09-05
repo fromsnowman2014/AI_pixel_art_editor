@@ -1,21 +1,14 @@
 import NextAuth from "next-auth"
-import Google from "next-auth/providers/google"
-import Facebook from "next-auth/providers/facebook"
-import GitHub from "next-auth/providers/github"
-import { DrizzleAdapter } from "@auth/drizzle-adapter"
-import { drizzle } from "drizzle-orm/postgres-js"
-import postgres from "postgres"
-
-const connectionString = process.env.DATABASE_URL!
-const pool = postgres(connectionString, { max: 1 })
-const db = drizzle(pool)
+import GoogleProvider from "next-auth/providers/google"
+import FacebookProvider from "next-auth/providers/facebook"
+import GitHubProvider from "next-auth/providers/github"
 
 const providers = []
 
 // Only add providers if credentials are properly configured
 if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET && 
     process.env.AUTH_GOOGLE_ID !== 'your-google-client-id') {
-  providers.push(Google({
+  providers.push(GoogleProvider({
     clientId: process.env.AUTH_GOOGLE_ID,
     clientSecret: process.env.AUTH_GOOGLE_SECRET,
   }))
@@ -23,7 +16,7 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET &&
 
 if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET && 
     process.env.AUTH_FACEBOOK_ID !== 'your-facebook-app-id') {
-  providers.push(Facebook({
+  providers.push(FacebookProvider({
     clientId: process.env.AUTH_FACEBOOK_ID,
     clientSecret: process.env.AUTH_FACEBOOK_SECRET,
   }))
@@ -31,30 +24,22 @@ if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET &&
 
 if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET && 
     process.env.AUTH_GITHUB_ID !== 'test-github-client-id') {
-  providers.push(GitHub({
+  providers.push(GitHubProvider({
     clientId: process.env.AUTH_GITHUB_ID,
     clientSecret: process.env.AUTH_GITHUB_SECRET,
   }))
 }
 
-// Fallback: if no providers are configured, add a mock provider for development
-if (providers.length === 0 && process.env.NODE_ENV === 'development') {
-  // For development without real OAuth, we'll use email magic links or create a mock provider
-  console.warn('No OAuth providers configured. Authentication will be limited in development.')
-}
-
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Temporarily disable adapter until schema is fully compatible
-  // adapter: DrizzleAdapter(db),
+// NextAuth v4 configuration
+export default NextAuth({
   providers,
   pages: {
     signIn: '/auth/signin',
   },
   callbacks: {
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user && token.sub) {
-        // Type assertion for now - in a real app you'd extend the session types
-        (session.user as any).id = token.sub
+        session.user.id = token.sub
       }
       return session
     },
