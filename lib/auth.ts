@@ -1,47 +1,114 @@
-import NextAuth from "next-auth"
+import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import FacebookProvider from "next-auth/providers/facebook"
 import GitHubProvider from "next-auth/providers/github"
 
+// Validate required environment variables
+const requiredEnvVars = ['NEXTAUTH_SECRET']
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.warn(`Missing environment variable: ${envVar}`)
+  }
+}
+
 const providers = []
 
-// Only add providers if credentials are properly configured
+// Google OAuth Provider
 if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET && 
     process.env.AUTH_GOOGLE_ID !== 'your-google-client-id') {
   providers.push(GoogleProvider({
     clientId: process.env.AUTH_GOOGLE_ID,
     clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    authorization: {
+      params: {
+        scope: 'openid email profile',
+        prompt: 'consent',
+      },
+    },
   }))
 }
 
+// Facebook OAuth Provider
 if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET && 
     process.env.AUTH_FACEBOOK_ID !== 'your-facebook-app-id') {
   providers.push(FacebookProvider({
     clientId: process.env.AUTH_FACEBOOK_ID,
     clientSecret: process.env.AUTH_FACEBOOK_SECRET,
+    authorization: {
+      params: {
+        scope: 'email',
+      },
+    },
   }))
 }
 
+// GitHub OAuth Provider
 if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET && 
     process.env.AUTH_GITHUB_ID !== 'test-github-client-id') {
   providers.push(GitHubProvider({
     clientId: process.env.AUTH_GITHUB_ID,
     clientSecret: process.env.AUTH_GITHUB_SECRET,
+    authorization: {
+      params: {
+        scope: 'read:user user:email',
+      },
+    },
   }))
 }
 
-// NextAuth v4 configuration
-export default NextAuth({
+export const authOptions: NextAuthOptions = {
   providers,
   pages: {
     signIn: '/auth/signin',
+    error: '/auth/error',
+  },
+  session: {
+    strategy: 'jwt',
   },
   callbacks: {
-    async session({ session, token }: any) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub
+    async jwt({ token, user, account }) {
+      if (account && user) {
+        token.provider = account.provider
+        token.userId = user.id
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user && token) {
+        session.user.id = token.userId as string
+        // @ts-ignore - Adding provider to session user
+        session.user.provider = token.provider as string
       }
       return session
     },
+    async signIn({ user, account, profile }) {
+      // Add custom sign-in logic here
+      console.log('Sign in attempt:', { 
+        provider: account?.provider, 
+        email: user.email 
+      })
+      return true
+    },
+    async redirect({ url, baseUrl }) {
+      // Redirect to home page after successful sign-in
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      else if (new URL(url).origin === baseUrl) return url
+      return baseUrl
+    }
   },
-})
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      console.log('User signed in:', { 
+        email: user.email, 
+        provider: account?.provider, 
+        isNewUser 
+      })
+    },
+    async signOut({ session }) {
+      console.log('User signed out:', session?.user?.email)
+    }
+  },
+  debug: process.env.NODE_ENV === 'development',
+}
+
+export default authOptions

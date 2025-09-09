@@ -223,3 +223,81 @@ npm run test:coverage
 - <1% AI request error rate
 - Weekly project retention >35%
 - Drawing operations feel instant (<16ms response)
+
+## Project File Structure
+
+### Frontend Architecture (Next.js App Router)
+```
+app/                          # Next.js App Router pages
+├── page.tsx                  # Main pixel editor page
+├── layout.tsx                # Root layout with providers
+├── auth/signin/              # Authentication pages
+└── test/                     # Development test pages
+
+components/                   # React components
+├── ui/                       # Reusable UI components (Button, Input, Toast, etc.)
+├── mobile/                   # Mobile-optimized components
+├── pixel-canvas.tsx          # Main drawing canvas component
+├── pixel-editor.tsx          # Complete pixel editor layout
+├── toolbar.tsx               # Drawing tools sidebar
+├── frame-manager.tsx         # Animation timeline
+├── project-tabs.tsx          # Multi-project workspace
+├── color-palette.tsx         # Color selection interface
+└── [various modals]          # Import, Export, Save modals
+
+lib/                          # Core business logic
+├── stores/                   # Zustand state management
+│   ├── project-store.ts      # Main project state (multi-tab, frames)
+│   └── auth-store.ts         # Authentication state
+├── services/                 # External service integrations
+│   ├── media-importer.ts     # Image/video import processing
+│   ├── prompt-enhancer.ts    # AI prompt optimization
+│   └── api-middleware.ts     # API client wrapper
+├── core/                     # Core canvas operations
+│   ├── magic-wand.ts         # Magic wand selection tool
+│   └── canvas-analysis.ts    # Canvas content analysis
+├── utils/                    # Utility functions
+│   ├── thumbnail-generator.ts # Frame thumbnail creation
+│   └── device-detection.ts   # Mobile/desktop detection
+└── types/                    # TypeScript type definitions
+```
+
+### Backend Architecture (Fastify + PostgreSQL)
+```
+backend/src/
+├── server.ts                 # Fastify server setup
+├── routes/                   # API endpoint handlers
+│   ├── ai.ts                 # AI image generation with quantization
+│   ├── projects.ts           # Project CRUD operations
+│   ├── saved-projects.ts     # Cloud project storage
+│   ├── frames.ts             # Frame management
+│   ├── export.ts             # GIF/PNG export
+│   └── upload.ts             # Image upload processing
+├── services/                 # Business logic services
+│   ├── openai.ts             # OpenAI API integration
+│   ├── imageProcessing.ts    # Canvas manipulation & quantization
+│   ├── storage.ts            # File storage abstraction
+│   └── rateLimit.ts          # Redis-based rate limiting
+├── middleware/               # Request middleware
+│   ├── auth.ts               # JWT authentication
+│   └── rateLimit.ts          # Rate limiting middleware
+├── db/                       # Database layer
+│   ├── schema.ts             # Drizzle ORM schema definitions
+│   └── connection.ts         # PostgreSQL connection
+└── types/                    # Backend TypeScript types
+```
+
+## Playwright Testing
+
+The project includes Playwright for end-to-end testing:
+
+```bash
+# Run Playwright tests
+npx playwright test
+
+# Run Playwright tests with UI
+npx playwright test --ui
+
+# Run specific test
+npx playwright test canvas-functionality.test.ts
+```
