@@ -2,6 +2,8 @@ import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import FacebookProvider from "next-auth/providers/facebook"
 import GitHubProvider from "next-auth/providers/github"
+import { DrizzleAdapter } from "@auth/drizzle-adapter"
+import { db } from "@/lib/db"
 
 // Validate required environment variables
 const requiredEnvVars = ['NEXTAUTH_SECRET']
@@ -57,6 +59,7 @@ if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET &&
 }
 
 export const authOptions: NextAuthOptions = {
+  // adapter: DrizzleAdapter(db), // TODO: Enable after database schema verification
   providers,
   pages: {
     signIn: '/auth/signin',
@@ -69,14 +72,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account }) {
       if (account && user) {
         token.provider = account.provider
-        token.userId = user.id
+        token.userId = user.id || token.sub || ''
       }
       return token
     },
     async session({ session, token }) {
       if (session.user && token) {
         session.user.id = token.userId as string
-        // @ts-ignore - Adding provider to session user
         session.user.provider = token.provider as string
       }
       return session
