@@ -2,6 +2,8 @@ import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import FacebookProvider from "next-auth/providers/facebook"
 import GitHubProvider from "next-auth/providers/github"
+import { DrizzleAdapter } from "@auth/drizzle-adapter"
+import { db } from "@/lib/db"
 
 // Validate required environment variables
 const requiredEnvVars = ['NEXTAUTH_SECRET']
@@ -65,7 +67,8 @@ const finalProviders = providers.length > 0 ? providers : [
 ]
 
 export const authOptions: NextAuthOptions = {
-  providers: finalProviders,
+  // adapter: DrizzleAdapter(db), // TODO: Enable after database schema verification
+  providers,
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',
@@ -77,8 +80,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account }) {
       if (account && user) {
         token.provider = account.provider
-        // @ts-ignore - user.id might not exist in type definition
-        token.userId = user.id || user.email || 'unknown'
+        token.userId = user.id || token.sub || ''
       }
       return token
     },
@@ -86,7 +88,6 @@ export const authOptions: NextAuthOptions = {
       if (session.user && token) {
         // @ts-ignore - Adding custom properties to session user
         session.user.id = token.userId as string
-        // @ts-ignore - Adding provider to session user
         session.user.provider = token.provider as string
       }
       return session

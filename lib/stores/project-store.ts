@@ -993,8 +993,8 @@ export const useProjectStore = create<ProjectStore>()(
                   chromaKeyCtx.putImageData(chromaKeyImageData, 0, 0)
                   
                   
-                  // Add frame to GIF with individual frame delay and transparency
-                  const frameDelay = frame.delayMs || frameDuration
+                  // Add frame to GIF with global duration setting (ignore individual frame delays)
+                  const frameDelay = frameDuration
                   
                   
                   gif.addFrame(chromaKeyCanvas, { 
