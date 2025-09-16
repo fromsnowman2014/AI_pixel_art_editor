@@ -31,7 +31,7 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET &&
 }
 
 // Facebook OAuth Provider
-if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET && 
+if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET &&
     process.env.AUTH_FACEBOOK_ID !== 'your-facebook-app-id') {
   providers.push(FacebookProvider({
     clientId: process.env.AUTH_FACEBOOK_ID,
@@ -85,9 +85,11 @@ export const authOptions: NextAuthOptions = {
     },
     async signIn({ user, account, profile }) {
       // Add custom sign-in logic here
-      console.log('Sign in attempt:', { 
-        provider: account?.provider, 
-        email: user.email 
+      console.log('Sign in attempt:', {
+        provider: account?.provider,
+        email: user.email,
+        nextauth_url: process.env.NEXTAUTH_URL,
+        callback_url: `${process.env.NEXTAUTH_URL}/api/auth/callback/${account?.provider}`
       })
       return true
     },
