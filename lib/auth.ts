@@ -36,11 +36,8 @@ if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET &&
   providers.push(FacebookProvider({
     clientId: process.env.AUTH_FACEBOOK_ID,
     clientSecret: process.env.AUTH_FACEBOOK_SECRET,
-    authorization: {
-      params: {
-        scope: 'email',
-      },
-    },
+    // Remove email scope to avoid Facebook permission error
+    // Basic profile info will still be available
   }))
 }
 
