@@ -1,0 +1,29 @@
+project_id = "fdiwnymnikylraofwhdu"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "https://ai-pixel-art-editor.vercel.app"
+additional_redirect_urls = ["https://ai-pixel-art-editor.vercel.app/**", "http://localhost:3000/**"]
+jwt_expiry = 3600
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[functions.ai-generate]
+verify_jwt = false

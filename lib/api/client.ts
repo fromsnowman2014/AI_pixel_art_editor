@@ -15,21 +15,11 @@ import type {
   Asset,
   HealthCheckResponse,
 } from '@/lib/types/api'
+import { supabaseAI } from '@/lib/services/supabase-ai'
 
-// API Configuration - Using Local Next.js API with Proxy to Backend
+// API Configuration - Using Supabase Edge Functions or Local Next.js API
 const getApiBaseUrl = () => {
-  // Development mode: Use production API directly if OPENAI_API_KEY is missing
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    const hasLocalApiKey = process.env.NEXT_PUBLIC_HAS_OPENAI_KEY === 'true';
-    
-    if (!hasLocalApiKey) {
-      console.log('🔧 API Client using production Railway API (no local OpenAI key)');
-      return 'https://aipixelarteditor-production.up.railway.app/api';
-    }
-  }
-  
-  // Default: use local Next.js API routes (CORS-free)
-  console.log('🔧 API Client using local Next.js API routes (CORS-free)');
+  console.log('🔧 API Client using local Next.js API routes for non-AI endpoints');
   return '/api';
 }
 
@@ -219,54 +209,70 @@ class ApiClient {
   async generateAI(data: AIGenerateRequest): Promise<AIGenerationResponse> {
     console.log('🔧 API Client: Original request data:', data);
     console.log('🔧 API Client: Original mode:', data.mode, 'colorLimit:', data.colorLimit);
-    
-    // Transform request data to match backend schema exactly
-    const transformedMode = data.mode === 'new' ? 'text-to-image' : data.mode;
-    const transformedColorCount = data.colorLimit;
-    
-    console.log('🔧 API Client: Mode transformation:', data.mode, '->', transformedMode);
-    console.log('🔧 API Client: Color field transformation: colorLimit ->', 'colorCount:', transformedColorCount);
-    
-    const backendRequest = {
-      prompt: data.prompt,
-      mode: transformedMode, // Convert 'new' mode to 'text-to-image'
-      width: data.width,
-      height: data.height,
-      colorCount: transformedColorCount,  // Backend expects 'colorCount', not 'colorLimit'
-      style: 'pixel-art', // Add required style field
-      // Optional fields
-      ...(data.enableDithering !== undefined && { enableDithering: data.enableDithering }),
-      ...(data.quantizationMethod && { quantizationMethod: data.quantizationMethod }),
-      ...(data.referenceImageId && { referenceImageId: data.referenceImageId }),
-      ...(data.referenceImageData && { inputImage: data.referenceImageData }), // Backend expects 'inputImage'
-      ...(data.seed && { seed: data.seed })
-    };
-    
-    console.log('🔧 API Client: Final backend request data:', backendRequest);
-    console.log('🔧 API Client: Final backend request keys:', Object.keys(backendRequest));
-    console.log('🔧 API Client: Request details:', {
-      url: `${API_BASE_URL}/ai/generate`,
-      method: 'POST',
-      timeout: 600000,
-      headers: this.client.defaults.headers
-    });
-    
-    try {
-      const response = await this.client.post<{success: boolean, data: AIGenerationResponse}>('/ai/generate', backendRequest, {
-        timeout: 600000, // 10 minutes for AI generation to match backend processing time
-      })
-      
-      console.log('✅ API Client: Request successful');
-      return this.handleResponse(response);
-    } catch (error: any) {
-      console.error('❌ API Client: Request failed:', {
-        error: error,
-        config: error?.config,
-        response: error?.response?.data,
-        status: error?.response?.status
-      });
-      throw error;
+
+    // Check if we should use Supabase Edge Functions
+    const useSupabaseAI = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_SUPABASE_AI === 'true';
+
+    if (useSupabaseAI) {
+      console.log('🔧 API Client: Using Supabase Edge Functions for AI generation');
+
+      // Transform request data for Supabase Edge Function
+      const transformedMode = data.mode === 'new' ? 'text-to-image' : data.mode;
+
+      const supabaseRequest = {
+        prompt: data.prompt,
+        mode: transformedMode,
+        width: data.width,
+        height: data.height,
+        colorCount: data.colorLimit,
+        style: 'pixel-art',
+        ...(data.referenceImageData && { inputImage: data.referenceImageData }),
+        preserveTransparency: true,
+        enforceTransparentBackground: true
+      };
+
+      console.log('🔧 API Client: Supabase request data:', supabaseRequest);
+
+      try {
+        const response = await supabaseAI.generateImage(supabaseRequest);
+
+        if (!response.success || !response.data) {
+          throw new Error(response.error?.message || 'AI generation failed');
+        }
+
+        // Transform Supabase response to match expected format
+        const aiResponse: AIGenerationResponse = {
+          assetId: crypto.randomUUID(),
+          pngUrl: response.data.imageUrl,
+          palette: response.data.palette.map(color =>
+            `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a || 1})`
+          ),
+          width: response.data.width,
+          height: response.data.height,
+          colorCount: response.data.colorCount,
+          processingTimeMs: response.data.processingTimeMs
+        };
+
+        console.log('✅ API Client: Supabase AI generation successful');
+        return aiResponse;
+
+      } catch (error: any) {
+        console.error('❌ API Client: Supabase AI generation failed:', error);
+        throw new ApiError(
+          'SUPABASE_AI_ERROR',
+          error.message || 'AI generation failed',
+          500
+        );
+      }
     }
+
+    // If Supabase AI is not enabled, throw an error since Railway is deprecated
+    console.error('❌ API Client: No AI service configured - Supabase AI is disabled and Railway is deprecated');
+    throw new ApiError(
+      'NO_AI_SERVICE',
+      'AI generation is not available. Please enable Supabase AI service.',
+      503
+    );
   }
 
   private handleResponse(response: any): AIGenerationResponse {
