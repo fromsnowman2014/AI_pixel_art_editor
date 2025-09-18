@@ -16,19 +16,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **CSS**: `image-rendering: pixelated` for crisp pixel art
 - **GIF Processing**: gifuct-js or WASM encoder
 
-### Backend (Railway)
-- **Runtime**: Node.js with Fastify
-- **Production URL**: https://aipixelarteditor-production.up.railway.app
-- **Validation**: Zod
-- **Database**: PostgreSQL for metadata
-- **Cache/Queue**: Redis for rate limiting and job processing
-- **Storage**: R2/Supabase for images
-- **Auth**: next-auth with email magic links (parent/teacher only)
+### Backend (Supabase)
+- **Runtime**: Supabase Edge Functions (Deno runtime)
+- **AI Service**: Direct OpenAI API integration via Edge Functions
+- **Database**: Supabase PostgreSQL
+- **Auth**: Supabase Auth with OAuth providers
+- **Storage**: Supabase Storage for images
+- **Security**: Server-side API key management
 
 ### Core Features Architecture
 
 1. **Multi-tab Canvas System**: Each tab represents a separate pixel art project
-2. **AI Integration**: Backend proxy for AI image generation with post-processing
+2. **AI Integration**: Supabase Edge Functions for secure AI image generation with post-processing
 3. **Image Processing Pipeline**: AI generation → quantization (Median Cut) → nearest-neighbor resize
 4. **GIF Builder**: Frame management with drag-drop reordering
 5. **Local-first**: IndexedDB autosave with optional cloud sync
@@ -71,32 +70,21 @@ npm run format
 npm run format:check
 ```
 
-### Backend Commands (in /backend directory)
+### Supabase Commands
 ```bash
-# Development server with hot reload
-npm run dev
+# Deploy Edge Functions
+npx supabase functions deploy ai-generate
 
-# Build TypeScript
-npm run build
+# Check Edge Function logs
+npx supabase functions logs ai-generate
 
-# Start production server
-npm run start
-
-# Start production with NODE_ENV=production
-npm run start:prod
+# Run Edge Functions locally
+npx supabase functions serve ai-generate
 
 # Database operations
-npm run db:generate    # Generate Drizzle schema
-npm run db:migrate     # Push schema to database
-npm run db:studio      # Open Drizzle Studio
-
-# Testing and linting
-npm test
-npm run test:watch
-npm run test:coverage
-npm run lint
-npm run lint:fix
-npm run type-check
+npx supabase db pull          # Pull schema changes
+npx supabase db push          # Push schema changes
+npx supabase studio           # Open Supabase Studio
 ```
 
 ## Key Implementation Guidelines
@@ -134,11 +122,10 @@ User -> Project -> Frame -> Layer (optional)
 ```
 
 ### API Endpoints Structure
-- `POST https://aipixelarteditor-production.up.railway.app/api/ai/generate` - AI image generation with quantization
-- `POST https://aipixelarteditor-production.up.railway.app/api/ai/variations` - Generate 4 variations of existing image  
-- `POST https://aipixelarteditor-production.up.railway.app/api/project/*` - CRUD operations for projects
-- `POST https://aipixelarteditor-production.up.railway.app/api/export/gif` - GIF compilation from frames
-- `POST https://aipixelarteditor-production.up.railway.app/api/upload` - Image upload with processing
+- `POST https://fdiwnymnikylraofwhdu.supabase.co/functions/v1/ai-generate` - AI image generation via Supabase Edge Function
+- Local project operations via IndexedDB and optional Supabase sync
+- Client-side GIF compilation and export
+- Direct image upload to Supabase Storage
 
 ### Security & Privacy (COPPA Compliance)
 - No public profiles by default
@@ -164,21 +151,18 @@ User -> Project -> Frame -> Layer (optional)
   - `FrameManager`: Multi-frame animation timeline
   - `ProjectTabs`: Multi-project workspace
   - `Toolbar`: Drawing tools and canvas controls
-- **AI Integration**: Frontend API calls to backend AI proxy endpoints
+- **AI Integration**: Direct calls to Supabase Edge Functions with client-side orchestration
 
-### Backend Structure (Fastify + TypeScript)
-- **Database**: Drizzle ORM with PostgreSQL
-- **Routes**: Modular route handlers (`/routes/*.ts`)
-  - `ai.ts`: AI image generation with post-processing
-  - `projects.ts`: Project CRUD operations
-  - `frames.ts`: Frame management
-  - `export.ts`: GIF/image export
-  - `upload.ts`: Image upload and processing
-- **Services**: Business logic layer (`/services/*.ts`)
-  - `openai.ts`: OpenAI API integration
-  - `imageProcessing.ts`: Canvas manipulation and quantization
-  - `rateLimit.ts`: Redis-based rate limiting
-- **Middleware**: Authentication, rate limiting, validation
+### Backend Structure (Supabase)
+- **Edge Functions**: Deno-based serverless functions
+  - `ai-generate`: Secure OpenAI API integration with image processing
+- **Database**: Supabase PostgreSQL with automatic schema management
+- **Storage**: Supabase Storage for user-generated content
+- **Auth**: Supabase Auth with OAuth provider integration
+- **Services**: Client-side business logic
+  - `supabase-ai.ts`: Edge Function client integration
+  - `media-importer.ts`: Local image processing
+  - Rate limiting via Supabase built-in features
 
 ### Key Data Flow
 1. **Project Storage**: Zustand store manages multiple project tabs with frame-specific canvas data
@@ -262,29 +246,19 @@ lib/                          # Core business logic
 └── types/                    # TypeScript type definitions
 ```
 
-### Backend Architecture (Fastify + PostgreSQL)
+### Backend Architecture (Supabase)
 ```
-backend/src/
-├── server.ts                 # Fastify server setup
-├── routes/                   # API endpoint handlers
-│   ├── ai.ts                 # AI image generation with quantization
-│   ├── projects.ts           # Project CRUD operations
-│   ├── saved-projects.ts     # Cloud project storage
-│   ├── frames.ts             # Frame management
-│   ├── export.ts             # GIF/PNG export
-│   └── upload.ts             # Image upload processing
-├── services/                 # Business logic services
-│   ├── openai.ts             # OpenAI API integration
-│   ├── imageProcessing.ts    # Canvas manipulation & quantization
-│   ├── storage.ts            # File storage abstraction
-│   └── rateLimit.ts          # Redis-based rate limiting
-├── middleware/               # Request middleware
-│   ├── auth.ts               # JWT authentication
-│   └── rateLimit.ts          # Rate limiting middleware
-├── db/                       # Database layer
-│   ├── schema.ts             # Drizzle ORM schema definitions
-│   └── connection.ts         # PostgreSQL connection
-└── types/                    # Backend TypeScript types
+supabase/
+├── functions/                # Edge Functions (Deno runtime)
+│   └── ai-generate/
+│       └── index.ts          # AI image generation with OpenAI integration
+├── migrations/               # Database schema migrations
+└── config.toml              # Supabase configuration
+
+lib/services/                # Client-side services
+├── supabase-ai.ts           # Edge Function client integration
+├── media-importer.ts        # Local image processing
+└── api-middleware.ts        # API client wrapper
 ```
 
 ## Playwright Testing

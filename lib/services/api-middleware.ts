@@ -450,7 +450,7 @@ export function logApiRequest(
     logger.error('API request failed', performanceMetrics);
   }
 
-  // Additional monitoring metrics for Railway (structured logs when enabled)
+  // Additional monitoring metrics (structured logs when enabled)
   if (process.env.STRUCTURED_LOGS === 'true') {
     logger.info('api_metrics', {
       metric_type: 'api_request',

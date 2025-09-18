@@ -55,6 +55,7 @@
     "out",
     "build",
     "backend",
+    "supabase",
     "__tests__"
   ]
 }
