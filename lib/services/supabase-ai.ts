@@ -32,22 +32,29 @@ export interface SupabaseAIGenerateResponse {
 }
 
 class SupabaseAIService {
-  private supabaseUrl: string;
-  private supabaseKey: string;
+  private supabaseUrl: string = '';
+  private supabaseKey: string = '';
+  private initialized: boolean = false;
 
-  constructor() {
-    this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-    this.supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  private initialize() {
+    if (this.initialized) return;
+
+    // Only use NEXT_PUBLIC_ prefixed variables for client-side access
+    this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    this.supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
     if (!this.supabaseUrl || !this.supabaseKey) {
       throw new Error('Supabase configuration missing');
     }
+
+    this.initialized = true;
   }
 
   /**
    * Generate AI image using Supabase Edge Function
    */
   async generateImage(params: SupabaseAIGenerateRequest): Promise<SupabaseAIGenerateResponse> {
+    this.initialize();
     const startTime = Date.now();
     const requestId = crypto.randomUUID();
 
@@ -153,6 +160,7 @@ class SupabaseAIService {
    * Check if AI service is available
    */
   async healthCheck(): Promise<{ available: boolean; error?: string }> {
+    this.initialize();
     try {
       // Simple test call to check if the Edge Function is responsive
       const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/ai-generate`;
