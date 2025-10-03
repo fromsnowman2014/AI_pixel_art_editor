@@ -25,9 +25,10 @@ export async function GET(request: NextRequest) {
       enableAiGeneration: env.ENABLE_AI_GENERATION,
       rateLimit: env.RATE_LIMIT_AI_REQUESTS_PER_HOUR,
       aiTimeout: env.AI_GENERATION_TIMEOUT,
-      railways: {
-        requestId: request.headers.get('x-railway-request-id') || 'unknown',
-        environment: 'Railway deployment detected'
+      deployment: {
+        platform: 'Vercel',
+        supabaseEnabled: process.env.NEXT_PUBLIC_USE_SUPABASE_AI === 'true',
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'
       }
     };
 

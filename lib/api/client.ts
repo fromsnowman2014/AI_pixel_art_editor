@@ -217,7 +217,9 @@ class ApiClient {
       console.log('🔧 API Client: Using Supabase Edge Functions for AI generation');
 
       // Transform request data for Supabase Edge Function
-      const transformedMode = data.mode === 'new' ? 'text-to-image' : data.mode;
+      const transformedMode: 'text-to-image' | 'image-to-image' =
+        data.mode === 'new' ? 'text-to-image' :
+        data.mode === 'img2img' ? 'image-to-image' : 'text-to-image';
 
       const supabaseRequest = {
         prompt: data.prompt,
@@ -266,8 +268,8 @@ class ApiClient {
       }
     }
 
-    // If Supabase AI is not enabled, throw an error since Railway is deprecated
-    console.error('❌ API Client: No AI service configured - Supabase AI is disabled and Railway is deprecated');
+    // If Supabase AI is not enabled, throw an error
+    console.error('❌ API Client: No AI service configured - Supabase AI is disabled');
     throw new ApiError(
       'NO_AI_SERVICE',
       'AI generation is not available. Please enable Supabase AI service.',

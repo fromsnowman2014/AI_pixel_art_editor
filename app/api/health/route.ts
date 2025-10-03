@@ -47,19 +47,17 @@ export async function GET() {
     const debugInfo = {
       openaiKeyFormat: apiKey ? (apiKey.startsWith('sk-') ? 'valid_prefix' : 'invalid_prefix') : 'missing',
       openaiKeyLength: apiKey ? apiKey.length : 0,
-      envVarsPresent: Object.keys(process.env).filter(key => 
-        key.includes('OPENAI') || 
-        key.includes('NEXT') || 
+      envVarsPresent: Object.keys(process.env).filter(key =>
+        key.includes('OPENAI') ||
+        key.includes('NEXT') ||
         key.includes('NODE') ||
-        key.includes('RAILWAY') ||
         key.includes('VERCEL')
       ),
       buildId: process.env.NEXT_BUILD_ID || 'unknown',
       deploymentInfo: {
-        platform: process.env.RAILWAY_PROJECT_ID ? 'Railway' : 
-                  process.env.VERCEL ? 'Vercel' : 'Unknown',
-        projectId: process.env.RAILWAY_PROJECT_ID || process.env.VERCEL_PROJECT_ID || 'unknown',
-        environment: process.env.RAILWAY_ENVIRONMENT || process.env.VERCEL_ENV || 'unknown'
+        platform: process.env.VERCEL ? 'Vercel' : 'Unknown',
+        projectId: process.env.VERCEL_PROJECT_ID || 'unknown',
+        environment: process.env.VERCEL_ENV || 'unknown'
       }
     };
     
