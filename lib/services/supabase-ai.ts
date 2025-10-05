@@ -33,32 +33,67 @@ export interface SupabaseAIGenerateResponse {
   };
 }
 
-// Video generation interfaces
+// Video generation interfaces (NEW: Webhook-based async)
 export interface SupabaseVideoGenerateRequest {
   prompt: string;
   width: number;  // Target pixel art dimensions
   height: number;
   colorCount: number;
   fps?: 12 | 24 | 30;
+  projectId?: string;
 }
 
 export interface SupabaseVideoGenerateResponse {
   success: boolean;
   data?: {
-    frames: Array<{
-      frame: Frame;
-      imageData: number[];
-    }>;
-    totalFrames: number;
-    fps: number;
-    processingTimeMs: number;
-    prompt: string;
+    jobId: string;
+    status: string;
+    estimatedTimeSeconds: number;
+    message: string;
   };
   error?: {
     message: string;
     code: string;
     details?: any;
   };
+}
+
+// Video job status types
+export type VideoJobStatus =
+  | 'pending'
+  | 'queued'
+  | 'dreaming'
+  | 'processing'
+  | 'completed'
+  | 'failed';
+
+export interface VideoGenerationJob {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  prompt: string;
+  width: number;
+  height: number;
+  color_count: number;
+  fps: number;
+  duration: number;
+  luma_generation_id: string | null;
+  luma_video_url: string | null;
+  status: VideoJobStatus;
+  progress: number;
+  progress_message: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  error_details: any;
+  total_frames: number | null;
+  frame_storage_urls: string[] | null;
+  frame_data: any;
+  processing_time_ms: number | null;
+  luma_processing_time_ms: number | null;
+  frame_processing_time_ms: number | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
 }
 
 class SupabaseAIService {
@@ -187,8 +222,8 @@ class SupabaseAIService {
   }
 
   /**
-   * Generate AI video and convert to pixel art frames
-   * Reuses existing FastVideoProcessor infrastructure
+   * Start async video generation job (NEW: Webhook-based)
+   * Returns immediately with jobId - client must subscribe to updates
    */
   async generateVideo(params: SupabaseVideoGenerateRequest): Promise<SupabaseVideoGenerateResponse> {
     this.initialize();
@@ -196,7 +231,7 @@ class SupabaseAIService {
     const requestId = crypto.randomUUID();
 
     try {
-      console.log(`🎬 [${requestId}] Starting video-to-frames generation`);
+      console.log(`🎬 [${requestId}] Starting async video generation job`);
       console.log(`📝 [${requestId}] Request params:`, {
         prompt: params.prompt.substring(0, 50) + '...',
         dimensions: `${params.width}x${params.height}`,
@@ -204,20 +239,33 @@ class SupabaseAIService {
         colorCount: params.colorCount
       });
 
-      // Step 1: Call Edge Function to generate video
-      const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/ai-generate-video`;
+      // Get user's JWT token from localStorage
+      const authKey = `sb-${this.supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+      const authData = localStorage.getItem(authKey);
+
+      if (!authData) {
+        return {
+          success: false,
+          error: {
+            message: 'Not authenticated. Please sign in.',
+            code: 'NOT_AUTHENTICATED'
+          }
+        };
+      }
+
+      const { access_token } = JSON.parse(authData);
+
+      // Call video-generate Edge Function (NEW endpoint)
+      const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/video-generate`;
 
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.supabaseKey}`,
+          'Authorization': `Bearer ${access_token}`,
           'apikey': this.supabaseKey
         },
-        body: JSON.stringify({
-          ...params,
-          duration: 1.0 // MVP: Always 1 second (backend will enforce this)
-        })
+        body: JSON.stringify(params)
       });
 
       const totalTime = Date.now() - startTime;
@@ -233,8 +281,8 @@ class SupabaseAIService {
         return {
           success: false,
           error: {
-            message: `Video generation failed: ${response.statusText}`,
-            code: 'VIDEO_GENERATION_ERROR',
+            message: `Video generation job creation failed: ${response.statusText}`,
+            code: 'JOB_CREATION_ERROR',
             details: {
               requestId,
               status: response.status,
@@ -245,59 +293,17 @@ class SupabaseAIService {
         };
       }
 
-      const videoData = await response.json();
+      const result = await response.json();
 
-      if (!videoData.success || !videoData.data) {
-        console.error(`❌ [${requestId}] No video data returned`);
-        return {
-          success: false,
-          error: {
-            message: videoData.error?.message || 'No video data returned',
-            code: videoData.error?.code || 'NO_VIDEO_DATA',
-            details: { requestId, processingTimeMs: totalTime }
-          }
-        };
+      if (!result.success) {
+        console.error(`❌ [${requestId}] Job creation failed:`, result.error);
+        return result;
       }
 
-      console.log(`✅ [${requestId}] Video generated:`, videoData.data.videoUrl);
+      console.log(`✅ [${requestId}] Video job created:`, result.data.jobId);
+      console.log(`⏱️  [${requestId}] Estimated completion: ${result.data.estimatedTimeSeconds}s`);
 
-      // Step 2: Download video and process with FastVideoProcessor
-      // This is where the magic happens - reusing existing infrastructure!
-
-      const { FastVideoProcessor } = await import('@/lib/domain/fast-video-processor');
-
-      const processingOptions = {
-        width: params.width,
-        height: params.height,
-        colorCount: params.colorCount,
-        maxFrames: params.fps === 12 ? 12 : params.fps === 24 ? 24 : 30
-      };
-
-      console.log(`🔄 [${requestId}] Processing video with FastVideoProcessor...`);
-
-      // Use existing video processor (already handles pixel art conversion!)
-      const importResult = await FastVideoProcessor.processVideoFast(
-        videoData.data.videoUrl,
-        processingOptions,
-        (progress: number, message: string) => {
-          console.log(`📊 [${requestId}] ${progress}%: ${message}`);
-        }
-      );
-
-      const finalTime = Date.now() - startTime;
-      console.log(`✅ [${requestId}] Extracted ${importResult.frames.length} pixel art frames in ${finalTime}ms`);
-
-      // Step 3: Return processed frames (already in pixel art format!)
-      return {
-        success: true,
-        data: {
-          frames: importResult.frames, // Already pixel art!
-          totalFrames: importResult.frames.length,
-          fps: params.fps || 24,
-          processingTimeMs: finalTime,
-          prompt: params.prompt
-        }
-      };
+      return result;
 
     } catch (error) {
       const totalTime = Date.now() - startTime;
@@ -315,6 +321,89 @@ class SupabaseAIService {
           }
         }
       };
+    }
+  }
+
+  /**
+   * Subscribe to video generation job updates
+   * Returns unsubscribe function
+   */
+  subscribeToVideoJob(
+    jobId: string,
+    onUpdate: (job: VideoGenerationJob) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    this.initialize();
+
+    console.log(`📡 Subscribing to video job updates: ${jobId}`);
+
+    // Use dynamic import to avoid bundling Supabase client on every page
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
+
+      const channel = supabase
+        .channel(`video-job-${jobId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'video_generation_jobs',
+            filter: `id=eq.${jobId}`
+          },
+          (payload) => {
+            console.log(`📊 Job update received:`, payload.new);
+            onUpdate(payload.new as VideoGenerationJob);
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`✅ Subscribed to job updates: ${jobId}`);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`❌ Channel error for job: ${jobId}`);
+            onError?.(new Error('Realtime subscription error'));
+          }
+        });
+
+      // Return cleanup function
+      return () => {
+        console.log(`🔌 Unsubscribing from job: ${jobId}`);
+        supabase.removeChannel(channel);
+      };
+    }).catch((error) => {
+      console.error('Failed to create Supabase client:', error);
+      onError?.(error);
+    });
+
+    // Return no-op for immediate return
+    return () => {};
+  }
+
+  /**
+   * Get job status
+   */
+  async getVideoJob(jobId: string): Promise<VideoGenerationJob | null> {
+    this.initialize();
+
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
+
+      const { data, error } = await supabase
+        .from('video_generation_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch job:', error);
+        return null;
+      }
+
+      return data as VideoGenerationJob;
+    } catch (error) {
+      console.error('Failed to get video job:', error);
+      return null;
     }
   }
 

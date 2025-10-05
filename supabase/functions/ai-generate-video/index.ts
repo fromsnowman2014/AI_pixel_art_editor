@@ -157,11 +157,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // MVP: Enforce 1.0 second duration (hardcoded)
-    const duration = 1.0; // Always 1 second for MVP
+    // MVP: Enforce 5 second duration (Luma API minimum)
+    const duration = 5; // Luma API only supports 5s, 9s, or 10s (we use 5s for MVP)
 
-    if (requestData.duration && requestData.duration !== 1.0) {
-      console.warn(`⚠️ [${requestId}] Duration ${requestData.duration}s requested but MVP only supports 1.0s`);
+    if (requestData.duration && requestData.duration !== 5) {
+      console.warn(`⚠️ [${requestId}] Duration ${requestData.duration}s requested but MVP uses 5s (Luma API minimum)`);
     }
 
     console.log(`🔍 [${requestId}] Processing video generation - ${width}x${height}, ${colorCount} colors, ${fps} fps, ${duration}s`);
@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
     const enhancedPrompt = enhancePromptForVideo(prompt);
     console.log(`🎨 [${requestId}] Original: "${prompt}"`);
     console.log(`🎨 [${requestId}] Enhanced: "${enhancedPrompt}"`);
-    console.log(`⏱️ [${requestId}] Duration: ${duration}s (MVP: hardcoded to 1.0s)`);
+    console.log(`⏱️ [${requestId}] Duration: ${duration}s (MVP: 5s minimum due to Luma API constraint)`);
 
     // TODO: Call Luma API when key is available
     // For now, return mock response for development
@@ -194,7 +194,7 @@ Deno.serve(async (req: Request) => {
             targetFps: fps,
             colorCount: colorCount,
             method: 'FastVideoProcessor',
-            maxDuration: 1.0
+            maxDuration: 5.0
           }
         }
       };
@@ -211,19 +211,18 @@ Deno.serve(async (req: Request) => {
     // Production: Call Luma API
     console.log(`🤖 [${requestId}] Calling Luma API...`);
 
-    const lumaResponse = await fetch('https://api.lumalabs.ai/v1/generations', {
+    const lumaResponse = await fetch('https://api.lumalabs.ai/dream-machine/v1/generations', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lumaApiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
-        model: 'ray2',
+        model: 'ray-2',
         prompt: enhancedPrompt,
-        duration: duration, // Always 1.0 for MVP
-        aspect_ratio: '1:1',
-        loop: false,
-        quality: 'high' // IMPORTANT: Request highest quality for better pixel art conversion
+        duration: '5s', // Luma API minimum is 5s (also supports 9s, 10s)
+        resolution: '720p' // High resolution for better quality when downscaling
       })
     });
 
@@ -257,14 +256,70 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const lumaData = await lumaResponse.json();
+    const initialData = await lumaResponse.json();
+    console.log(`📦 [${requestId}] Luma API initial response:`, JSON.stringify(initialData, null, 2));
 
-    if (!lumaData.data || !lumaData.data.video_url) {
-      console.error(`❌ [${requestId}] No video URL in Luma response`);
+    const generationId = initialData.id;
+    console.log(`🎬 [${requestId}] Generation started with ID: ${generationId}`);
+    console.log(`⏳ [${requestId}] Waiting for video generation to complete...`);
+
+    // Poll for completion (Luma API is async)
+    let lumaData = initialData;
+    const maxAttempts = 60; // 5 minutes max (5 second intervals)
+    let attempts = 0;
+
+    while (lumaData.state === 'queued' || lumaData.state === 'dreaming') {
+      if (attempts >= maxAttempts) {
+        console.error(`❌ [${requestId}] Timeout waiting for video generation`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              message: 'Video generation timeout',
+              code: 'GENERATION_TIMEOUT',
+              details: { generationId, state: lumaData.state }
+            }
+          }),
+          {
+            status: 408,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Wait 5 seconds before polling
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      attempts++;
+
+      // Check generation status
+      const statusResponse = await fetch(`https://api.lumalabs.ai/dream-machine/v1/generations/${generationId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${lumaApiKey}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!statusResponse.ok) {
+        console.error(`❌ [${requestId}] Failed to check generation status`);
+        break;
+      }
+
+      lumaData = await statusResponse.json();
+      console.log(`🔄 [${requestId}] Status check ${attempts}/${maxAttempts}: ${lumaData.state}`);
+    }
+
+    // Check if generation completed successfully
+    if (lumaData.state !== 'completed') {
+      console.error(`❌ [${requestId}] Generation failed or incomplete:`, lumaData);
       return new Response(
         JSON.stringify({
           success: false,
-          error: { message: 'No video generated', code: 'NO_VIDEO_GENERATED' }
+          error: {
+            message: `Video generation ${lumaData.state}`,
+            code: 'GENERATION_FAILED',
+            details: { generationId, state: lumaData.state, reason: lumaData.failure_reason }
+          }
         }),
         {
           status: 500,
@@ -273,8 +328,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const videoUrl = lumaData.data.video_url;
-    console.log(`✅ [${requestId}] Luma video generation successful: ${videoUrl}`);
+    // Extract video URL from completed generation
+    if (!lumaData.assets || !lumaData.assets.video) {
+      console.error(`❌ [${requestId}] No video URL in completed generation:`, lumaData);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: {
+            message: 'No video URL in response',
+            code: 'NO_VIDEO_URL',
+            details: lumaData
+          }
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const videoUrl = lumaData.assets.video;
+    console.log(`✅ [${requestId}] Video generation completed successfully`);
+    console.log(`   Generation ID: ${generationId}`);
+    console.log(`   Attempts: ${attempts}`);
+    console.log(`   Video URL: ${videoUrl}`);
 
     const totalTime = Date.now() - startTime;
 
@@ -294,7 +371,7 @@ Deno.serve(async (req: Request) => {
           targetFps: fps,
           colorCount: colorCount,
           method: 'FastVideoProcessor',
-          maxDuration: 1.0 // MVP: enforce 1 second limit
+          maxDuration: 5.0 // MVP: 5 seconds (Luma API minimum)
         }
       }
     };

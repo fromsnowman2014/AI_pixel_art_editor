@@ -30,3 +30,9 @@ verify_jwt = false
 
 [functions.ai-generate-video]
 verify_jwt = false
+
+[functions.video-generate]
+verify_jwt = true
+
+[functions.video-webhook]
+verify_jwt = false
