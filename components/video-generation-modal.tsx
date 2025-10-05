@@ -155,6 +155,23 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
       })
 
       if (!response.success || !response.data) {
+        // Check for authentication error
+        if (response.error?.code === 'NOT_AUTHENTICATED') {
+          const message = (
+            <div className="flex flex-col gap-2">
+              <span className="font-medium">Sign in required</span>
+              <button
+                onClick={() => window.location.href = '/auth/signin'}
+                className="px-3 py-1.5 bg-white text-purple-600 rounded-md text-sm font-medium hover:bg-purple-50 transition-colors"
+              >
+                Go to Sign In
+              </button>
+            </div>
+          )
+          toast.error(message, { duration: 5000 })
+          setIsGenerating(false)
+          return
+        }
         throw new Error(response.error?.message || 'Video generation failed')
       }
 
