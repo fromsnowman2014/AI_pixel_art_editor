@@ -27,3 +27,6 @@ port = 54323
 
 [functions.ai-generate]
 verify_jwt = false
+
+[functions.ai-generate-video]
+verify_jwt = false

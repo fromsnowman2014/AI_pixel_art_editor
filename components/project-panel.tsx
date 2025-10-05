@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ExportModal } from '@/components/export-modal';
 import { SaveProjectModal } from '@/components/save-project-modal';
 import { LoadProjectModal } from '@/components/load-project-modal';
+import { VideoGenerationModal } from '@/components/video-generation-modal';
 import { api } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { debugLog } from '@/lib/ui/debug';
@@ -21,6 +22,7 @@ import {
   Trash2,
   Cloud,
   FolderOpen,
+  Video,
 } from 'lucide-react';
 
 interface ProjectPanelProps {
@@ -76,6 +78,7 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showVideoGenerationModal, setShowVideoGenerationModal] = useState(false);
 
   // AI Guided Prompt Options State - Updated for compact checkbox layout
   const [guidedOptions, setGuidedOptions] = useState({
@@ -1049,23 +1052,35 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
               </div>
             </div>
 
-            <Button
-              onClick={handleAiGenerate}
-              disabled={!aiPrompt.trim() || isGenerating}
-              className='w-full bg-purple-600 hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400'
-            >
-              {isGenerating ? (
-                <>
-                  <div className='mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent' />
-                  Generating AI Image...
-                </>
-              ) : (
-                <>
-                  <Sparkles className='mr-2 h-4 w-4' />
-                  Generate with AI
-                </>
-              )}
-            </Button>
+            <div className='grid grid-cols-2 gap-2'>
+              <Button
+                onClick={handleAiGenerate}
+                disabled={!aiPrompt.trim() || isGenerating}
+                className='w-full bg-purple-600 hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400'
+              >
+                {isGenerating ? (
+                  <>
+                    <div className='mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent' />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className='mr-2 h-4 w-4' />
+                    Image
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={() => setShowVideoGenerationModal(true)}
+                disabled={isGenerating || !project}
+                variant='outline'
+                className='w-full border-purple-600 text-purple-600 hover:bg-purple-50'
+              >
+                <Video className='mr-2 h-4 w-4' />
+                Animation
+              </Button>
+            </div>
 
             {isGenerating && (
               <div className='rounded-lg bg-purple-50 p-3 text-xs text-purple-700'>
@@ -1216,6 +1231,9 @@ const ProjectPanel = memo(function ProjectPanel({ className }: ProjectPanelProps
 
       {/* Load Project Modal */}
       <LoadProjectModal open={showLoadModal} onOpenChange={setShowLoadModal} />
+
+      {/* Video Generation Modal */}
+      <VideoGenerationModal open={showVideoGenerationModal} onOpenChange={setShowVideoGenerationModal} />
     </div>
   );
 });

@@ -1,5 +1,7 @@
 // Using fetch directly instead of Supabase client to avoid dependency issues
 
+import { Frame } from '@/lib/types/api';
+
 export interface SupabaseAIGenerateRequest {
   prompt: string;
   width: number;
@@ -21,6 +23,34 @@ export interface SupabaseAIGenerateResponse {
     height: number;
     colorCount: number;
     palette: Array<{ r: number; g: number; b: number; a?: number }>;
+    processingTimeMs: number;
+    prompt: string;
+  };
+  error?: {
+    message: string;
+    code: string;
+    details?: any;
+  };
+}
+
+// Video generation interfaces
+export interface SupabaseVideoGenerateRequest {
+  prompt: string;
+  width: number;  // Target pixel art dimensions
+  height: number;
+  colorCount: number;
+  fps?: 12 | 24 | 30;
+}
+
+export interface SupabaseVideoGenerateResponse {
+  success: boolean;
+  data?: {
+    frames: Array<{
+      frame: Frame;
+      imageData: number[];
+    }>;
+    totalFrames: number;
+    fps: number;
     processingTimeMs: number;
     prompt: string;
   };
@@ -146,6 +176,138 @@ class SupabaseAIService {
         error: {
           message: error instanceof Error ? error.message : 'Unknown error occurred',
           code: 'SERVICE_ERROR',
+          details: {
+            requestId,
+            processingTimeMs: totalTime,
+            originalError: error
+          }
+        }
+      };
+    }
+  }
+
+  /**
+   * Generate AI video and convert to pixel art frames
+   * Reuses existing FastVideoProcessor infrastructure
+   */
+  async generateVideo(params: SupabaseVideoGenerateRequest): Promise<SupabaseVideoGenerateResponse> {
+    this.initialize();
+    const startTime = Date.now();
+    const requestId = crypto.randomUUID();
+
+    try {
+      console.log(`🎬 [${requestId}] Starting video-to-frames generation`);
+      console.log(`📝 [${requestId}] Request params:`, {
+        prompt: params.prompt.substring(0, 50) + '...',
+        dimensions: `${params.width}x${params.height}`,
+        fps: params.fps || 24,
+        colorCount: params.colorCount
+      });
+
+      // Step 1: Call Edge Function to generate video
+      const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/ai-generate-video`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.supabaseKey}`,
+          'apikey': this.supabaseKey
+        },
+        body: JSON.stringify({
+          ...params,
+          duration: 1.0 // MVP: Always 1 second (backend will enforce this)
+        })
+      });
+
+      const totalTime = Date.now() - startTime;
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [${requestId}] Edge Function error:`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+
+        return {
+          success: false,
+          error: {
+            message: `Video generation failed: ${response.statusText}`,
+            code: 'VIDEO_GENERATION_ERROR',
+            details: {
+              requestId,
+              status: response.status,
+              error: errorText,
+              processingTimeMs: totalTime
+            }
+          }
+        };
+      }
+
+      const videoData = await response.json();
+
+      if (!videoData.success || !videoData.data) {
+        console.error(`❌ [${requestId}] No video data returned`);
+        return {
+          success: false,
+          error: {
+            message: videoData.error?.message || 'No video data returned',
+            code: videoData.error?.code || 'NO_VIDEO_DATA',
+            details: { requestId, processingTimeMs: totalTime }
+          }
+        };
+      }
+
+      console.log(`✅ [${requestId}] Video generated:`, videoData.data.videoUrl);
+
+      // Step 2: Download video and process with FastVideoProcessor
+      // This is where the magic happens - reusing existing infrastructure!
+
+      const { FastVideoProcessor } = await import('@/lib/domain/fast-video-processor');
+
+      const processingOptions = {
+        width: params.width,
+        height: params.height,
+        colorCount: params.colorCount,
+        maxFrames: params.fps === 12 ? 12 : params.fps === 24 ? 24 : 30
+      };
+
+      console.log(`🔄 [${requestId}] Processing video with FastVideoProcessor...`);
+
+      // Use existing video processor (already handles pixel art conversion!)
+      const importResult = await FastVideoProcessor.processVideoFast(
+        videoData.data.videoUrl,
+        processingOptions,
+        (progress: number, message: string) => {
+          console.log(`📊 [${requestId}] ${progress}%: ${message}`);
+        }
+      );
+
+      const finalTime = Date.now() - startTime;
+      console.log(`✅ [${requestId}] Extracted ${importResult.frames.length} pixel art frames in ${finalTime}ms`);
+
+      // Step 3: Return processed frames (already in pixel art format!)
+      return {
+        success: true,
+        data: {
+          frames: importResult.frames, // Already pixel art!
+          totalFrames: importResult.frames.length,
+          fps: params.fps || 24,
+          processingTimeMs: finalTime,
+          prompt: params.prompt
+        }
+      };
+
+    } catch (error) {
+      const totalTime = Date.now() - startTime;
+      console.error(`❌ [${requestId}] Video generation error:`, error);
+
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'VIDEO_GENERATION_ERROR',
           details: {
             requestId,
             processingTimeMs: totalTime,
