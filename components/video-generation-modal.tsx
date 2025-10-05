@@ -117,8 +117,13 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
         updateCanvasData(activeTab.id, pixelData)
       }
 
-      toast.success(`${result.frames.length} frames added to project!`)
-      setTimeout(() => handleClose(), 1500)
+      toast.success(`🎉 ${result.frames.length} frames added to your project!`, { duration: 3000 })
+
+      // Close modal and navigate to main page
+      setTimeout(() => {
+        handleClose()
+        window.location.href = '/'
+      }, 2000)
 
     } catch (err) {
       console.error('❌ Video processing error:', err)
@@ -141,6 +146,7 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
     }
 
     setIsGenerating(true)
+    toast.loading('Creating AI animation...', { id: 'video-generation' })
 
     try {
       console.log('🎬 Starting async video generation...')
@@ -154,9 +160,12 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
         projectId: activeTab.id
       })
 
+      console.log('📦 Response received:', response)
+
       if (!response.success || !response.data) {
         // Check for authentication error
         if (response.error?.code === 'NOT_AUTHENTICATED') {
+          toast.dismiss('video-generation')
           const message = (
             <div className="flex flex-col gap-2">
               <span className="font-medium">Sign in required</span>
@@ -172,9 +181,13 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
           setIsGenerating(false)
           return
         }
+
+        toast.dismiss('video-generation')
+        console.error('❌ Error response:', response.error)
         throw new Error(response.error?.message || 'Video generation failed')
       }
 
+      toast.dismiss('video-generation')
       setJobId(response.data.jobId)
 
       const initialJob = await supabaseAI.getVideoJob(response.data.jobId)
@@ -182,11 +195,12 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
         setJob(initialJob)
       }
 
-      toast.success('Video generation started!')
+      toast.success('Video generation started! Processing in background...')
 
     } catch (error) {
+      toast.dismiss('video-generation')
       console.error('❌ Video generation error:', error)
-      toast.error('Failed to start video generation')
+      toast.error(error instanceof Error ? error.message : 'Failed to start video generation')
       setIsGenerating(false)
     }
   }
@@ -204,6 +218,8 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
   }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
+    // Prevent closing modal when generating or processing
+    if (isGenerating || processingVideo) return
     if (e.target === e.currentTarget) {
       handleClose()
     }
@@ -237,7 +253,8 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
       onClick={handleBackdropClick}
     >
       <div className={cn(
-        "relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-200"
+        "relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-200",
+        (isGenerating || processingVideo) && "pointer-events-auto opacity-100"
       )}>
         {/* Header */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-6 pb-4">
@@ -251,7 +268,13 @@ export function VideoGenerationModal({ open, onOpenChange }: VideoGenerationModa
                 <p className="text-sm text-gray-500">Generate animated pixel art</p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 p-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClose}
+              className="h-8 w-8 p-0"
+              disabled={isGenerating || processingVideo}
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
