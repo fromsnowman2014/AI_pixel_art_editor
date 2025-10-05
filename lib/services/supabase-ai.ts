@@ -239,17 +239,25 @@ class SupabaseAIService {
         colorCount: params.colorCount
       });
 
-      // Get user's JWT token from Supabase client
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
+      // Get user's JWT token from Supabase client (use singleton instance)
+      const { supabase } = await import('@/lib/supabase/client');
 
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       console.log(`🔑 [${requestId}] Session check:`, {
         hasSession: !!session,
         hasAccessToken: !!session?.access_token,
+        userId: session?.user?.id,
+        expiresAt: session?.expires_at,
         error: sessionError
       });
+
+      // Additional debugging: check localStorage
+      if (!session) {
+        console.log(`🔍 [${requestId}] Debugging - localStorage keys:`, Object.keys(localStorage));
+        const authKeys = Object.keys(localStorage).filter(key => key.includes('supabase') || key.includes('auth'));
+        console.log(`🔍 [${requestId}] Auth-related keys:`, authKeys);
+      }
 
       if (!session || !session.access_token) {
         console.error(`❌ [${requestId}] No valid session found`);
@@ -346,9 +354,8 @@ class SupabaseAIService {
 
     console.log(`📡 Subscribing to video job updates: ${jobId}`);
 
-    // Use dynamic import to avoid bundling Supabase client on every page
-    import('@supabase/supabase-js').then(({ createClient }) => {
-      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
+    // Use singleton Supabase client
+    import('@/lib/supabase/client').then(({ supabase }) => {
 
       const channel = supabase
         .channel(`video-job-${jobId}`)
@@ -395,8 +402,7 @@ class SupabaseAIService {
     this.initialize();
 
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
+      const { supabase } = await import('@/lib/supabase/client');
 
       const { data, error } = await supabase
         .from('video_generation_jobs')

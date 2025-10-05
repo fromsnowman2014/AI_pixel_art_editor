@@ -192,36 +192,60 @@ export function TransformScopeModal({
           </RadioGroup>
         </div>
 
-        {/* Rotation Angle Selection (90° rotation) */}
+        {/* Rotation Direction Selection */}
         {transformType === 'rotate-90' && (
-          <div className="space-y-2">
-            <Label>회전 각도</Label>
-            <RadioGroup
-              value={rotationAngle.toString()}
-              onValueChange={(v: string) => setRotationAngle(parseInt(v))}
-            >
-              <div className="flex space-x-4">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="90" id="angle-90" />
-                  <Label htmlFor="angle-90" className="cursor-pointer">90°</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="180" id="angle-180" />
-                  <Label htmlFor="angle-180" className="cursor-pointer">180°</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="270" id="angle-270" />
-                  <Label htmlFor="angle-270" className="cursor-pointer">270°</Label>
-                </div>
-              </div>
-            </RadioGroup>
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Rotation Direction:</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {/* Rotate Left 90° */}
+              <Button
+                type="button"
+                variant={rotationAngle === 270 ? 'default' : 'outline'}
+                className={`flex flex-col items-center justify-center h-20 ${
+                  rotationAngle === 270 ? 'bg-blue-500 text-white' : ''
+                }`}
+                onClick={() => setRotationAngle(270)}
+              >
+                <RotateCcw className="h-6 w-6 mb-1" />
+                <span className="text-xs font-semibold">Rotate Left</span>
+                <span className="text-xs opacity-70">90° CCW</span>
+              </Button>
+
+              {/* Rotate 180° */}
+              <Button
+                type="button"
+                variant={rotationAngle === 180 ? 'default' : 'outline'}
+                className={`flex flex-col items-center justify-center h-20 ${
+                  rotationAngle === 180 ? 'bg-blue-500 text-white' : ''
+                }`}
+                onClick={() => setRotationAngle(180)}
+              >
+                <FlipVertical2 className="h-6 w-6 mb-1" />
+                <span className="text-xs font-semibold">Flip 180°</span>
+                <span className="text-xs opacity-70">Upside Down</span>
+              </Button>
+
+              {/* Rotate Right 90° */}
+              <Button
+                type="button"
+                variant={rotationAngle === 90 ? 'default' : 'outline'}
+                className={`flex flex-col items-center justify-center h-20 ${
+                  rotationAngle === 90 ? 'bg-blue-500 text-white' : ''
+                }`}
+                onClick={() => setRotationAngle(90)}
+              >
+                <RotateCw className="h-6 w-6 mb-1" />
+                <span className="text-xs font-semibold">Rotate Right</span>
+                <span className="text-xs opacity-70">90° CW</span>
+              </Button>
+            </div>
           </div>
         )}
 
         {/* Free Rotation Slider */}
         {transformType === 'rotate-free' && (
           <div className="space-y-2">
-            <Label className="font-semibold">회전 각도: {freeRotationAngle}°</Label>
+            <Label className="font-semibold">Rotation Angle: {freeRotationAngle}°</Label>
             <Slider
               min={-180}
               max={180}
@@ -236,16 +260,16 @@ export function TransformScopeModal({
               <span>180°</span>
             </div>
             <p className="text-xs text-amber-600">
-              💡 픽셀 아트 품질 유지를 위해 90도 단위 회전을 권장합니다
+              💡 For best pixel art quality, we recommend 90° increments
             </p>
           </div>
         )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            취소
+            Cancel
           </Button>
-          <Button onClick={handleApply}>적용</Button>
+          <Button onClick={handleApply}>Apply</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
