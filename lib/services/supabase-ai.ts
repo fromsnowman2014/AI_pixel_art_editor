@@ -240,8 +240,9 @@ class SupabaseAIService {
       });
 
       // Get user's JWT token from localStorage
-      const authKey = `sb-${this.supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
-      const authData = localStorage.getItem(authKey);
+      const urlParts = this.supabaseUrl.split('//');
+      const authKey = urlParts[1] ? `sb-${urlParts[1].split('.')[0]}-auth-token` : '';
+      const authData = authKey ? localStorage.getItem(authKey) : null;
 
       if (!authData) {
         return {

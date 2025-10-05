@@ -6,8 +6,8 @@
 - Phase 1: Database migration 실행 완료
 - Phase 2: video-generate Edge Function 배포 완료
 - Phase 3: video-webhook Edge Function 구현 완료 (코드만, 배포 필요)
-- Phase 4: Client Service Layer 업데이트 완료
-- Phase 5: UI 통합 테스트 페이지 작성 완료
+- Phase 4: Client Service Layer 업데이트 완료 (비동기 webhook 방식)
+- Phase 5: VideoGenerationModal 업데이트 완료 (비동기 UI + Realtime)
 - 전체 문서화 완료
 
 ### ⏳ 사용자 작업 필요 (2단계)
@@ -81,7 +81,7 @@ https://supabase.com/dashboard/project/fdiwnymnikylraofwhdu/database/replication
 
 https://supabase.com/dashboard/project/fdiwnymnikylraofwhdu/functions
 
-다음 3개 함수가 모두 Active인지:
+다음 함수가 모두 Active인지:
 - ✅ ai-generate
 - ✅ video-generate (Verify JWT: ON)
 - ✅ video-webhook (Verify JWT: OFF) ⬅️ **새로 추가됨**
@@ -105,73 +105,70 @@ https://supabase.com/dashboard/project/fdiwnymnikylraofwhdu/settings/vault/secre
 
 모든 작업이 완료되었다면 테스트를 진행합니다:
 
-### 방법 1: 로컬 개발 서버에서 테스트
+### 테스트 방법
 
-```bash
-# 프로젝트 디렉토리에서
-cd /Users/seinoh/Desktop/github/AI_pixel_art_editor
+1. **앱 접속**:
+   - Production: https://ai-pixel-art-editor.vercel.app
+   - 또는 로컬: http://localhost:3000
 
-# 개발 서버 실행
-npm run dev
+2. **로그인**:
+   - 로그인하지 않았다면 /auth/signin 에서 로그인
 
-# 브라우저에서 열기
-open http://localhost:3000/test/video-full
-```
+3. **프로젝트 생성**:
+   - 새 프로젝트 생성 또는 기존 프로젝트 열기
+   - 권장 크기: 64x64 (테스트용)
 
-### 방법 2: 테스트 절차
+4. **Video 생성 시작**:
+   - 우측 **Project Settings** 패널 찾기
+   - **AI Assistant** 섹션으로 스크롤
+   - **"Video" 버튼** 클릭 (Image 버튼 옆, 보라색)
 
-1. **로그인 확인**:
-   - http://localhost:3000/auth/signin 에서 로그인
+5. **Modal에서 설정**:
+   - **Animation Prompt** 입력
+     - 예: "a cute cat walking in a garden"
+     - 예: "a knight swinging a sword"
+   - **FPS** 선택: 12, 24, 또는 30
+   - **"Generate" 버튼** 클릭
 
-2. **테스트 페이지 접속**:
-   - http://localhost:3000/test/video-full
+6. **예상 동작 (실시간 업데이트!)**:
+   - ✅ 즉시 "Video generation started!" 토스트 (1-2초)
+   - ✅ Modal에 Job 상태 표시: **PENDING** → **QUEUED**
+   - ✅ 진행률 바 업데이트: 0% → 10% → 50% ...
+   - ✅ 1-3분 후: **DREAMING** (Luma AI가 비디오 생성 중)
+   - ✅ 비디오 완료: **PROCESSING** (프레임 추출 중)
+   - ✅ "Extracting frames..." 메시지 표시
+   - ✅ 완료: 프레임들이 프로젝트에 자동 추가
+   - ✅ Toast: "XX frames added!"
+   - ✅ Modal 자동 닫힘
 
-3. **비디오 생성 시작**:
-   - 프롬프트 입력 (예: "a cute pixel art cat walking in a garden")
-   - 크기: 64x64
-   - 색상: 16
-   - FPS: 24
-   - "Start Video Generation" 클릭
-
-4. **예상 동작**:
-   - ✅ **즉시** Job ID 반환 (1-2초 내)
-   - ✅ Job 상태 표시: pending → queued
-   - ✅ 진행률 바 업데이트
-   - ✅ 1-3분 후: status → dreaming
-   - ✅ 비디오 생성 완료: status → processing
-   - ✅ 프레임 추출 시작 (클라이언트에서 자동)
-   - ✅ 완료: 프레임들이 화면에 표시됨
-
-5. **문제 발생 시**:
-   - 브라우저 콘솔(F12) 확인
-   - 에러 메시지 캡처
-   - Supabase Edge Functions 로그 확인:
-     ```bash
-     npx supabase functions logs video-generate
-     npx supabase functions logs video-webhook
-     ```
+7. **백그라운드 처리 (중요!)**:
+   - Modal을 닫아도 처리가 계속됨
+   - Realtime으로 진행 상황 자동 추적
+   - 완료 시 자동으로 프레임이 프로젝트에 추가됨
+   - **다른 작업을 계속할 수 있습니다!**
 
 ### Expected Timeline
 
-- **0초**: Job 생성 (즉시!)
+- **0초**: Job 생성 (즉시 반환!)
 - **0-10초**: Luma API 호출
-- **10-180초**: Luma가 비디오 생성 (1-3분, status = dreaming)
-- **180초**: Webhook 수신 (status = processing)
+- **10-180초**: Luma가 비디오 생성 (1-3분, status = DREAMING)
+- **180초**: Webhook 수신 (status = PROCESSING)
 - **180-220초**: 클라이언트에서 프레임 추출
-- **220초**: ✅ 완료!
+- **220초**: ✅ 완료! 프레임들이 프로젝트에 자동 추가
 
 ---
 
 ## 🎉 성공 확인
 
-테스트가 성공하면 다음이 표시됩니다:
+테스트가 성공하면 다음이 나타납니다:
 
-1. ✅ Job ID (UUID 형식)
-2. ✅ 실시간 상태 업데이트 (Realtime 동작 확인)
-3. ✅ 진행률 바 증가
-4. ✅ Luma Video URL 표시
-5. ✅ 프레임 이미지들 (격자로 표시)
-6. ✅ "Complete! Video successfully converted to N pixel art frames"
+1. ✅ Modal에서 실시간 진행률 업데이트 (Realtime 작동 확인!)
+2. ✅ 진행률 바 증가 (0% → 10% → 50% → 100%)
+3. ✅ Status 변경: PENDING → QUEUED → DREAMING → PROCESSING → COMPLETED
+4. ✅ 프레임 추출 메시지: "Extracting frames..."
+5. ✅ Toast 메시지: "XX frames added to project!"
+6. ✅ Frame Manager에 새 프레임들 표시됨
+7. ✅ Modal 자동 닫힘
 
 ---
 
@@ -187,29 +184,29 @@ open http://localhost:3000/test/video-full
 
 ## ❓ 문제 해결
 
-### Q: Job이 "pending"에서 멈춤
+### Q: Job이 "PENDING"에서 멈춤
 **A**: video-generate 함수 로그 확인:
-```bash
-npx supabase functions logs video-generate
-```
-LUMA_API_KEY 설정 확인
+- Supabase Dashboard → Functions → video-generate → Logs
+- LUMA_API_KEY 설정 확인
 
-### Q: Job이 "dreaming"에서 멈춤
+### Q: Job이 "DREAMING"에서 멈춤
 **A**: video-webhook 함수가 배포되지 않았거나, Luma가 webhook 호출 실패
 - video-webhook 함수 배포 확인
-- Webhook 로그 확인:
-  ```bash
-  npx supabase functions logs video-webhook
-  ```
+- Functions → video-webhook → Logs 확인
 
 ### Q: Realtime 업데이트가 안 옴
 **A**: Realtime 활성화 확인
 - Database → Replication에서 video_generation_jobs 확인
-- 브라우저 콘솔에서 subscription 에러 확인
+- 브라우저 콘솔(F12)에서 subscription 에러 확인
 
 ### Q: 401 Unauthorized
 **A**: 로그인 상태 확인
-- http://localhost:3000/auth/signin 에서 재로그인
+- /auth/signin 에서 재로그인
+
+### Q: Build 실패
+**A**: 누락된 파일 확인
+- video-webhook Edge Function 배포 확인
+- `npm run build` 로컬에서 테스트
 
 ---
 
@@ -222,7 +219,7 @@ LUMA_API_KEY 설정 확인
 문제가 발생하면:
 - 스크린샷
 - 에러 메시지
-- 브라우저 콘솔 로그
+- 브라우저 콘솔 로그 (F12)
 
 를 공유해주세요.
 
@@ -238,4 +235,10 @@ LUMA_API_KEY 설정 확인
 
 **테스트 소요 시간**: 3-5분 (비디오 생성 대기 시간 포함)
 
-모든 작업이 완료되면 사용자는 AI 비디오를 생성하고 자동으로 픽셀 아트 프레임으로 변환할 수 있습니다! 🎨🎬
+**핵심 장점**:
+- ⚡ **즉시 반환** - 타임아웃 없음
+- 📊 **실시간 진행률** - Supabase Realtime
+- 🔄 **백그라운드 처리** - 다른 작업 가능
+- ✅ **자동 프레임 추가** - 완료 시 자동
+
+모든 작업이 완료되면 사용자는 AI 비디오를 생성하고 실시간으로 진행 상황을 보면서 자동으로 픽셀 아트 프레임으로 변환할 수 있습니다! 🎨🎬
