@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
+import { RotateCcw, RotateCw, FlipVertical2 } from 'lucide-react'
 import type { TransformType, TransformScope } from '@/lib/utils/canvas-transform'
 import {
   flipHorizontal,
@@ -130,10 +131,19 @@ export function TransformScopeModal({
 
   const getTitle = () => {
     switch (transformType) {
-      case 'flip-h': return '좌우 반전'
-      case 'flip-v': return '상하 반전'
-      case 'rotate-90': return '90도 회전'
-      case 'rotate-free': return '자유 회전'
+      case 'flip-h': return 'Flip Horizontal'
+      case 'flip-v': return 'Flip Vertical'
+      case 'rotate-90': return 'Rotate Canvas'
+      case 'rotate-free': return 'Free Rotation'
+    }
+  }
+
+  const getDescription = () => {
+    switch (transformType) {
+      case 'flip-h': return 'Mirror your canvas horizontally'
+      case 'flip-v': return 'Mirror your canvas vertically'
+      case 'rotate-90': return 'Rotate your canvas in 90° increments'
+      case 'rotate-free': return 'Rotate your canvas by any angle'
     }
   }
 
@@ -143,7 +153,7 @@ export function TransformScopeModal({
         <DialogHeader>
           <DialogTitle>{getTitle()}</DialogTitle>
           <DialogDescription>
-            변형을 적용할 범위를 선택하세요
+            {getDescription()}
           </DialogDescription>
         </DialogHeader>
 
@@ -157,27 +167,30 @@ export function TransformScopeModal({
         </div>
 
         {/* Scope Selection */}
-        <RadioGroup value={scope} onValueChange={(v: string) => setScope(v as TransformScope)}>
-          <div className="flex items-center space-x-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
-            <RadioGroupItem value="current" id="current" />
-            <Label htmlFor="current" className="flex flex-col flex-1 cursor-pointer">
-              <span className="font-semibold">현재 프레임만</span>
-              <span className="text-xs text-gray-500">
-                Frame {currentFrameIndex + 1}에만 적용
-              </span>
-            </Label>
-          </div>
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold">Apply to:</Label>
+          <RadioGroup value={scope} onValueChange={(v: string) => setScope(v as TransformScope)}>
+            <div className="flex items-center space-x-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+              <RadioGroupItem value="current" id="current" />
+              <Label htmlFor="current" className="flex flex-col flex-1 cursor-pointer">
+                <span className="font-semibold">Current Frame Only</span>
+                <span className="text-xs text-gray-500">
+                  Apply to Frame {currentFrameIndex + 1}
+                </span>
+              </Label>
+            </div>
 
-          <div className="flex items-center space-x-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
-            <RadioGroupItem value="all" id="all" />
-            <Label htmlFor="all" className="flex flex-col flex-1 cursor-pointer">
-              <span className="font-semibold">모든 프레임</span>
-              <span className="text-xs text-gray-500">
-                총 {frames.length}개 프레임에 일괄 적용
-              </span>
-            </Label>
-          </div>
-        </RadioGroup>
+            <div className="flex items-center space-x-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+              <RadioGroupItem value="all" id="all" />
+              <Label htmlFor="all" className="flex flex-col flex-1 cursor-pointer">
+                <span className="font-semibold">All Frames</span>
+                <span className="text-xs text-gray-500">
+                  Apply to all {frames.length} frames
+                </span>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
 
         {/* Rotation Angle Selection (90° rotation) */}
         {transformType === 'rotate-90' && (

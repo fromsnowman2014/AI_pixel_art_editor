@@ -239,12 +239,20 @@ class SupabaseAIService {
         colorCount: params.colorCount
       });
 
-      // Get user's JWT token from localStorage
-      const urlParts = this.supabaseUrl.split('//');
-      const authKey = urlParts[1] ? `sb-${urlParts[1].split('.')[0]}-auth-token` : '';
-      const authData = authKey ? localStorage.getItem(authKey) : null;
+      // Get user's JWT token from Supabase client
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
 
-      if (!authData) {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      console.log(`🔑 [${requestId}] Session check:`, {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        error: sessionError
+      });
+
+      if (!session || !session.access_token) {
+        console.error(`❌ [${requestId}] No valid session found`);
         return {
           success: false,
           error: {
@@ -254,7 +262,7 @@ class SupabaseAIService {
         };
       }
 
-      const { access_token } = JSON.parse(authData);
+      const access_token = session.access_token;
 
       // Call video-generate Edge Function (NEW endpoint)
       const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/video-generate`;
