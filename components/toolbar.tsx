@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,14 @@ import {
   PaintBucket,
   Pipette,
   Move,
-  Wand2
+  Wand2,
+  FlipHorizontal,
+  FlipVertical,
+  RotateCw,
+  Orbit
 } from 'lucide-react'
+import { TransformScopeModal } from '@/components/modals/transform-scope-modal'
+import type { TransformType } from '@/lib/utils/canvas-transform'
 
 interface ToolbarProps {
   className?: string
@@ -35,6 +41,19 @@ const tools: Array<{
   { id: 'pan', name: 'Pan', icon: Move, shortcut: 'H', description: 'Move around the canvas' },
 ]
 
+const transformTools: Array<{
+  id: TransformType
+  name: string
+  icon: React.ComponentType<{ className?: string }>
+  shortcut: string
+  description: string
+}> = [
+  { id: 'flip-h', name: 'Flip Horizontal', icon: FlipHorizontal, shortcut: 'F', description: 'Flip canvas horizontally (left ↔ right)' },
+  { id: 'flip-v', name: 'Flip Vertical', icon: FlipVertical, shortcut: 'V', description: 'Flip canvas vertically (top ↔ bottom)' },
+  { id: 'rotate-90', name: 'Rotate 90°', icon: RotateCw, shortcut: 'R', description: 'Rotate canvas 90° clockwise' },
+  { id: 'rotate-free', name: 'Free Rotate', icon: Orbit, shortcut: 'T', description: 'Rotate canvas freely by dragging' },
+]
+
 export function Toolbar({ className }: ToolbarProps) {
   const {
     activeTabId,
@@ -47,9 +66,19 @@ export function Toolbar({ className }: ToolbarProps) {
   const activeTab = getActiveTab()
   const canvasState = activeTab?.canvasState
 
+  // Transform modal state
+  const [isTransformModalOpen, setIsTransformModalOpen] = useState(false)
+  const [selectedTransformType, setSelectedTransformType] = useState<TransformType>('flip-h')
+
   // Debug logging utility (disabled)
   const debugLog = (category: string, message: string, data?: any) => {
     // Debug logs disabled for playback optimization
+  }
+
+  // Handle transform tool click
+  const handleTransformToolClick = (transformType: TransformType) => {
+    setSelectedTransformType(transformType)
+    setIsTransformModalOpen(true)
   }
 
   const handleToolChange = React.useCallback((tool: Tool) => {
@@ -82,11 +111,20 @@ export function Toolbar({ className }: ToolbarProps) {
       }
 
       const key = e.key.toLowerCase()
+
+      // Check drawing tools
       const tool = tools.find(t => t.shortcut.toLowerCase() === key)
-      
       if (tool) {
         e.preventDefault()
         handleToolChange(tool.id)
+        return
+      }
+
+      // Check transform tools
+      const transformTool = transformTools.find(t => t.shortcut.toLowerCase() === key)
+      if (transformTool) {
+        e.preventDefault()
+        handleTransformToolClick(transformTool.id)
       }
     }
 
@@ -239,11 +277,85 @@ export function Toolbar({ className }: ToolbarProps) {
         </div>
       </div>
 
+      {/* Transform Tools Section */}
+      <div className="space-y-3 mt-4 pt-4 border-t border-gray-200">
+        <div className="text-xs font-semibold text-purple-600 uppercase tracking-wide flex items-center gap-2">
+          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+          TRANSFORM TOOLS
+        </div>
+
+        {/* Transform Tools Grid - 2 columns */}
+        <div className={cn(
+          "grid gap-2",
+          "grid-cols-2"
+        )}>
+          {transformTools.map((transformTool) => {
+            const Icon = transformTool.icon
+            return (
+              <Tooltip
+                key={transformTool.id}
+                content={`${transformTool.name} - ${transformTool.description} (Press ${transformTool.shortcut})`}
+                side="right"
+              >
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "relative w-full h-11 lg:h-12 rounded-lg transition-all duration-200",
+                    "border-2 shadow-sm hover:shadow-lg transform hover:scale-105 active:scale-95",
+                    "focus:ring-2 focus:ring-purple-400/40 focus:ring-offset-1",
+                    "group",
+                    "bg-white hover:bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300"
+                  )}
+                  onClick={() => handleTransformToolClick(transformTool.id)}
+                  aria-label={`${transformTool.name} (keyboard shortcut: ${transformTool.shortcut})`}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 lg:h-5 lg:w-5 transition-all duration-200",
+                      "group-hover:scale-110",
+                      "text-purple-600 group-hover:text-purple-700"
+                    )}
+                    aria-hidden="true"
+                  />
+                  {/* Keyboard shortcut indicator */}
+                  <span
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 text-xs font-mono font-bold",
+                      "w-3 h-3 lg:w-4 lg:h-4 rounded-full flex items-center justify-center",
+                      "transition-all duration-200 pointer-events-none",
+                      "bg-purple-100 text-purple-600 group-hover:bg-purple-200 group-hover:text-purple-700"
+                    )}
+                    style={{ fontSize: '0.6rem' }}
+                    aria-hidden="true"
+                  >
+                    {transformTool.shortcut}
+                  </span>
+                </Button>
+              </Tooltip>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Transform Scope Modal */}
+      <TransformScopeModal
+        isOpen={isTransformModalOpen}
+        onClose={() => setIsTransformModalOpen(false)}
+        transformType={selectedTransformType}
+      />
+
       {/* Tips and Shortcuts */}
       <div className="mt-4">
         <div className="space-y-2">
           <div className="rounded bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700">
-            ⌨️ <strong>Shortcuts:</strong> P-Pencil, E-Eraser, B-Fill, W-Magic Wand, I-Color Picker, H-Pan
+            ⌨️ <strong>Draw:</strong> P-Pencil, E-Eraser, B-Fill, W-Magic Wand, I-Color Picker, H-Pan
+          </div>
+
+          <div className="rounded bg-purple-50 border border-purple-200 p-2 text-xs text-purple-700">
+            🔄 <strong>Transform:</strong> F-Flip H, V-Flip V, R-Rotate 90°, T-Free Rotate
           </div>
           
           <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">

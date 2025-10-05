@@ -15,14 +15,24 @@ import { logProject, logError, logDebug, logPerformance } from '@/lib/ui/central
 // Import extracted utilities
 import { generateThumbnail } from '@/lib/utils/thumbnail-generator'
 import { downloadFile } from '@/lib/utils/file-helpers'
-import { 
-  createDefaultCanvasState, 
-  createDefaultProject, 
-  createDefaultFrame, 
+import {
+  createDefaultCanvasState,
+  createDefaultProject,
+  createDefaultFrame,
   createEmptyPixelData,
   createFrame,
   validateProjectDimensions
 } from '@/lib/factories/project-factories'
+
+// Import canvas transform utilities
+import {
+  flipHorizontal as flipHorizontalUtil,
+  flipVertical as flipVerticalUtil,
+  rotate90Clockwise,
+  rotate180,
+  rotate270Clockwise,
+  rotateFree as rotateFreeUtil,
+} from '@/lib/utils/canvas-transform'
 
 
 
@@ -103,13 +113,19 @@ interface ProjectStore {
   setPlaybackSpeed: (tabId: string, speed: number) => void
   resetPlaybackToStart: (tabId: string) => void
 
+  // Transform operations
+  flipHorizontal: (tabId: string, scope: 'current' | 'all') => void
+  flipVertical: (tabId: string, scope: 'current' | 'all') => void
+  rotateCanvas: (tabId: string, angle: 90 | 180 | 270, scope: 'current' | 'all') => void
+  rotateFreeCanvas: (tabId: string, angleDegrees: number, scope: 'current' | 'all') => void
+
   // Utility functions
   getActiveTab: () => ProjectTab | null
   getTab: (tabId: string) => ProjectTab | null
   markTabDirty: (tabId: string) => void
   clearError: () => void
   loadProject: (projectData: any) => void
-  
+
   // Storage optimization flags (optional)
   _storageOptimized?: boolean
   _lastSaveSize?: number
@@ -1765,6 +1781,236 @@ export const useProjectStore = create<ProjectStore>()(
         clearError: () => {
           set((state) => {
             state.error = null
+          })
+        },
+
+        // Transform operations
+        flipHorizontal: (tabId, scope) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (!tab) return
+
+            if (scope === 'current') {
+              // Transform current frame only
+              if (tab.canvasData) {
+                const transformedData = flipHorizontalUtil(tab.canvasData)
+                tab.canvasData = transformedData
+
+                // Add to history for undo/redo
+                get().addHistoryEntry(tabId, 'flip_horizontal', transformedData)
+
+                // Update frame canvas data
+                if (tab.project.activeFrameId) {
+                  const frameData = tab.frameCanvasData.find(f => f.frameId === tab.project.activeFrameId)
+                  if (frameData) {
+                    frameData.canvasData = transformedData
+                  }
+
+                  // Regenerate thumbnail
+                  get().regenerateFrameThumbnail(tabId, tab.project.activeFrameId)
+                }
+              }
+            } else {
+              // Transform all frames
+              tab.frameCanvasData = tab.frameCanvasData.map(frameData => ({
+                ...frameData,
+                canvasData: flipHorizontalUtil(frameData.canvasData),
+                thumbnail: null // Will be regenerated
+              }))
+
+              // Update current canvas data
+              if (tab.canvasData) {
+                tab.canvasData = flipHorizontalUtil(tab.canvasData)
+              }
+
+              // Regenerate all thumbnails
+              setTimeout(() => {
+                get().regenerateAllThumbnails()
+              }, 100)
+            }
+
+            tab.isDirty = true
+          })
+        },
+
+        flipVertical: (tabId, scope) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (!tab) return
+
+            if (scope === 'current') {
+              // Transform current frame only
+              if (tab.canvasData) {
+                const transformedData = flipVerticalUtil(tab.canvasData)
+                tab.canvasData = transformedData
+
+                // Add to history for undo/redo
+                get().addHistoryEntry(tabId, 'flip_vertical', transformedData)
+
+                // Update frame canvas data
+                if (tab.project.activeFrameId) {
+                  const frameData = tab.frameCanvasData.find(f => f.frameId === tab.project.activeFrameId)
+                  if (frameData) {
+                    frameData.canvasData = transformedData
+                  }
+
+                  // Regenerate thumbnail
+                  get().regenerateFrameThumbnail(tabId, tab.project.activeFrameId)
+                }
+              }
+            } else {
+              // Transform all frames
+              tab.frameCanvasData = tab.frameCanvasData.map(frameData => ({
+                ...frameData,
+                canvasData: flipVerticalUtil(frameData.canvasData),
+                thumbnail: null
+              }))
+
+              // Update current canvas data
+              if (tab.canvasData) {
+                tab.canvasData = flipVerticalUtil(tab.canvasData)
+              }
+
+              // Regenerate all thumbnails
+              setTimeout(() => {
+                get().regenerateAllThumbnails()
+              }, 100)
+            }
+
+            tab.isDirty = true
+          })
+        },
+
+        rotateCanvas: (tabId, angle, scope) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (!tab) return
+
+            // Select rotation function based on angle
+            const rotateFunc = angle === 90 ? rotate90Clockwise :
+                             angle === 180 ? rotate180 :
+                             rotate270Clockwise
+
+            if (scope === 'current') {
+              // Transform current frame only
+              if (tab.canvasData) {
+                const transformedData = rotateFunc(tab.canvasData)
+                tab.canvasData = transformedData
+
+                // Add to history for undo/redo
+                get().addHistoryEntry(tabId, `rotate_${angle}`, transformedData)
+
+                // Update project dimensions if 90° or 270° rotation
+                if (angle === 90 || angle === 270) {
+                  const oldWidth = tab.project.width
+                  tab.project.width = tab.project.height
+                  tab.project.height = oldWidth
+                }
+
+                // Update frame canvas data
+                if (tab.project.activeFrameId) {
+                  const frameData = tab.frameCanvasData.find(f => f.frameId === tab.project.activeFrameId)
+                  if (frameData) {
+                    frameData.canvasData = transformedData
+                  }
+
+                  // Regenerate thumbnail
+                  get().regenerateFrameThumbnail(tabId, tab.project.activeFrameId)
+                }
+              }
+            } else {
+              // Transform all frames
+              tab.frameCanvasData = tab.frameCanvasData.map(frameData => ({
+                ...frameData,
+                canvasData: rotateFunc(frameData.canvasData),
+                thumbnail: null
+              }))
+
+              // Update current canvas data
+              if (tab.canvasData) {
+                tab.canvasData = rotateFunc(tab.canvasData)
+              }
+
+              // Update project dimensions for all frames if 90° or 270° rotation
+              if (angle === 90 || angle === 270) {
+                const oldWidth = tab.project.width
+                tab.project.width = tab.project.height
+                tab.project.height = oldWidth
+              }
+
+              // Regenerate all thumbnails
+              setTimeout(() => {
+                get().regenerateAllThumbnails()
+              }, 100)
+            }
+
+            tab.isDirty = true
+          })
+        },
+
+        rotateFreeCanvas: (tabId, angleDegrees, scope) => {
+          set((state) => {
+            const tab = state.tabs.find(t => t.id === tabId)
+            if (!tab) return
+
+            if (scope === 'current') {
+              // Transform current frame only
+              if (tab.canvasData) {
+                const transformedData = rotateFreeUtil(tab.canvasData, angleDegrees)
+                tab.canvasData = transformedData
+
+                // Add to history for undo/redo
+                get().addHistoryEntry(tabId, `rotate_free_${angleDegrees}`, transformedData)
+
+                // Update project dimensions (canvas size changed)
+                tab.project.width = transformedData.width
+                tab.project.height = transformedData.height
+
+                // Update frame canvas data
+                if (tab.project.activeFrameId) {
+                  const frameData = tab.frameCanvasData.find(f => f.frameId === tab.project.activeFrameId)
+                  if (frameData) {
+                    frameData.canvasData = transformedData
+                  }
+
+                  // Regenerate thumbnail
+                  get().regenerateFrameThumbnail(tabId, tab.project.activeFrameId)
+                }
+              }
+            } else {
+              // Transform all frames
+              let newWidth = 0
+              let newHeight = 0
+
+              tab.frameCanvasData = tab.frameCanvasData.map(frameData => {
+                const transformed = rotateFreeUtil(frameData.canvasData, angleDegrees)
+                // Track largest dimensions
+                newWidth = Math.max(newWidth, transformed.width)
+                newHeight = Math.max(newHeight, transformed.height)
+
+                return {
+                  ...frameData,
+                  canvasData: transformed,
+                  thumbnail: null
+                }
+              })
+
+              // Update current canvas data
+              if (tab.canvasData) {
+                tab.canvasData = rotateFreeUtil(tab.canvasData, angleDegrees)
+              }
+
+              // Update project dimensions to largest frame size
+              tab.project.width = newWidth
+              tab.project.height = newHeight
+
+              // Regenerate all thumbnails
+              setTimeout(() => {
+                get().regenerateAllThumbnails()
+              }, 100)
+            }
+
+            tab.isDirty = true
           })
         },
 
