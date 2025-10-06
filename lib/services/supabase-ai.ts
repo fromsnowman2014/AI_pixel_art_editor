@@ -239,27 +239,62 @@ class SupabaseAIService {
         colorCount: params.colorCount
       });
 
-      // Get user's JWT token from Supabase client (use singleton instance)
-      const { supabase } = await import('@/lib/supabase/client');
+      // Get authentication - Try both NextAuth and Supabase Auth
+      let access_token: string | null = null;
 
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // First try: Check NextAuth session
+      try {
+        const { getSession } = await import('next-auth/react');
+        const nextAuthSession = await getSession();
 
-      console.log(`🔑 [${requestId}] Session check:`, {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        userId: session?.user?.id,
-        expiresAt: session?.expires_at,
-        error: sessionError
-      });
+        console.log(`🔑 [${requestId}] NextAuth session check:`, {
+          hasSession: !!nextAuthSession,
+          hasUser: !!nextAuthSession?.user,
+          userEmail: nextAuthSession?.user?.email
+        });
 
-      // Additional debugging: check localStorage
-      if (!session) {
-        console.log(`🔍 [${requestId}] Debugging - localStorage keys:`, Object.keys(localStorage));
-        const authKeys = Object.keys(localStorage).filter(key => key.includes('supabase') || key.includes('auth'));
-        console.log(`🔍 [${requestId}] Auth-related keys:`, authKeys);
+        if (nextAuthSession?.user) {
+          // We have NextAuth session, now get Supabase session
+          const { supabase } = await import('@/lib/supabase/client');
+
+          // Try to sign in anonymously or get existing session
+          let { data: { session: supabaseSession }, error: sessionError } = await supabase.auth.getSession();
+
+          console.log(`🔑 [${requestId}] Supabase session check:`, {
+            hasSession: !!supabaseSession,
+            hasAccessToken: !!supabaseSession?.access_token,
+            error: sessionError
+          });
+
+          // If no Supabase session, try to sign in anonymously
+          if (!supabaseSession) {
+            console.log(`🔐 [${requestId}] No Supabase session, signing in anonymously...`);
+            const { data, error: anonError } = await supabase.auth.signInAnonymously();
+
+            if (anonError) {
+              console.error(`❌ [${requestId}] Anonymous sign-in failed:`, anonError);
+            } else {
+              supabaseSession = data.session;
+              console.log(`✅ [${requestId}] Anonymous sign-in successful`);
+            }
+          }
+
+          if (supabaseSession?.access_token) {
+            access_token = supabaseSession.access_token;
+          }
+        }
+      } catch (error) {
+        console.error(`❌ [${requestId}] Auth check error:`, error);
       }
 
-      if (!session || !session.access_token) {
+      // Additional debugging
+      if (!access_token) {
+        console.log(`🔍 [${requestId}] Debugging - localStorage keys:`, Object.keys(localStorage));
+        const authKeys = Object.keys(localStorage).filter(key =>
+          key.includes('supabase') || key.includes('auth') || key.includes('nextauth')
+        );
+        console.log(`🔍 [${requestId}] Auth-related keys:`, authKeys);
+
         console.error(`❌ [${requestId}] No valid session found`);
         return {
           success: false,
@@ -269,8 +304,6 @@ class SupabaseAIService {
           }
         };
       }
-
-      const access_token = session.access_token;
 
       // Call video-generate Edge Function (NEW endpoint)
       const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/video-generate`;
