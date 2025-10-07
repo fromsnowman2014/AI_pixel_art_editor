@@ -29,7 +29,7 @@ Deno.serve(async (req: Request) => {
   // CORS headers
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-email, x-user-id',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
 
@@ -58,41 +58,58 @@ Deno.serve(async (req: Request) => {
   try {
     console.log(`🎬 [${requestId}] Video generation job creation started`);
 
-    // Get authorization header
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: { message: 'Missing authorization header', code: 'UNAUTHORIZED' }
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Initialize Supabase client
+    // Initialize Supabase client (with service role key for DB operations)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Client with user's JWT for auth
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: { Authorization: authHeader }
+    // Get authentication - Support both Supabase Auth and NextAuth
+    const authHeader = req.headers.get('authorization');
+    const userEmail = req.headers.get('x-user-email');
+    const userId = req.headers.get('x-user-id');
+
+    let authenticatedUserId: string;
+
+    // Try NextAuth first (custom headers)
+    if (userEmail && userId) {
+      console.log(`✅ [${requestId}] Using NextAuth user: ${userEmail}`);
+      authenticatedUserId = userId;
+    }
+    // Fallback to Supabase Auth
+    else if (authHeader) {
+      // Create client with user's JWT for auth verification
+      const authClient = createClient(supabaseUrl, supabaseServiceKey, {
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      });
+
+      // Get authenticated user
+      const { data: { user }, error: authError } = await authClient.auth.getUser();
+
+      if (authError || !user) {
+        console.error(`❌ [${requestId}] Supabase authentication failed:`, authError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: { message: 'Authentication failed', code: 'UNAUTHORIZED' }
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
-    });
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
-      console.error(`❌ [${requestId}] Authentication failed:`, authError);
+      console.log(`✅ [${requestId}] Supabase user authenticated: ${user.id}`);
+      authenticatedUserId = user.id;
+    }
+    // No authentication provided
+    else {
       return new Response(
         JSON.stringify({
           success: false,
-          error: { message: 'Authentication failed', code: 'UNAUTHORIZED' }
+          error: { message: 'Missing authentication', code: 'UNAUTHORIZED' }
         }),
         {
           status: 401,
@@ -100,8 +117,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log(`✅ [${requestId}] User authenticated: ${user.id}`);
 
     // Parse request body
     let requestData: VideoGenerateRequest;
@@ -162,13 +177,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`📝 [${requestId}] Creating job for user ${user.id}: ${width}x${height}, ${fps}fps, ${colorCount} colors`);
+    console.log(`📝 [${requestId}] Creating job for user ${authenticatedUserId}: ${width}x${height}, ${fps}fps, ${colorCount} colors`);
 
     // Create database job record
     const { data: job, error: jobError } = await supabaseClient
       .from('video_generation_jobs')
       .insert({
-        user_id: user.id,
+        user_id: authenticatedUserId,
         project_id: projectId || null,
         prompt: prompt.trim(),
         width,

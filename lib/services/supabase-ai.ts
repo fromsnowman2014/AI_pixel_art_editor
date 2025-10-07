@@ -239,10 +239,10 @@ class SupabaseAIService {
         colorCount: params.colorCount
       });
 
-      // Get authentication - Try both NextAuth and Supabase Auth
-      let access_token: string | null = null;
+      // Get authentication - Use NextAuth session
+      let userEmail: string | null = null;
+      let userId: string | null = null;
 
-      // First try: Check NextAuth session
       try {
         const { getSession } = await import('next-auth/react');
         const nextAuthSession = await getSession();
@@ -254,41 +254,16 @@ class SupabaseAIService {
         });
 
         if (nextAuthSession?.user) {
-          // We have NextAuth session, now get Supabase session
-          const { supabase } = await import('@/lib/supabase/client');
-
-          // Try to sign in anonymously or get existing session
-          let { data: { session: supabaseSession }, error: sessionError } = await supabase.auth.getSession();
-
-          console.log(`🔑 [${requestId}] Supabase session check:`, {
-            hasSession: !!supabaseSession,
-            hasAccessToken: !!supabaseSession?.access_token,
-            error: sessionError
-          });
-
-          // If no Supabase session, try to sign in anonymously
-          if (!supabaseSession) {
-            console.log(`🔐 [${requestId}] No Supabase session, signing in anonymously...`);
-            const { data, error: anonError } = await supabase.auth.signInAnonymously();
-
-            if (anonError) {
-              console.error(`❌ [${requestId}] Anonymous sign-in failed:`, anonError);
-            } else {
-              supabaseSession = data.session;
-              console.log(`✅ [${requestId}] Anonymous sign-in successful`);
-            }
-          }
-
-          if (supabaseSession?.access_token) {
-            access_token = supabaseSession.access_token;
-          }
+          userEmail = nextAuthSession.user.email || null;
+          // @ts-ignore - Custom property added in auth config
+          userId = nextAuthSession.user.id || null;
         }
       } catch (error) {
         console.error(`❌ [${requestId}] Auth check error:`, error);
       }
 
       // Additional debugging
-      if (!access_token) {
+      if (!userEmail) {
         console.log(`🔍 [${requestId}] Debugging - localStorage keys:`, Object.keys(localStorage));
         const authKeys = Object.keys(localStorage).filter(key =>
           key.includes('supabase') || key.includes('auth') || key.includes('nextauth')
@@ -305,6 +280,8 @@ class SupabaseAIService {
         };
       }
 
+      console.log(`✅ [${requestId}] Using NextAuth user: ${userEmail}`);
+
       // Call video-generate Edge Function (NEW endpoint)
       const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/video-generate`;
 
@@ -312,8 +289,11 @@ class SupabaseAIService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${access_token}`,
-          'apikey': this.supabaseKey
+          'Authorization': `Bearer ${this.supabaseKey}`,
+          'apikey': this.supabaseKey,
+          // Send NextAuth user info as custom headers
+          'x-user-email': userEmail,
+          'x-user-id': userId || 'nextauth-user'
         },
         body: JSON.stringify(params)
       });
