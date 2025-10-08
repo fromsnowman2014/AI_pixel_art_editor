@@ -285,6 +285,18 @@ class SupabaseAIService {
       // Call video-generate Edge Function (NEW endpoint)
       const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/video-generate`;
 
+      console.log(`🚀 [${requestId}] Calling Edge Function:`, {
+        url: edgeFunctionUrl,
+        headers: {
+          'x-user-email': userEmail,
+          'x-user-id': userId || 'nextauth-user'
+        },
+        params: {
+          prompt: params.prompt.substring(0, 50) + '...',
+          dimensions: `${params.width}x${params.height}`
+        }
+      });
+
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
@@ -300,12 +312,19 @@ class SupabaseAIService {
 
       const totalTime = Date.now() - startTime;
 
+      console.log(`📡 [${requestId}] Edge Function response:`, {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`❌ [${requestId}] Edge Function error:`, {
           status: response.status,
           statusText: response.statusText,
-          error: errorText
+          error: errorText,
+          errorPreview: errorText.substring(0, 200)
         });
 
         return {
