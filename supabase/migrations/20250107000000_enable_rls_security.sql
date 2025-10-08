@@ -1,5 +1,6 @@
 -- Enable RLS on all public tables and create appropriate policies
 -- This migration fixes the Security Advisor warnings
+-- Fixed: Correct type casting for TEXT user_id columns
 
 -- ============================================
 -- 1. NextAuth Tables (read-only for service role)
@@ -92,40 +93,41 @@ ALTER TABLE IF EXISTS public.assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.analytics ENABLE ROW LEVEL SECURITY;
 
 -- Saved Projects: Users can only access their own projects
+-- Note: user_id is TEXT, so we cast auth.uid() to text
 CREATE POLICY "Users can view their own saved projects" ON public.saved_projects
   FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can insert their own saved projects" ON public.saved_projects
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can update their own saved projects" ON public.saved_projects
   FOR UPDATE
-  USING (auth.uid()::text = user_id)
-  WITH CHECK (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text)
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can delete their own saved projects" ON public.saved_projects
   FOR DELETE
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 -- Projects: Users can access their own projects
 CREATE POLICY "Users can view their own projects" ON public.projects
   FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can insert their own projects" ON public.projects
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can update their own projects" ON public.projects
   FOR UPDATE
-  USING (auth.uid()::text = user_id)
-  WITH CHECK (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text)
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can delete their own projects" ON public.projects
   FOR DELETE
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 -- User Profiles: Users can view all profiles but only edit their own
 CREATE POLICY "Anyone can view user profiles" ON public.user_profiles
@@ -134,35 +136,35 @@ CREATE POLICY "Anyone can view user profiles" ON public.user_profiles
 
 CREATE POLICY "Users can insert their own profile" ON public.user_profiles
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can update their own profile" ON public.user_profiles
   FOR UPDATE
-  USING (auth.uid()::text = user_id)
-  WITH CHECK (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text)
+  WITH CHECK (user_id = auth.uid()::text);
 
 -- Assets: Users can access their own assets
 CREATE POLICY "Users can view their own assets" ON public.assets
   FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can insert their own assets" ON public.assets
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can update their own assets" ON public.assets
   FOR UPDATE
-  USING (auth.uid()::text = user_id)
-  WITH CHECK (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text)
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can delete their own assets" ON public.assets
   FOR DELETE
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 -- Analytics: Users can only insert analytics (append-only)
 CREATE POLICY "Users can insert analytics" ON public.analytics
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Service role can view all analytics" ON public.analytics
   FOR SELECT
@@ -179,11 +181,11 @@ ALTER TABLE IF EXISTS public.video_generation_jobs ENABLE ROW LEVEL SECURITY;
 -- Users can view and manage their own video generation jobs
 CREATE POLICY "Users can view their own video jobs" ON public.video_generation_jobs
   FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (user_id = auth.uid()::text);
 
 CREATE POLICY "Users can insert their own video jobs" ON public.video_generation_jobs
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (user_id = auth.uid()::text);
 
 CREATE POLICY "Service role can manage all video jobs" ON public.video_generation_jobs
   FOR ALL
