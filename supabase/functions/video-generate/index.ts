@@ -73,7 +73,10 @@ Deno.serve(async (req: Request) => {
     // Try NextAuth first (custom headers)
     if (userEmail && userId) {
       console.log(`✅ [${requestId}] Using NextAuth user: ${userEmail}`);
-      authenticatedUserId = userId;
+      // Generate a deterministic UUID from the user email
+      // This ensures the same email always gets the same UUID
+      authenticatedUserId = await generateUuidFromEmail(userEmail);
+      console.log(`🔑 [${requestId}] Generated UUID: ${authenticatedUserId} from email: ${userEmail}`);
     }
     // Fallback to Supabase Auth
     else if (authHeader) {
@@ -393,4 +396,24 @@ function enhancePromptForVideo(prompt: string): string {
   }
 
   return `${prompt}, high quality animation, smooth motion, detailed, clear, consistent style`;
+}
+
+/**
+ * Generate a deterministic UUID v5 from an email address
+ * This ensures the same email always produces the same UUID
+ */
+async function generateUuidFromEmail(email: string): Promise<string> {
+  // Use UUID v5 with a custom namespace
+  // Namespace: 6ba7b810-9dad-11d1-80b4-00c04fd430c8 (DNS namespace)
+  const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+  // Create a hash from the email
+  const encoder = new TextEncoder();
+  const data = encoder.encode(namespace + email.toLowerCase());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+
+  // Convert to UUID format (8-4-4-4-12)
+  const hex = hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
