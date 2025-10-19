@@ -11,7 +11,6 @@ import {
   PaintBucket,
   Pipette,
   Move,
-  Wand2,
   FlipHorizontal,
   FlipVertical,
   RotateCw,
@@ -19,12 +18,13 @@ import {
 } from 'lucide-react'
 import { TransformScopeModal } from '@/components/modals/transform-scope-modal'
 import type { TransformType } from '@/lib/utils/canvas-transform'
+import { SelectionToolGroup } from '@/components/toolbar/selection-tool-group'
 
 interface ToolbarProps {
   className?: string
 }
 
-type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'pan' | 'magic-wand'
+type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'pan'
 
 const tools: Array<{
   id: Tool
@@ -36,7 +36,6 @@ const tools: Array<{
   { id: 'pencil', name: 'Pencil', icon: Pencil, shortcut: 'P', description: 'Draw pixels one by one' },
   { id: 'eraser', name: 'Eraser', icon: Eraser, shortcut: 'E', description: 'Erase pixels to transparency' },
   { id: 'fill', name: 'Paint Bucket', icon: PaintBucket, shortcut: 'B', description: 'Fill connected areas with color' },
-  { id: 'magic-wand', name: 'Magic Wand', icon: Wand2, shortcut: 'W', description: 'Select connected pixels of same color' },
   { id: 'eyedropper', name: 'Color Picker', icon: Pipette, shortcut: 'I', description: 'Pick color from canvas' },
   { id: 'pan', name: 'Pan', icon: Move, shortcut: 'H', description: 'Move around the canvas' },
 ]
@@ -84,22 +83,8 @@ export function Toolbar({ className }: ToolbarProps) {
   const handleToolChange = React.useCallback((tool: Tool) => {
     if (!canvasState || !activeTabId) return
     
-    // Tool changed
-    
-    // Clear selection when switching away from magic wand
-    if (canvasState.tool === 'magic-wand' && tool !== 'magic-wand' && canvasState.selection?.isActive) {
-      updateCanvasState(activeTabId, { 
-        tool,
-        selection: {
-          ...canvasState.selection,
-          isActive: false,
-          selectedPixels: new Set(),
-          bounds: null
-        }
-      })
-    } else {
-      updateCanvasState(activeTabId, { tool })
-    }
+    // Tool changed - just update the tool
+    updateCanvasState(activeTabId, { tool })
   }, [canvasState, activeTabId, updateCanvasState])
 
   // Handle keyboard shortcuts
@@ -152,12 +137,12 @@ export function Toolbar({ className }: ToolbarProps) {
           "grid gap-2",
           // Desktop: 3 columns (3x2 layout)
           "lg:grid-cols-3",
-          // Tablet: 2 columns (3x2 layout) 
+          // Tablet: 2 columns (3x2 layout)
           "md:grid-cols-2",
           // Mobile: 3 columns (compact)
           "grid-cols-3"
         )}>
-          {/* First Row - Primary Tools */}
+          {/* First Row - Primary Tools (Pencil, Eraser, Fill) */}
           {tools.slice(0, 3).map((tool) => {
             const Icon = tool.icon
             const isActive = canvasState.tool === tool.id
@@ -215,7 +200,11 @@ export function Toolbar({ className }: ToolbarProps) {
             )
           })}
           
-          {/* Second Row - Secondary Tools (Centered on larger screens) */}
+          {/* Second Row - Selection Tool + Secondary Tools */}
+          {/* Selection Tool Group (Magic Wand, Rectangle, Circle) */}
+          <SelectionToolGroup />
+
+          {/* Remaining Secondary Tools (Color Picker, Pan) */}
           {tools.slice(3).map((tool, index) => {
             const Icon = tool.icon
             const isActive = canvasState.tool === tool.id
@@ -233,8 +222,6 @@ export function Toolbar({ className }: ToolbarProps) {
                     "border-2 shadow-sm hover:shadow-lg transform hover:scale-105 active:scale-95",
                     "focus:ring-2 focus:ring-blue-400/40 focus:ring-offset-1",
                     "group",
-                    // Center the last row on desktop (3-column layout)
-                    index === 0 && tools.slice(3).length === 2 && "lg:col-start-2",
                     isActive
                       ? "bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-blue-500 shadow-lg"
                       : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300 hover:text-gray-900"
@@ -245,24 +232,24 @@ export function Toolbar({ className }: ToolbarProps) {
                   role="button"
                   tabIndex={0}
                 >
-                  <Icon 
+                  <Icon
                     className={cn(
                       "h-4 w-4 lg:h-5 lg:w-5 transition-all duration-200",
                       "group-hover:scale-110",
-                      isActive 
-                        ? "text-white drop-shadow-sm" 
+                      isActive
+                        ? "text-white drop-shadow-sm"
                         : "text-gray-600 group-hover:text-gray-900"
-                    )} 
-                    aria-hidden="true" 
+                    )}
+                    aria-hidden="true"
                   />
                   {/* Keyboard shortcut indicator */}
-                  <span 
+                  <span
                     className={cn(
                       "absolute -bottom-0.5 -right-0.5 text-xs font-mono font-bold",
                       "w-3 h-3 lg:w-4 lg:h-4 rounded-full flex items-center justify-center",
                       "transition-all duration-200 pointer-events-none",
-                      isActive 
-                        ? "bg-white text-blue-600 shadow-md" 
+                      isActive
+                        ? "bg-white text-blue-600 shadow-md"
                         : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-700"
                     )}
                     style={{ fontSize: '0.6rem' }}
@@ -351,15 +338,19 @@ export function Toolbar({ className }: ToolbarProps) {
       <div className="mt-4">
         <div className="space-y-2">
           <div className="rounded bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700">
-            ⌨️ <strong>Draw:</strong> P-Pencil, E-Eraser, B-Fill, W-Magic Wand, I-Color Picker, H-Pan
+            ⌨️ <strong>Draw:</strong> P-Pencil, E-Eraser, B-Fill, I-Color Picker, H-Pan
+          </div>
+
+          <div className="rounded bg-indigo-50 border border-indigo-200 p-2 text-xs text-indigo-700">
+            🪄 <strong>Select:</strong> W-Magic Wand, M-Rectangle, O-Circle (Long-press for menu)
           </div>
 
           <div className="rounded bg-purple-50 border border-purple-200 p-2 text-xs text-purple-700">
             🔄 <strong>Transform:</strong> F-Flip H, V-Flip V, R-Rotate 90°, T-Free Rotate
           </div>
-          
+
           <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">
-            💡 <strong>Tip:</strong> Use Magic Wand (W) to select similar colors. Esc to clear, Del to delete selection.
+            💡 <strong>Tip:</strong> Long-press selection tool for more options. Esc to clear, Del to delete selection.
           </div>
           
           {canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0 && (

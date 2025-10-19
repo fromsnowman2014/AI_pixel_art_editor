@@ -200,6 +200,7 @@ export interface CanvasState {
   panX: number
   panY: number
   selection?: SelectionState
+  selectionToolType?: 'magic-wand' | 'rectangle' | 'circle' // Selection tool variant
 }
 
 export interface SelectionState {

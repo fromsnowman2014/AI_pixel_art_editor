@@ -183,6 +183,13 @@ Deno.serve(async (req: Request) => {
     console.log(`📝 [${requestId}] Creating job for user ${authenticatedUserId}: ${width}x${height}, ${fps}fps, ${colorCount} colors`);
 
     // Create database job record
+    console.log(`💾 [${requestId}] Inserting job record:`, {
+      user_id: authenticatedUserId,
+      project_id: projectId || null,
+      prompt: prompt.trim().substring(0, 50) + '...',
+      dimensions: `${width}x${height}`
+    });
+
     const { data: job, error: jobError } = await supabaseClient
       .from('video_generation_jobs')
       .insert({
@@ -203,6 +210,34 @@ Deno.serve(async (req: Request) => {
 
     if (jobError || !job) {
       console.error(`❌ [${requestId}] Failed to create job:`, jobError);
+
+      // Check for UUID type error
+      const isUuidError = jobError?.message?.includes('uuid') ||
+                         jobError?.message?.includes('UUID');
+
+      if (isUuidError) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              message: 'Database schema error: project_id column needs to be TEXT type instead of UUID. Please run the migration: 20250118000000_fix_video_jobs_project_id_type.sql',
+              code: 'SCHEMA_ERROR',
+              details: {
+                issue: 'project_id column type mismatch',
+                expected: 'TEXT',
+                actual: 'UUID',
+                migration: '20250118000000_fix_video_jobs_project_id_type.sql',
+                error: jobError
+              }
+            }
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
       return new Response(
         JSON.stringify({
           success: false,
