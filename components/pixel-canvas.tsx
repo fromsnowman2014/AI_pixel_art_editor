@@ -5,6 +5,10 @@ import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
 import { performMagicWandSelection, clearSelection } from '@/lib/core/magic-wand'
+import { rectangleSelect } from '@/lib/core/rectangle-selection'
+import { circleSelect } from '@/lib/core/circle-selection'
+import { SelectionOverlay } from '@/components/canvas/selection-overlay'
+import type { SelectionToolType } from '@/components/toolbar/selection-tool-group'
 
 // Simplified debug logging
 import { canvasDebug } from '@/lib/ui/debug'
@@ -20,7 +24,13 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null)
-  
+  const [selectionDrag, setSelectionDrag] = useState<{
+    startX: number
+    startY: number
+    currentX: number
+    currentY: number
+  } | null>(null)
+
   const {
     activeTabId,
     updateCanvasData,
@@ -324,10 +334,13 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     }
   }, [])
 
+  // Get selection tool type
+  const selectionToolType = (canvasState.selectionToolType || 'magic-wand') as SelectionToolType
+
   // Mouse event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!containerRef.current || !canvasRef.current) return
-    
+
     // Disable drawing during playback
     if (isPlaying) return
 
@@ -336,24 +349,59 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     const x = e.clientX - canvasRect.left
     const y = e.clientY - canvasRect.top
 
+    // Convert to pixel coordinates
+    const pixelX = Math.floor(x / canvasState.zoom)
+    const pixelY = Math.floor(y / canvasState.zoom)
+
+    // Check if we're using rectangle or circle selection tool
+    if (canvasState.tool === 'magic-wand' && (selectionToolType === 'rectangle' || selectionToolType === 'circle')) {
+      // Start selection drag
+      setSelectionDrag({
+        startX: pixelX,
+        startY: pixelY,
+        currentX: pixelX,
+        currentY: pixelY,
+      })
+      setIsDragging(true)
+      setLastMousePos({ x: e.clientX, y: e.clientY })
+      return
+    }
+
     setIsDragging(true)
     setLastMousePos({ x: e.clientX, y: e.clientY })
 
     if (canvasState.tool !== 'pan') {
       drawPixel(x, y)
     }
-  }, [canvasState.panX, canvasState.panY, canvasState.tool, drawPixel, isPlaying])
+  }, [canvasState.panX, canvasState.panY, canvasState.tool, canvasState.zoom, selectionToolType, drawPixel, isPlaying])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging || !lastMousePos || !containerRef.current || !canvasRef.current) return
-    
+
     // Disable drawing during playback (but allow panning)
     if (isPlaying && canvasState.tool !== 'pan') return
+
+    // Update selection drag
+    if (selectionDrag) {
+      const canvasRect = canvasRef.current.getBoundingClientRect()
+      const x = e.clientX - canvasRect.left
+      const y = e.clientY - canvasRect.top
+      const pixelX = Math.floor(x / canvasState.zoom)
+      const pixelY = Math.floor(y / canvasState.zoom)
+
+      setSelectionDrag(prev => prev ? {
+        ...prev,
+        currentX: pixelX,
+        currentY: pixelY,
+      } : null)
+      setLastMousePos({ x: e.clientX, y: e.clientY })
+      return
+    }
 
     if (canvasState.tool === 'pan') {
       const deltaX = e.clientX - lastMousePos.x
       const deltaY = e.clientY - lastMousePos.y
-      
+
       if (activeTabId) {
         updateCanvasState(activeTabId, {
           panX: canvasState.panX + deltaX,
@@ -370,12 +418,74 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     }
 
     setLastMousePos({ x: e.clientX, y: e.clientY })
-  }, [isDragging, lastMousePos, canvasState, activeTabId, updateCanvasState, drawPixel, isPlaying])
+  }, [isDragging, lastMousePos, selectionDrag, canvasState, activeTabId, updateCanvasState, drawPixel, isPlaying])
 
   const handleMouseUp = useCallback(() => {
+    // Complete selection drag
+    if (selectionDrag && activeTabId) {
+      let selectedPixels: Set<string> | null = null
+
+      if (selectionToolType === 'rectangle') {
+        selectedPixels = rectangleSelect(
+          selectionDrag.startX,
+          selectionDrag.startY,
+          selectionDrag.currentX,
+          selectionDrag.currentY,
+          {
+            constrainSquare: false,
+            fromCenter: false,
+          }
+        )
+      } else if (selectionToolType === 'circle') {
+        selectedPixels = circleSelect(
+          selectionDrag.startX,
+          selectionDrag.startY,
+          selectionDrag.currentX,
+          selectionDrag.currentY,
+          {
+            constrainCircle: false,
+            fromCenter: true,
+            filled: true,
+          }
+        )
+      }
+
+      if (selectedPixels && selectedPixels.size > 0) {
+        // Calculate bounds
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+        selectedPixels.forEach(pixel => {
+          const [x, y] = pixel.split(',').map(Number)
+          if (x !== undefined && y !== undefined) {
+            minX = Math.min(minX, x)
+            maxX = Math.max(maxX, x)
+            minY = Math.min(minY, y)
+            maxY = Math.max(maxY, y)
+          }
+        })
+
+        updateCanvasState(activeTabId, {
+          selection: {
+            isActive: true,
+            selectedPixels,
+            bounds: { minX, maxX, minY, maxY },
+            tolerance: canvasState.selection?.tolerance || 32,
+          }
+        })
+
+        canvasDebug('SELECTION', `Selected ${selectedPixels.size} pixels using ${selectionToolType}`, {
+          bounds: { minX, maxX, minY, maxY }
+        })
+      }
+
+      setSelectionDrag(null)
+      setIsDragging(false)
+      setLastMousePos(null)
+      return
+    }
+
     if (isDragging && canvasData && activeTabId && canvasState.tool !== 'pan' && !isPlaying) {
       addHistoryEntry(activeTabId, `${canvasState.tool}_draw`, canvasData)
-      
+
       // FINAL THUMBNAIL UPDATE: Ensure thumbnail is updated when drawing is complete
       if (project.activeFrameId) {
         setTimeout(() => {
@@ -385,7 +495,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     }
     setIsDragging(false)
     setLastMousePos(null)
-  }, [isDragging, canvasData, activeTabId, canvasState.tool, addHistoryEntry, project.activeFrameId, regenerateFrameThumbnail, isPlaying])
+  }, [isDragging, selectionDrag, canvasData, activeTabId, canvasState.tool, canvasState.selection?.tolerance, selectionToolType, addHistoryEntry, project.activeFrameId, regenerateFrameThumbnail, updateCanvasState, isPlaying])
 
   // Handle zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -636,8 +746,8 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           style={{
-            cursor: isPlaying ? 'not-allowed' : 
-                   canvasState.tool === 'pan' ? 'grab' : 
+            cursor: isPlaying ? 'not-allowed' :
+                   canvasState.tool === 'pan' ? 'grab' :
                    canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair',
             backgroundColor: 'transparent',
             imageRendering: 'pixelated',
@@ -646,15 +756,32 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
             // opacity: isPlaying ? 0.9 : 1 // Removed - was causing visual issues
           }}
         />
-        
+
+        {/* Selection Overlay */}
+        <SelectionOverlay
+          bounds={canvasState.selection?.bounds || null}
+          dragPreview={selectionDrag ? {
+            startX: selectionDrag.startX,
+            startY: selectionDrag.startY,
+            currentX: selectionDrag.currentX,
+            currentY: selectionDrag.currentY,
+            type: selectionToolType === 'rectangle' ? 'rectangle' : 'circle',
+          } : null}
+          zoom={canvasState.zoom}
+          panX={0}
+          panY={0}
+          canvasWidth={project.width * canvasState.zoom}
+          canvasHeight={project.height * canvasState.zoom}
+        />
+
         {/* Tool indicator */}
         <div className="absolute -top-8 left-0 rounded bg-black/75 px-2 py-1 text-xs text-white">
           {isPlaying ? '🎬 Playing Animation - editing disabled' :
            canvasState.tool === 'eyedropper' ? 'Color Picker - click to pick color' :
            canvasState.tool === 'magic-wand' ? (
-             canvasState.selection?.isActive 
-               ? `🪄 ${canvasState.selection.selectedPixels.size} pixels selected | ${canvasState.zoom}x`
-               : `🪄 Magic Wand - click to select pixels | ${canvasState.zoom}x`
+             canvasState.selection?.isActive
+               ? `🪄 ${canvasState.selection.selectedPixels.size} pixels selected (${selectionToolType}) | ${canvasState.zoom}x`
+               : `🪄 ${selectionToolType === 'magic-wand' ? 'Magic Wand' : selectionToolType === 'rectangle' ? 'Rectangle Select' : 'Circle Select'} - ${selectionToolType === 'magic-wand' ? 'click' : 'drag'} to select | ${canvasState.zoom}x`
            ) :
            `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
