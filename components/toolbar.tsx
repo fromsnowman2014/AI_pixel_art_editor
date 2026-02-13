@@ -19,22 +19,22 @@ import {
 import { TransformScopeModal } from '@/components/modals/transform-scope-modal'
 import type { TransformType } from '@/lib/utils/canvas-transform'
 import { SelectionToolGroup } from '@/components/toolbar/selection-tool-group'
+import { BrushToolGroup } from '@/components/toolbar/brush-tool-group'
 
 interface ToolbarProps {
   className?: string
 }
 
-type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'pan'
+// Secondary tools (not pencil/eraser - those use BrushToolGroup)
+type SecondaryTool = 'fill' | 'eyedropper' | 'pan'
 
-const tools: Array<{
-  id: Tool
+const secondaryTools: Array<{
+  id: SecondaryTool
   name: string
   icon: React.ComponentType<{ className?: string }>
   shortcut: string
-  description?: string
+  description: string
 }> = [
-  { id: 'pencil', name: 'Pencil', icon: Pencil, shortcut: 'P', description: 'Draw pixels one by one' },
-  { id: 'eraser', name: 'Eraser', icon: Eraser, shortcut: 'E', description: 'Erase pixels to transparency' },
   { id: 'fill', name: 'Paint Bucket', icon: PaintBucket, shortcut: 'B', description: 'Fill connected areas with color' },
   { id: 'eyedropper', name: 'Color Picker', icon: Pipette, shortcut: 'I', description: 'Pick color from canvas' },
   { id: 'pan', name: 'Pan', icon: Move, shortcut: 'H', description: 'Move around the canvas' },
@@ -80,14 +80,15 @@ export function Toolbar({ className }: ToolbarProps) {
     setIsTransformModalOpen(true)
   }
 
-  const handleToolChange = React.useCallback((tool: Tool) => {
+  const handleToolChange = React.useCallback((tool: SecondaryTool) => {
     if (!canvasState || !activeTabId) return
-    
+
     // Tool changed - just update the tool
     updateCanvasState(activeTabId, { tool })
   }, [canvasState, activeTabId, updateCanvasState])
 
-  // Handle keyboard shortcuts
+  // Handle keyboard shortcuts (secondary tools + transform tools only)
+  // Pencil/Eraser shortcuts are handled by BrushToolGroup
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't handle shortcuts if user is typing in an input
@@ -97,8 +98,8 @@ export function Toolbar({ className }: ToolbarProps) {
 
       const key = e.key.toLowerCase()
 
-      // Check drawing tools
-      const tool = tools.find(t => t.shortcut.toLowerCase() === key)
+      // Check secondary drawing tools
+      const tool = secondaryTools.find(t => t.shortcut.toLowerCase() === key)
       if (tool) {
         e.preventDefault()
         handleToolChange(tool.id)
@@ -131,7 +132,7 @@ export function Toolbar({ className }: ToolbarProps) {
           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           DRAWING TOOLS
         </div>
-        
+
         {/* Tools Grid - Responsive Layout */}
         <div className={cn(
           "grid gap-2",
@@ -143,13 +144,32 @@ export function Toolbar({ className }: ToolbarProps) {
           "grid-cols-3"
         )}>
           {/* First Row - Primary Tools (Pencil, Eraser, Fill) */}
-          {tools.slice(0, 3).map((tool) => {
-            const Icon = tool.icon
-            const isActive = canvasState.tool === tool.id
+          {/* Pencil with brush settings (long-press for size/shape) */}
+          <BrushToolGroup
+            toolId="pencil"
+            toolName="Pencil"
+            toolDescription="Draw pixels one by one"
+            toolShortcut="P"
+            icon={Pencil}
+          />
+
+          {/* Eraser with brush settings (long-press for size/shape) */}
+          <BrushToolGroup
+            toolId="eraser"
+            toolName="Eraser"
+            toolDescription="Erase pixels to transparency"
+            toolShortcut="E"
+            icon={Eraser}
+          />
+
+          {/* Paint Bucket (plain button, no brush settings) */}
+          {(() => {
+            const fillTool = secondaryTools[0]!
+            const FillIcon = fillTool.icon
+            const isActive = canvasState.tool === fillTool.id
             return (
               <Tooltip
-                key={tool.id}
-                content={`${tool.name} - ${tool.description} (Press ${tool.shortcut})`}
+                content={`${fillTool.name} - ${fillTool.description} (Press ${fillTool.shortcut})`}
                 side="right"
               >
                 <Button
@@ -164,48 +184,47 @@ export function Toolbar({ className }: ToolbarProps) {
                       ? "bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-blue-500 shadow-lg"
                       : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300 hover:text-gray-900"
                   )}
-                  onClick={() => handleToolChange(tool.id)}
-                  aria-label={`${tool.name} tool (keyboard shortcut: ${tool.shortcut})`}
+                  onClick={() => handleToolChange(fillTool.id)}
+                  aria-label={`${fillTool.name} tool (keyboard shortcut: ${fillTool.shortcut})`}
                   aria-pressed={isActive}
                   role="button"
                   tabIndex={0}
                 >
-                  <Icon 
+                  <FillIcon
                     className={cn(
                       "h-4 w-4 lg:h-5 lg:w-5 transition-all duration-200",
                       "group-hover:scale-110",
-                      isActive 
-                        ? "text-white drop-shadow-sm" 
+                      isActive
+                        ? "text-white drop-shadow-sm"
                         : "text-gray-600 group-hover:text-gray-900"
-                    )} 
-                    aria-hidden="true" 
+                    )}
+                    aria-hidden="true"
                   />
-                  {/* Keyboard shortcut indicator */}
-                  <span 
+                  <span
                     className={cn(
                       "absolute -bottom-0.5 -right-0.5 text-xs font-mono font-bold",
                       "w-3 h-3 lg:w-4 lg:h-4 rounded-full flex items-center justify-center",
                       "transition-all duration-200 pointer-events-none text-xs",
-                      isActive 
-                        ? "bg-white text-blue-600 shadow-md" 
+                      isActive
+                        ? "bg-white text-blue-600 shadow-md"
                         : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-700"
                     )}
                     style={{ fontSize: '0.6rem' }}
                     aria-hidden="true"
                   >
-                    {tool.shortcut}
+                    {fillTool.shortcut}
                   </span>
                 </Button>
               </Tooltip>
             )
-          })}
-          
+          })()}
+
           {/* Second Row - Selection Tool + Secondary Tools */}
           {/* Selection Tool Group (Magic Wand, Rectangle, Circle) */}
           <SelectionToolGroup />
 
           {/* Remaining Secondary Tools (Color Picker, Pan) */}
-          {tools.slice(3).map((tool, index) => {
+          {secondaryTools.slice(1).map((tool) => {
             const Icon = tool.icon
             const isActive = canvasState.tool === tool.id
             return (
@@ -339,6 +358,8 @@ export function Toolbar({ className }: ToolbarProps) {
         <div className="space-y-2">
           <div className="rounded bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700">
             ⌨️ <strong>Draw:</strong> P-Pencil, E-Eraser, B-Fill, I-Color Picker, H-Pan
+            <br />
+            🖌️ <strong>Brush:</strong> [-Smaller, ]-Bigger (Long-press Pencil/Eraser for settings)
           </div>
 
           <div className="rounded bg-indigo-50 border border-indigo-200 p-2 text-xs text-indigo-700">
@@ -350,9 +371,9 @@ export function Toolbar({ className }: ToolbarProps) {
           </div>
 
           <div className="rounded bg-green-50 border border-green-200 p-2 text-xs text-green-700">
-            💡 <strong>Tip:</strong> Long-press selection tool for more options. Esc to clear, Del to delete selection.
+            💡 <strong>Tip:</strong> Long-press Pencil/Eraser or Selection tool for more options.
           </div>
-          
+
           {canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0 && (
             <div className="rounded bg-purple-50 border border-purple-200 p-2 text-xs text-purple-700">
               🪄 <strong>Selection Active:</strong> {canvasState.selection.selectedPixels.size} pixels selected

@@ -2058,6 +2058,7 @@ export const useProjectStore = create<ProjectStore>()(
               tool: 'pencil',
               color: '#000000',
               brushSize: 1,
+              brushShape: 'square',
               zoom: data.canvasSettings.zoom || 200,
               panX: 0,
               panY: 0,

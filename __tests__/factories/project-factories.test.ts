@@ -21,6 +21,7 @@ describe('Project Factories', () => {
         tool: 'pencil',
         color: '#000000',
         brushSize: 1,
+        brushShape: 'square',
         zoom: 8,
         panX: 0,
         panY: 0,

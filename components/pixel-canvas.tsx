@@ -7,7 +7,9 @@ import type { Project, PixelData, CanvasState } from '@/lib/types/api'
 import { performMagicWandSelection, clearSelection } from '@/lib/core/magic-wand'
 import { rectangleSelect } from '@/lib/core/rectangle-selection'
 import { circleSelect } from '@/lib/core/circle-selection'
+import { getBrushOffsets } from '@/lib/core/brush-patterns'
 import { SelectionOverlay } from '@/components/canvas/selection-overlay'
+import { BrushCursorOverlay } from '@/components/canvas/brush-cursor-overlay'
 import type { SelectionToolType } from '@/components/toolbar/selection-tool-group'
 
 // Simplified debug logging
@@ -30,6 +32,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     currentX: number
     currentY: number
   } | null>(null)
+  const [hoverPixel, setHoverPixel] = useState<{ x: number; y: number } | null>(null)
 
   const {
     activeTabId,
@@ -165,35 +168,35 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     // Apply tool-specific drawing logic
     switch (canvasState.tool) {
       case 'pencil':
-        // If there's an active selection, only draw within selection
-        if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
-          if (canvasState.selection.selectedPixels.has(`${pixelX},${pixelY}`)) {
-            newData[index] = color.r
-            newData[index + 1] = color.g
-            newData[index + 2] = color.b
-            newData[index + 3] = 255
+      case 'eraser': {
+        const brushSize = canvasState.brushSize || 1
+        const brushShape = canvasState.brushShape || 'square'
+        const offsets = getBrushOffsets(brushSize, brushShape)
+        const hasSelection = canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0
+
+        for (const { dx, dy } of offsets) {
+          const bx = pixelX + dx
+          const by = pixelY + dy
+
+          // Bounds check
+          if (bx < 0 || bx >= project.width || by < 0 || by >= project.height) continue
+
+          // Selection check
+          if (hasSelection && !canvasState.selection!.selectedPixels.has(`${bx},${by}`)) continue
+
+          const bIndex = (by * project.width + bx) * 4
+
+          if (canvasState.tool === 'pencil') {
+            newData[bIndex] = color.r
+            newData[bIndex + 1] = color.g
+            newData[bIndex + 2] = color.b
+            newData[bIndex + 3] = 255
           } else {
-            return // Don't draw outside selection
+            newData[bIndex + 3] = 0 // Make transparent
           }
-        } else {
-          newData[index] = color.r
-          newData[index + 1] = color.g
-          newData[index + 2] = color.b
-          newData[index + 3] = 255
         }
         break
-      case 'eraser':
-        // If there's an active selection, only erase within selection
-        if (canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0) {
-          if (canvasState.selection.selectedPixels.has(`${pixelX},${pixelY}`)) {
-            newData[index + 3] = 0 // Make transparent
-          } else {
-            return // Don't erase outside selection
-          }
-        } else {
-          newData[index + 3] = 0 // Make transparent
-        }
-        break
+      }
       case 'eyedropper':
         // Get the color values from the pixel data
         const r = newData[index] || 0
@@ -336,6 +339,21 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
 
   // Get selection tool type
   const selectionToolType = (canvasState.selectionToolType || 'magic-wand') as SelectionToolType
+
+  // Track hover pixel for ghost cursor preview
+  const handleMouseHover = useCallback((e: React.MouseEvent) => {
+    if (!canvasRef.current) return
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const x = e.clientX - canvasRect.left
+    const y = e.clientY - canvasRect.top
+    const hx = Math.floor(x / canvasState.zoom)
+    const hy = Math.floor(y / canvasState.zoom)
+    if (hx >= 0 && hx < project.width && hy >= 0 && hy < project.height) {
+      setHoverPixel(prev => (prev?.x === hx && prev?.y === hy) ? prev : { x: hx, y: hy })
+    } else {
+      setHoverPixel(null)
+    }
+  }, [canvasState.zoom, project.width, project.height])
 
   // Mouse event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -742,18 +760,17 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           ref={canvasRef}
           className="pixel-canvas border-2 border-gray-300 shadow-lg relative"
           onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
+          onMouseMove={(e) => { handleMouseHover(e); handleMouseMove(e) }}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseLeave={(e) => { handleMouseUp(); setHoverPixel(null) }}
           style={{
             cursor: isPlaying ? 'not-allowed' :
                    canvasState.tool === 'pan' ? 'grab' :
+                   (canvasState.tool === 'pencil' || canvasState.tool === 'eraser') && (canvasState.brushSize || 1) > 1 ? 'none' :
                    canvasState.tool === 'eyedropper' ? 'crosshair' : 'crosshair',
             backgroundColor: 'transparent',
             imageRendering: 'pixelated',
             zIndex: 2 // Ensure canvas is above checkerboard background
-            // PLAYBACK FIX: Remove opacity change that causes "bright transparent background"
-            // opacity: isPlaying ? 0.9 : 1 // Removed - was causing visual issues
           }}
         />
 
@@ -774,6 +791,23 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           canvasHeight={project.height * canvasState.zoom}
         />
 
+        {/* Brush cursor ghost preview */}
+        {hoverPixel && (canvasState.tool === 'pencil' || canvasState.tool === 'eraser') && !isPlaying && (
+          <BrushCursorOverlay
+            mousePixelX={hoverPixel.x}
+            mousePixelY={hoverPixel.y}
+            brushSize={canvasState.brushSize || 1}
+            brushShape={canvasState.brushShape || 'square'}
+            tool={canvasState.tool}
+            color={canvasState.color}
+            zoom={canvasState.zoom}
+            canvasWidth={project.width * canvasState.zoom}
+            canvasHeight={project.height * canvasState.zoom}
+            projectWidth={project.width}
+            projectHeight={project.height}
+          />
+        )}
+
         {/* Tool indicator */}
         <div className="absolute -top-8 left-0 rounded bg-black/75 px-2 py-1 text-xs text-white">
           {isPlaying ? '🎬 Playing Animation - editing disabled' :
@@ -783,7 +817,9 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
                ? `🪄 ${canvasState.selection.selectedPixels.size} pixels selected (${selectionToolType}) | ${canvasState.zoom}x`
                : `🪄 ${selectionToolType === 'magic-wand' ? 'Magic Wand' : selectionToolType === 'rectangle' ? 'Rectangle Select' : 'Circle Select'} - ${selectionToolType === 'magic-wand' ? 'click' : 'drag'} to select | ${canvasState.zoom}x`
            ) :
-           `${canvasState.tool} | ${canvasState.zoom}x`}
+           (canvasState.tool === 'pencil' || canvasState.tool === 'eraser')
+             ? `${canvasState.tool} ${(canvasState.brushSize || 1) > 1 ? `${canvasState.brushSize}px ${canvasState.brushShape || 'square'}` : ''} | ${canvasState.zoom}x`
+             : `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
       </div>
     </div>

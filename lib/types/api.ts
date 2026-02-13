@@ -196,6 +196,7 @@ export interface CanvasState {
   tool: string
   color: string
   brushSize: number
+  brushShape: 'square' | 'circle'
   zoom: number
   panX: number
   panY: number

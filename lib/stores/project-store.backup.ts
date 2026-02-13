@@ -183,6 +183,7 @@ const createDefaultCanvasState = (): CanvasState => ({
   tool: 'pencil',
   color: '#000000',
   brushSize: 1,
+  brushShape: 'square',
   zoom: 8, // 8x zoom for pixel art
   panX: 0,
   panY: 0,

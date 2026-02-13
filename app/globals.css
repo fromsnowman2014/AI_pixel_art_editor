@@ -93,6 +93,25 @@ body {
   }
 }
 
+/* Popover bounce-in animation for brush settings */
+@keyframes popover-bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(-4px);
+  }
+  50% {
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-popover-bounce-in {
+  animation: popover-bounce-in 0.25s ease-out;
+}
+
 /* Loading spinner */
 .spinner {
   border: 2px solid #f3f4f6;
