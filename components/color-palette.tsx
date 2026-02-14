@@ -4,7 +4,8 @@ import React, { useState } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Plus, Palette } from 'lucide-react'
+import { Plus, Palette, Pipette } from 'lucide-react'
+import { AdvancedColorPicker } from './advanced-color-picker'
 
 interface ColorPaletteProps {
   className?: string
@@ -19,6 +20,7 @@ export function ColorPalette({ className }: ColorPaletteProps) {
   } = useProjectStore()
 
   const [showColorPicker, setShowColorPicker] = useState(false)
+  const [showAdvancedPicker, setShowAdvancedPicker] = useState(false)
   const [customColor, setCustomColor] = useState('#000000')
 
   const activeTab = getActiveTab()
@@ -83,18 +85,33 @@ export function ColorPalette({ className }: ColorPaletteProps) {
           <span className="text-xs font-medium text-gray-600">
             PALETTE ({project.palette.length}/{project.colorLimit})
           </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowColorPicker(!showColorPicker)}
-            disabled={project.palette.length >= project.colorLimit}
-            className="h-6 w-6 p-0"
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvancedPicker(true)}
+              title="Advanced Color Picker"
+              className="h-6 w-6 p-0"
+            >
+              <Pipette className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              disabled={project.palette.length >= project.colorLimit}
+              className="h-6 w-6 p-0"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-6 gap-2">
+        {/* Scrollable color grid for 24+ colors */}
+        <div className={cn(
+          "grid grid-cols-6 gap-2",
+          project.palette.length > 24 && "max-h-64 overflow-y-auto pr-1"
+        )}>
           {project.palette.map((color, index) => (
             <button
               key={`${color}-${index}`}
@@ -295,8 +312,25 @@ export function ColorPalette({ className }: ColorPaletteProps) {
 
       {/* Tips */}
       <div className="rounded bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700 mt-3">
-        💡 <strong>Tip:</strong> Double-click a color to remove it from the palette
+        💡 <strong>Tip:</strong> Double-click a color to remove it from the palette. Use <Pipette className="h-3 w-3 inline" /> for advanced color picker.
       </div>
+
+      {/* Advanced Color Picker Modal */}
+      {showAdvancedPicker && (
+        <AdvancedColorPicker
+          color={canvasState.color}
+          onChange={(newColor) => {
+            // Add to palette if not already present
+            if (!project.palette.includes(newColor)) {
+              const newPalette = [...project.palette, newColor]
+              updateProject(activeTabId, { palette: newPalette })
+            }
+            // Select the color
+            updateCanvasState(activeTabId, { color: newColor })
+          }}
+          onClose={() => setShowAdvancedPicker(false)}
+        />
+      )}
     </div>
   )
 }

@@ -160,7 +160,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
                   <input
                     type="number"
                     min="8"
-                    max="512"
+                    max="3840"
                     value={customWidth}
                     onChange={(e) => setCustomWidth(parseInt(e.target.value) || 64)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -171,18 +171,21 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
                   <input
                     type="number"
                     min="8"
-                    max="512"
+                    max="2160"
                     value={customHeight}
                     onChange={(e) => setCustomHeight(parseInt(e.target.value) || 64)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
-              
+
               <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
                 Size: {customWidth}×{customHeight} pixels
-                {(customWidth > 256 || customHeight > 256) && (
+                {(customWidth > 512 || customHeight > 512) && (
                   <span className="text-orange-600 ml-2">⚠️ Large canvases may be slower</span>
+                )}
+                {(customWidth > 1920 || customHeight > 1080) && (
+                  <span className="text-red-600 ml-2">⚠️ Very large canvas - performance may be impacted</span>
                 )}
               </div>
 
@@ -197,7 +200,7 @@ export function NewProjectModal({ open, onOpenChange, onCreateProject }: NewProj
                 </Button>
                 <Button
                   onClick={handleCustomCreate}
-                  disabled={customWidth < 8 || customHeight < 8 || customWidth > 512 || customHeight > 512}
+                  disabled={customWidth < 8 || customHeight < 8 || customWidth > 3840 || customHeight > 2160}
                   size="sm"
                   className="flex-1"
                 >

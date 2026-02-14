@@ -1,18 +1,22 @@
 'use client'
 
 import { Frame } from '@/lib/types/api'
+import { extractColorPalette, type ColorPalette } from '@/lib/utils/color-extraction'
 
 export interface MediaImportOptions {
   width: number
   height: number
   colorCount?: number
   maxFrames?: number
+  preserveOriginalSize?: boolean // New option to preserve original dimensions
+  extractPalette?: boolean // New option to extract color palette
 }
 
 export interface ImportResult {
   frames: { frame: Frame; imageData: number[] }[]
   originalDimensions: { width: number; height: number }
   mediaType: 'image' | 'gif' | 'video'
+  extractedPalette?: ColorPalette // Extracted color palette from image
 }
 
 export class MediaImporter {
@@ -148,6 +152,17 @@ export class MediaImporter {
       
       img.onload = async () => {
         try {
+          // Extract color palette if requested
+          let extractedPalette: ColorPalette | undefined
+          if (options.extractPalette) {
+            const { canvas, ctx } = this.getCanvas()
+            canvas.width = img.width
+            canvas.height = img.height
+            ctx.drawImage(img, 0, 0)
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            extractedPalette = extractColorPalette(imageData, 24)
+          }
+
           const pixelatedImageData = await this.pixelateImage(img, options)
           const frame: Frame = {
             id: `imported_${Date.now()}`,
@@ -164,7 +179,8 @@ export class MediaImporter {
           resolve({
             frames: [{ frame, imageData: Array.from(pixelatedImageData.data) }],
             originalDimensions: { width: img.width, height: img.height },
-            mediaType: 'image'
+            mediaType: 'image',
+            extractedPalette
           })
         } catch (error) {
           reject(error)
@@ -255,6 +271,17 @@ export class MediaImporter {
       
       img.onload = async () => {
         try {
+          // Extract color palette if requested
+          let extractedPalette: ColorPalette | undefined
+          if (options.extractPalette) {
+            const { canvas, ctx } = this.getCanvas()
+            canvas.width = img.width
+            canvas.height = img.height
+            ctx.drawImage(img, 0, 0)
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            extractedPalette = extractColorPalette(imageData, 24)
+          }
+
           const pixelatedImageData = await this.pixelateImage(img, options)
           const frame: Frame = {
             id: `imported_file_${Date.now()}`,
@@ -271,7 +298,8 @@ export class MediaImporter {
           resolve({
             frames: [{ frame, imageData: Array.from(pixelatedImageData.data) }],
             originalDimensions: { width: img.width, height: img.height },
-            mediaType: 'image'
+            mediaType: 'image',
+            extractedPalette
           })
         } catch (error) {
           reject(error)
@@ -373,11 +401,19 @@ export class MediaImporter {
    * Convert image to pixel art using nearest-neighbor scaling
    */
   private static async pixelateImage(
-    img: HTMLImageElement, 
+    img: HTMLImageElement,
     options: MediaImportOptions
   ): Promise<ImageData> {
     const { canvas, ctx } = this.getCanvas()
-    const { width: targetWidth, height: targetHeight } = options
+
+    // Use original dimensions if preserveOriginalSize is true
+    let targetWidth = options.width
+    let targetHeight = options.height
+
+    if (options.preserveOriginalSize) {
+      targetWidth = Math.min(img.width, 3840) // Max 4K width
+      targetHeight = Math.min(img.height, 2160) // Max 4K height
+    }
 
     // Set canvas to target size
     canvas.width = targetWidth

@@ -185,13 +185,13 @@ export function ProjectEmptyState({ onCreateProject, className }: ProjectEmptySt
                   id="custom-width"
                   type="number"
                   min="8"
-                  max="512"
+                  max="3840"
                   value={customWidth}
                   onChange={(e) => setCustomWidth(parseInt(e.target.value) || 128)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label htmlFor="custom-height" className="text-sm font-medium text-gray-700">
                   Height (pixels)
@@ -200,22 +200,27 @@ export function ProjectEmptyState({ onCreateProject, className }: ProjectEmptySt
                   id="custom-height"
                   type="number"
                   min="8"
-                  max="512"
+                  max="2160"
                   value={customHeight}
                   onChange={(e) => setCustomHeight(parseInt(e.target.value) || 128)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
-            
+
             <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-md">
-              <strong>Tip:</strong> Larger canvases require more processing power. 
-              Start with smaller sizes (32×32 or 64×64) for faster performance.
+              <strong>Tip:</strong> Larger canvases require more processing power.
+              {(customWidth > 1920 || customHeight > 1080) && (
+                <span className="text-orange-600 ml-2">⚠️ Very large canvas (4K) - performance may be impacted</span>
+              )}
+              {(customWidth <= 512 && customHeight <= 512) && (
+                <span className="ml-1">Start with smaller sizes (32×32 or 64×64) for faster performance.</span>
+              )}
             </div>
-            
+
             <Button
               onClick={handleCustomCreate}
-              disabled={customWidth < 8 || customHeight < 8 || customWidth > 512 || customHeight > 512}
+              disabled={customWidth < 8 || customHeight < 8 || customWidth > 3840 || customHeight > 2160}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
             >
               Create {customWidth}×{customHeight} Canvas
