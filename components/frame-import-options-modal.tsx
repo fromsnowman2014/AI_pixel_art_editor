@@ -60,7 +60,8 @@ export function FrameImportOptionsModal({
   // State management with smart defaults
   const [selectedColorMode, setSelectedColorMode] = React.useState<'auto' | 'project' | 'custom'>(smartColorDefault)
   const [selectedSizeMode, setSelectedSizeMode] = React.useState<ExtendedScalingMode>(smartSizeDefault)
-  
+  const [preserveOriginalSize, setPreserveOriginalSize] = React.useState(false)
+
   // Auto colors preview (8 diverse colors)
   const autoColors = ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF']
   
@@ -117,7 +118,9 @@ export function FrameImportOptionsModal({
   // Handle import action
   const handleImport = () => {
     const colorMapping = createColorMapping(selectedColorMode)
-    onSelectOption('add', selectedSizeMode, colorMapping)
+    // If preserve original size is checked, use 'original' mode regardless of selected size mode
+    const finalSizeMode = preserveOriginalSize ? 'original' : selectedSizeMode
+    onSelectOption('add', finalSizeMode, colorMapping)
   }
   
   if (!open) return null
@@ -186,28 +189,64 @@ export function FrameImportOptionsModal({
               label="Smart"
               tooltip={tooltips.smart}
               recommended={true}
-              selected={selectedSizeMode === smartSizeDefault}
-              onClick={() => setSelectedSizeMode(smartSizeDefault)}
+              selected={selectedSizeMode === smartSizeDefault && !preserveOriginalSize}
+              onClick={() => {
+                setSelectedSizeMode(smartSizeDefault)
+                setPreserveOriginalSize(false)
+              }}
             />
             <MinimalOption
               emoji="📐"
               label="Original"
               tooltip={`원본 크기 유지 (${originalDimensions.width}×${originalDimensions.height}px)`}
-              selected={selectedSizeMode === 'original'}
-              onClick={() => setSelectedSizeMode('original')}
+              selected={selectedSizeMode === 'original' || preserveOriginalSize}
+              onClick={() => {
+                setSelectedSizeMode('original')
+                setPreserveOriginalSize(true)
+              }}
             />
             <MinimalOption
               emoji="🔲"
               label="Fill"
               tooltip="캔버스 전체 채움 (일부 잘릴 수 있음)"
-              selected={selectedSizeMode === 'fill'}
-              onClick={() => setSelectedSizeMode('fill')}
+              selected={selectedSizeMode === 'fill' && !preserveOriginalSize}
+              onClick={() => {
+                setSelectedSizeMode('fill')
+                setPreserveOriginalSize(false)
+              }}
             />
+          </div>
+
+          {/* Preserve Original Size Checkbox */}
+          <div className="flex items-center gap-2 px-1 py-2 rounded-lg bg-gray-50 border border-gray-200">
+            <input
+              type="checkbox"
+              id="preserve-original-size"
+              checked={preserveOriginalSize}
+              onChange={(e) => {
+                setPreserveOriginalSize(e.target.checked)
+                if (e.target.checked) {
+                  setSelectedSizeMode('original')
+                }
+              }}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-colors"
+            />
+            <label
+              htmlFor="preserve-original-size"
+              className="text-sm font-medium text-gray-700 cursor-pointer flex-1"
+              title={`Import at original size: ${originalDimensions.width}×${originalDimensions.height}px (max 4K supported)`}
+            >
+              <span className="mr-1">📏</span>
+              Preserve Original Dimensions
+              <span className="ml-1 text-xs text-gray-500">
+                ({originalDimensions.width}×{originalDimensions.height}px)
+              </span>
+            </label>
           </div>
 
           {/* Import button */}
           <div className="pt-1">
-            <Button 
+            <Button
               onClick={handleImport}
               className="w-full"
               size="lg"

@@ -342,9 +342,9 @@ export class EnhancedMediaImporter {
       if (options.width <= 0 || options.height <= 0) {
         throw new Error(`Invalid target dimensions: ${options.width}x${options.height}`)
       }
-      
-      if (options.width > 512 || options.height > 512) {
-        console.warn(`Large target dimensions detected: ${options.width}x${options.height}`)
+
+      if (options.width > 3840 || options.height > 2160) {
+        console.warn(`Very large target dimensions detected: ${options.width}x${options.height}. Max recommended: 3840x2160 (4K)`)
       }
       
       switch (mediaType) {

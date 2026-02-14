@@ -32,7 +32,7 @@ interface ProjectPanelProps {
 // Constants for validation
 const CANVAS_SIZE_LIMITS = {
   MIN: 8,
-  MAX: 128,
+  MAX: 3840, // 4K width support (height max is 2160)
 } as const;
 
 const COLOR_LIMIT_RANGE = {
