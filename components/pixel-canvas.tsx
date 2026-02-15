@@ -4,7 +4,14 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
-import { performMagicWandSelection, clearSelection, expandSelection, contractSelection } from '@/lib/core/magic-wand'
+import {
+  performMagicWandSelection,
+  clearSelection,
+  expandSelectionSmart,
+  contractSelection,
+  addToSelection,
+  subtractFromSelection
+} from '@/lib/core/magic-wand'
 import { rectangleSelect } from '@/lib/core/rectangle-selection'
 import { circleSelect } from '@/lib/core/circle-selection'
 import { getBrushOffsets } from '@/lib/core/brush-patterns'
@@ -50,12 +57,14 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
 
   // Selection modification handlers
   const handleExpandSelection = useCallback(() => {
-    if (!activeTabId || !canvasState.selection?.isActive || canvasState.selection.selectedPixels.size === 0) return
+    if (!activeTabId || !canvasState.selection?.isActive || canvasState.selection.selectedPixels.size === 0 || !canvasData) return
 
-    const expandedPixels = expandSelection(
+    const expandedPixels = expandSelectionSmart(
       canvasState.selection.selectedPixels,
+      canvasData.data,
       project.width,
-      project.height
+      project.height,
+      canvasState.selection.tolerance
     )
 
     // Calculate new bounds
@@ -78,8 +87,8 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
       }
     })
 
-    canvasDebug('SELECTION', `Expanded selection to ${expandedPixels.size} pixels`)
-  }, [activeTabId, canvasState.selection, project.width, project.height, updateCanvasState])
+    canvasDebug('SELECTION', `Smart expanded selection to ${expandedPixels.size} pixels (tolerance: ${canvasState.selection.tolerance})`)
+  }, [activeTabId, canvasState.selection, canvasData, project.width, project.height, updateCanvasState])
 
   const handleContractSelection = useCallback(() => {
     if (!activeTabId || !canvasState.selection?.isActive || canvasState.selection.selectedPixels.size === 0) return
@@ -506,7 +515,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
 
   // Mouse event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!containerRef.current || !canvasRef.current) return
+    if (!containerRef.current || !canvasRef.current || !canvasData || !activeTabId) return
 
     // Disable drawing during playback
     if (isPlaying) return
@@ -519,6 +528,67 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     // Convert to pixel coordinates
     const pixelX = Math.floor(x / canvasState.zoom)
     const pixelY = Math.floor(y / canvasState.zoom)
+
+    // Handle Magic Wand with modifier keys for Add/Subtract selection
+    if (canvasState.tool === 'magic-wand' && selectionToolType === 'magic-wand') {
+      // Perform magic wand selection
+      const selectionResult = performMagicWandSelection(
+        canvasData.data,
+        pixelX,
+        pixelY,
+        project.width,
+        project.height,
+        {
+          tolerance: canvasState.selection?.tolerance || 32,
+          contiguous: true,
+          sampleAllLayers: false
+        }
+      )
+
+      if (selectionResult.pixelCount > 0) {
+        let finalSelection = selectionResult.selectedPixels
+        let mode = 'new'
+
+        // Shift = Add to selection
+        if (e.shiftKey && canvasState.selection?.isActive) {
+          finalSelection = addToSelection(canvasState.selection.selectedPixels, selectionResult.selectedPixels)
+          mode = 'add'
+        }
+        // Alt = Subtract from selection
+        else if (e.altKey && canvasState.selection?.isActive) {
+          finalSelection = subtractFromSelection(canvasState.selection.selectedPixels, selectionResult.selectedPixels)
+          mode = 'subtract'
+        }
+
+        // Calculate bounds
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+        finalSelection.forEach(pixel => {
+          const [x, y] = pixel.split(',').map(Number)
+          if (x !== undefined && y !== undefined) {
+            minX = Math.min(minX, x)
+            maxX = Math.max(maxX, x)
+            minY = Math.min(minY, y)
+            maxY = Math.max(maxY, y)
+          }
+        })
+
+        updateCanvasState(activeTabId, {
+          selection: {
+            isActive: finalSelection.size > 0,
+            selectedPixels: finalSelection,
+            bounds: finalSelection.size > 0 ? { minX, maxX, minY, maxY } : null,
+            tolerance: canvasState.selection?.tolerance || 32
+          }
+        })
+
+        canvasDebug('MAGIC_WAND', `${mode} mode: ${finalSelection.size} pixels selected`, {
+          targetColor: selectionResult.targetColor,
+          bounds: { minX, maxX, minY, maxY }
+        })
+      }
+
+      return
+    }
 
     // Check if we're using rectangle or circle selection tool
     if (canvasState.tool === 'magic-wand' && (selectionToolType === 'rectangle' || selectionToolType === 'circle')) {
@@ -540,7 +610,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
     if (canvasState.tool !== 'pan') {
       drawPixel(x, y)
     }
-  }, [canvasState.panX, canvasState.panY, canvasState.tool, canvasState.zoom, selectionToolType, drawPixel, isPlaying])
+  }, [canvasState, canvasData, activeTabId, project.width, project.height, selectionToolType, drawPixel, isPlaying, updateCanvasState])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging || !lastMousePos || !containerRef.current || !canvasRef.current) return

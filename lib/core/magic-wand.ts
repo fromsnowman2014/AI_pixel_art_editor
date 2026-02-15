@@ -260,7 +260,85 @@ export function clearSelection(): MagicWandResult {
 }
 
 /**
- * Expand selection by one pixel in all directions
+ * Expand selection by finding similar colored pixels adjacent to current selection
+ * This is a color-aware expansion, not geometric
+ */
+export function expandSelectionSmart(
+  selectedPixels: Set<string>,
+  imageData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  tolerance: number
+): Set<string> {
+  const expandedPixels = new Set(selectedPixels)
+  const borderPixels = new Set<string>()
+
+  // Find border pixels of current selection
+  for (const pixelKey of Array.from(selectedPixels)) {
+    const coords = pixelKey.split(',').map(Number)
+    if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+      const x = coords[0]
+      const y = coords[1]
+
+      // Check 4-way neighbors
+      const neighbors = [
+        { x: x + 1, y },
+        { x: x - 1, y },
+        { x, y: y + 1 },
+        { x, y: y - 1 }
+      ]
+
+      for (const neighbor of neighbors) {
+        if (neighbor.x >= 0 && neighbor.x < width && neighbor.y >= 0 && neighbor.y < height) {
+          const neighborKey = `${neighbor.x},${neighbor.y}`
+          if (!selectedPixels.has(neighborKey)) {
+            borderPixels.add(neighborKey)
+          }
+        }
+      }
+    }
+  }
+
+  // Calculate average color of current selection
+  let totalR = 0, totalG = 0, totalB = 0, totalA = 0
+  let count = 0
+
+  for (const pixelKey of Array.from(selectedPixels)) {
+    const coords = pixelKey.split(',').map(Number)
+    if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+      const color = getPixelColor(imageData, coords[0], coords[1], width)
+      totalR += color.r
+      totalG += color.g
+      totalB += color.b
+      totalA += color.a
+      count++
+    }
+  }
+
+  const avgColor = {
+    r: Math.round(totalR / count),
+    g: Math.round(totalG / count),
+    b: Math.round(totalB / count),
+    a: Math.round(totalA / count)
+  }
+
+  // Check border pixels and add those with similar colors
+  for (const borderPixelKey of Array.from(borderPixels)) {
+    const coords = borderPixelKey.split(',').map(Number)
+    if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
+      const pixelColor = getPixelColor(imageData, coords[0], coords[1], width)
+
+      if (colorMatches(pixelColor, avgColor, tolerance)) {
+        expandedPixels.add(borderPixelKey)
+      }
+    }
+  }
+
+  return expandedPixels
+}
+
+/**
+ * Legacy geometric expansion (kept for backwards compatibility)
  */
 export function expandSelection(
   selectedPixels: Set<string>,
@@ -268,26 +346,21 @@ export function expandSelection(
   height: number
 ): Set<string> {
   const expandedPixels = new Set(selectedPixels)
-  
+
   for (const pixelKey of Array.from(selectedPixels)) {
     const coords = pixelKey.split(',').map(Number)
     if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
       const x = coords[0]
       const y = coords[1]
-      
-      // Add neighboring pixels
+
+      // Add 4-way neighbors only (not diagonal for more precise control)
       const neighbors = [
         { x: x + 1, y },
         { x: x - 1, y },
         { x, y: y + 1 },
-        { x, y: y - 1 },
-        // Diagonal neighbors for smoother expansion
-        { x: x + 1, y: y + 1 },
-        { x: x + 1, y: y - 1 },
-        { x: x - 1, y: y + 1 },
-        { x: x - 1, y: y - 1 }
+        { x, y: y - 1 }
       ]
-      
+
       for (const neighbor of neighbors) {
         if (neighbor.x >= 0 && neighbor.x < width && neighbor.y >= 0 && neighbor.y < height) {
           expandedPixels.add(`${neighbor.x},${neighbor.y}`)
@@ -295,7 +368,7 @@ export function expandSelection(
       }
     }
   }
-  
+
   return expandedPixels
 }
 
@@ -308,13 +381,13 @@ export function contractSelection(
   height: number
 ): Set<string> {
   const contractedPixels = new Set<string>()
-  
+
   for (const pixelKey of Array.from(selectedPixels)) {
     const coords = pixelKey.split(',').map(Number)
     if (coords.length === 2 && coords[0] !== undefined && coords[1] !== undefined) {
       const x = coords[0]
       const y = coords[1]
-      
+
       // Check if all 4-way neighbors are also selected
       const neighbors = [
         `${x + 1},${y}`,
@@ -322,7 +395,7 @@ export function contractSelection(
         `${x},${y + 1}`,
         `${x},${y - 1}`
       ]
-      
+
       const allNeighborsSelected = neighbors.every(neighborKey => {
         const neighborCoords = neighborKey.split(',').map(Number)
         if (neighborCoords.length === 2 && neighborCoords[0] !== undefined && neighborCoords[1] !== undefined) {
@@ -334,12 +407,55 @@ export function contractSelection(
         }
         return false
       })
-      
+
       if (allNeighborsSelected) {
         contractedPixels.add(pixelKey)
       }
     }
   }
-  
+
   return contractedPixels
+}
+
+/**
+ * Add to selection (union operation)
+ * Combines existing selection with new selection
+ */
+export function addToSelection(
+  existingSelection: Set<string>,
+  newSelection: Set<string>
+): Set<string> {
+  const combined = new Set(existingSelection)
+  Array.from(newSelection).forEach(pixel => combined.add(pixel))
+  return combined
+}
+
+/**
+ * Subtract from selection (difference operation)
+ * Removes new selection from existing selection
+ */
+export function subtractFromSelection(
+  existingSelection: Set<string>,
+  selectionToRemove: Set<string>
+): Set<string> {
+  const result = new Set(existingSelection)
+  Array.from(selectionToRemove).forEach(pixel => result.delete(pixel))
+  return result
+}
+
+/**
+ * Intersect selection (intersection operation)
+ * Keeps only pixels that are in both selections
+ */
+export function intersectSelection(
+  selection1: Set<string>,
+  selection2: Set<string>
+): Set<string> {
+  const result = new Set<string>()
+  Array.from(selection1).forEach(pixel => {
+    if (selection2.has(pixel)) {
+      result.add(pixel)
+    }
+  })
+  return result
 }
