@@ -4,12 +4,13 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useProjectStore } from '@/lib/stores/project-store'
 import { createPixelCanvas, hexToRgb } from '@/lib/utils'
 import type { Project, PixelData, CanvasState } from '@/lib/types/api'
-import { performMagicWandSelection, clearSelection } from '@/lib/core/magic-wand'
+import { performMagicWandSelection, clearSelection, expandSelection, contractSelection } from '@/lib/core/magic-wand'
 import { rectangleSelect } from '@/lib/core/rectangle-selection'
 import { circleSelect } from '@/lib/core/circle-selection'
 import { getBrushOffsets } from '@/lib/core/brush-patterns'
 import { SelectionOverlay } from '@/components/canvas/selection-overlay'
 import { BrushCursorOverlay } from '@/components/canvas/brush-cursor-overlay'
+import { SelectionControls } from '@/components/canvas/selection-controls'
 import type { SelectionToolType } from '@/components/toolbar/selection-tool-group'
 
 // Simplified debug logging
@@ -47,6 +48,145 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
   const activeTab = getActiveTab()
   const isPlaying = activeTab?.isPlaying || false
 
+  // Selection modification handlers
+  const handleExpandSelection = useCallback(() => {
+    if (!activeTabId || !canvasState.selection?.isActive || canvasState.selection.selectedPixels.size === 0) return
+
+    const expandedPixels = expandSelection(
+      canvasState.selection.selectedPixels,
+      project.width,
+      project.height
+    )
+
+    // Calculate new bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    expandedPixels.forEach(pixel => {
+      const [x, y] = pixel.split(',').map(Number)
+      if (x !== undefined && y !== undefined) {
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+    })
+
+    updateCanvasState(activeTabId, {
+      selection: {
+        ...canvasState.selection,
+        selectedPixels: expandedPixels,
+        bounds: { minX, maxX, minY, maxY }
+      }
+    })
+
+    canvasDebug('SELECTION', `Expanded selection to ${expandedPixels.size} pixels`)
+  }, [activeTabId, canvasState.selection, project.width, project.height, updateCanvasState])
+
+  const handleContractSelection = useCallback(() => {
+    if (!activeTabId || !canvasState.selection?.isActive || canvasState.selection.selectedPixels.size === 0) return
+
+    const contractedPixels = contractSelection(
+      canvasState.selection.selectedPixels,
+      project.width,
+      project.height
+    )
+
+    if (contractedPixels.size === 0) {
+      // Selection completely contracted - clear it
+      updateCanvasState(activeTabId, {
+        selection: {
+          isActive: false,
+          selectedPixels: new Set(),
+          bounds: null,
+          tolerance: canvasState.selection.tolerance
+        }
+      })
+      canvasDebug('SELECTION', 'Selection contracted to nothing - cleared')
+      return
+    }
+
+    // Calculate new bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    contractedPixels.forEach(pixel => {
+      const [x, y] = pixel.split(',').map(Number)
+      if (x !== undefined && y !== undefined) {
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+    })
+
+    updateCanvasState(activeTabId, {
+      selection: {
+        ...canvasState.selection,
+        selectedPixels: contractedPixels,
+        bounds: { minX, maxX, minY, maxY }
+      }
+    })
+
+    canvasDebug('SELECTION', `Contracted selection to ${contractedPixels.size} pixels`)
+  }, [activeTabId, canvasState.selection, project.width, project.height, updateCanvasState])
+
+  const handleClearSelection = useCallback(() => {
+    if (!activeTabId || !canvasState.selection?.isActive) return
+
+    updateCanvasState(activeTabId, {
+      selection: {
+        isActive: false,
+        selectedPixels: new Set(),
+        bounds: null,
+        tolerance: canvasState.selection?.tolerance || 0
+      }
+    })
+
+    canvasDebug('SELECTION', 'Selection cleared')
+  }, [activeTabId, canvasState.selection, updateCanvasState])
+
+  const handleInvertSelection = useCallback(() => {
+    if (!activeTabId || !canvasData) return
+
+    const currentSelection = canvasState.selection?.selectedPixels || new Set<string>()
+    const invertedSelection = new Set<string>()
+
+    // Invert selection: select all pixels NOT in current selection
+    for (let y = 0; y < project.height; y++) {
+      for (let x = 0; x < project.width; x++) {
+        const pixelKey = `${x},${y}`
+        if (!currentSelection.has(pixelKey)) {
+          invertedSelection.add(pixelKey)
+        }
+      }
+    }
+
+    if (invertedSelection.size === 0) {
+      handleClearSelection()
+      return
+    }
+
+    // Calculate bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    invertedSelection.forEach(pixel => {
+      const [x, y] = pixel.split(',').map(Number)
+      if (x !== undefined && y !== undefined) {
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+    })
+
+    updateCanvasState(activeTabId, {
+      selection: {
+        isActive: true,
+        selectedPixels: invertedSelection,
+        bounds: { minX, maxX, minY, maxY },
+        tolerance: canvasState.selection?.tolerance || 0
+      }
+    })
+
+    canvasDebug('SELECTION', `Inverted selection to ${invertedSelection.size} pixels`)
+  }, [activeTabId, canvasData, canvasState.selection, project.width, project.height, updateCanvasState, handleClearSelection])
+
   // Handle keyboard shortcuts for selection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,15 +197,31 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           // Clear selection
           if (canvasState.selection.isActive) {
             e.preventDefault()
-            updateCanvasState(activeTabId, {
-              selection: {
-                isActive: false,
-                selectedPixels: new Set(),
-                bounds: null,
-                tolerance: canvasState.selection.tolerance
-              }
-            })
-            canvasDebug('SELECTION', 'Selection cleared via Escape key')
+            handleClearSelection()
+          }
+          break
+        case '+':
+        case '=':
+          // Expand selection (Shift + Plus)
+          if (e.shiftKey && canvasState.selection.isActive && canvasState.selection.selectedPixels.size > 0) {
+            e.preventDefault()
+            handleExpandSelection()
+          }
+          break
+        case '-':
+        case '_':
+          // Contract selection (Shift + Minus)
+          if (e.shiftKey && canvasState.selection.isActive && canvasState.selection.selectedPixels.size > 0) {
+            e.preventDefault()
+            handleContractSelection()
+          }
+          break
+        case 'i':
+        case 'I':
+          // Invert selection (Ctrl+Shift+I)
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+            e.preventDefault()
+            handleInvertSelection()
           }
           break
         case 'Delete':
@@ -74,7 +230,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
           if (canvasState.selection.isActive && canvasState.selection.selectedPixels.size > 0 && canvasData) {
             e.preventDefault()
             const newData = new Uint8ClampedArray(canvasData.data)
-            
+
             // Make selected pixels transparent
             for (const pixelKey of Array.from(canvasState.selection.selectedPixels)) {
               const coords = pixelKey.split(',').map(Number)
@@ -92,17 +248,10 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
             }
 
             updateCanvasData(activeTabId, updatedCanvasData)
-            
+
             // Clear selection after deletion
-            updateCanvasState(activeTabId, {
-              selection: {
-                isActive: false,
-                selectedPixels: new Set(),
-                bounds: null,
-                tolerance: canvasState.selection.tolerance
-              }
-            })
-            
+            handleClearSelection()
+
             canvasDebug('SELECTION', `Deleted ${canvasState.selection.selectedPixels.size} selected pixels`)
           }
           break
@@ -118,7 +267,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
                   allPixels.add(`${x},${y}`)
                 }
               }
-              
+
               updateCanvasState(activeTabId, {
                 selection: {
                   isActive: true,
@@ -132,7 +281,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
                   tolerance: canvasState.selection.tolerance
                 }
               })
-              
+
               canvasDebug('SELECTION', `Selected all ${allPixels.size} pixels`)
             }
           }
@@ -142,7 +291,7 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTabId, canvasState.selection, canvasData, project.width, project.height, updateCanvasState, updateCanvasData])
+  }, [activeTabId, canvasState.selection, canvasData, project.width, project.height, updateCanvasState, updateCanvasData, handleExpandSelection, handleContractSelection, handleClearSelection, handleInvertSelection])
 
   // Component mounted
 
@@ -822,6 +971,18 @@ export function PixelCanvas({ project, canvasData, canvasState }: PixelCanvasPro
              : `${canvasState.tool} | ${canvasState.zoom}x`}
         </div>
       </div>
+
+      {/* Selection Controls - Floating UI */}
+      {canvasState.selection?.isActive && canvasState.selection.selectedPixels.size > 0 && !isPlaying && (
+        <SelectionControls
+          selectedPixelCount={canvasState.selection.selectedPixels.size}
+          onExpand={handleExpandSelection}
+          onContract={handleContractSelection}
+          onClear={handleClearSelection}
+          onInvert={handleInvertSelection}
+          disabled={false}
+        />
+      )}
     </div>
   )
 }
