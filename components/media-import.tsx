@@ -298,16 +298,16 @@ export function MediaImport({ className, onImportSuccess }: MediaImportProps) {
       }
       
       setSuccess(successMessage)
-      
-      // Auto-select first frame after successful import and close popup for multi-frame imports
+
+      // Auto-select first frame after successful import and close popup
       setTimeout(() => {
         if (activeTabId && result.frames && result.frames.length > 0) {
           const firstFrame = result.frames[0]
           if (firstFrame && firstFrame.frame && firstFrame.frame.id) {
             setActiveFrame(activeTabId, firstFrame.frame.id)
-            
-            // Auto-close import modal after successful GIF/multi-frame import
-            if ((mediaType === 'gif' || mediaType === 'video') && frameCount > 1 && onImportSuccess) {
+
+            // Auto-close import modal after successful import
+            if (onImportSuccess) {
               onImportSuccess()
             }
           }
